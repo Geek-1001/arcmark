@@ -7,8 +7,6 @@ final class MainViewController: NSViewController {
     private let workspacePopup = NSPopUpButton()
     private let workspaceActionsButton = NSButton()
     private let searchField = NSSearchField()
-    private let urlField = NSTextField()
-    private let addButton = NSButton(title: "Add", target: nil, action: nil)
     private let pasteButton = NSButton(title: "Paste", target: nil, action: nil)
     private let collectionView = ContextMenuCollectionView()
     private let scrollView = NSScrollView()
@@ -75,17 +73,6 @@ final class MainViewController: NSViewController {
         searchField.placeholderString = "Search in workspace"
         searchField.delegate = self
 
-        urlField.translatesAutoresizingMaskIntoConstraints = false
-        urlField.placeholderString = "Paste or type a URL"
-        urlField.delegate = self
-        urlField.target = self
-        urlField.action = #selector(addLinkFromField)
-
-        addButton.translatesAutoresizingMaskIntoConstraints = false
-        addButton.bezelStyle = .rounded
-        addButton.target = self
-        addButton.action = #selector(addLinkFromField)
-
         pasteButton.translatesAutoresizingMaskIntoConstraints = false
         pasteButton.bezelStyle = .rounded
         pasteButton.target = self
@@ -134,8 +121,6 @@ final class MainViewController: NSViewController {
 
         let bottomBar = NSView()
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
-        bottomBar.addSubview(urlField)
-        bottomBar.addSubview(addButton)
         bottomBar.addSubview(pasteButton)
 
         let stack = NSStackView(views: [topBar, searchField, scrollView, bottomBar])
@@ -156,17 +141,9 @@ final class MainViewController: NSViewController {
             workspaceActionsButton.widthAnchor.constraint(equalToConstant: 20),
             workspaceActionsButton.heightAnchor.constraint(equalToConstant: 20),
 
-            urlField.leadingAnchor.constraint(equalTo: bottomBar.leadingAnchor, constant: 12),
-            urlField.centerYAnchor.constraint(equalTo: bottomBar.centerYAnchor),
-
-            addButton.leadingAnchor.constraint(equalTo: urlField.trailingAnchor, constant: 8),
-            addButton.centerYAnchor.constraint(equalTo: bottomBar.centerYAnchor),
-
-            pasteButton.leadingAnchor.constraint(equalTo: addButton.trailingAnchor, constant: 8),
             pasteButton.trailingAnchor.constraint(equalTo: bottomBar.trailingAnchor, constant: -12),
             pasteButton.centerYAnchor.constraint(equalTo: bottomBar.centerYAnchor),
-
-            urlField.heightAnchor.constraint(equalToConstant: 26),
+            pasteButton.leadingAnchor.constraint(greaterThanOrEqualTo: bottomBar.leadingAnchor, constant: 12),
 
             stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
@@ -481,6 +458,32 @@ final class MainViewController: NSViewController {
         return nil
     }
 
+    private func extractUrls(from text: String) -> [URL] {
+        let pattern = #"(?i)\b(?:https?://[^\s<>"',;]+|localhost(?::\d+)?(?:/[^\s<>"',;]*)?)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let range = NSRange(text.startIndex..., in: text)
+        var urls: [URL] = []
+
+        regex.enumerateMatches(in: text, range: range) { match, _, _ in
+            guard let matchRange = match?.range,
+                  let stringRange = Range(matchRange, in: text) else { return }
+            let candidate = stripTrailingPunctuation(from: String(text[stringRange]))
+            if let url = normalizedUrl(from: candidate) {
+                urls.append(url)
+            }
+        }
+
+        return urls
+    }
+
+    private func stripTrailingPunctuation(from value: String) -> String {
+        var trimmed = value
+        while let last = trimmed.last, ".,;:)]}?!".contains(last) {
+            trimmed.removeLast()
+        }
+        return trimmed
+    }
+
     private func titleForUrl(_ url: URL) -> String {
         if let host = url.host {
             return host
@@ -696,21 +699,13 @@ final class MainViewController: NSViewController {
         return value.isEmpty ? nil : value
     }
 
-    @objc private func addLinkFromField() {
-        guard let url = normalizedUrl(from: urlField.stringValue) else { return }
-        let linkId = model.addLink(urlString: url.absoluteString, title: titleForUrl(url), parentId: nil)
-        fetchTitleForNewLink(id: linkId, url: url)
-        urlField.stringValue = ""
-    }
-
     @objc private func pasteLink() {
-        if let pasted = NSPasteboard.general.string(forType: .string),
-           let url = normalizedUrl(from: pasted) {
+        guard let pasted = NSPasteboard.general.string(forType: .string) else { return }
+        let urls = extractUrls(from: pasted)
+        guard !urls.isEmpty else { return }
+        for url in urls {
             let linkId = model.addLink(urlString: url.absoluteString, title: titleForUrl(url), parentId: nil)
             fetchTitleForNewLink(id: linkId, url: url)
-            urlField.stringValue = ""
-        } else if let pasted = NSPasteboard.general.string(forType: .string) {
-            urlField.stringValue = pasted
         }
     }
 
@@ -918,7 +913,7 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
     }
 }
 
-extension MainViewController: NSSearchFieldDelegate, NSTextFieldDelegate {
+extension MainViewController: NSSearchFieldDelegate {
     func controlTextDidChange(_ obj: Notification) {
         if let field = obj.object as? NSSearchField, field == searchField {
             currentQuery = field.stringValue
