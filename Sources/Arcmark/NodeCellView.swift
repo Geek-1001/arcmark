@@ -22,12 +22,12 @@ final class NodeCellView: NSTableCellView {
 
     private func setupViews() {
         wantsLayer = true
-        layer?.cornerRadius = 8
+        layer?.cornerRadius = 12
         layer?.masksToBounds = true
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.imageScaling = .scaleProportionallyDown
         iconView.wantsLayer = true
-        iconView.layer?.cornerRadius = 8
+        iconView.layer?.cornerRadius = 6
         iconView.layer?.masksToBounds = true
 
         titleField.translatesAutoresizingMaskIntoConstraints = false

@@ -29,7 +29,7 @@ final class NodeRowView: NSView {
 
     private func setupViews() {
         wantsLayer = true
-        layer?.cornerRadius = 8
+        layer?.cornerRadius = 12
         layer?.masksToBounds = true
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
