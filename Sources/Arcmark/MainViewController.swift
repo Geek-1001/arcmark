@@ -7,7 +7,11 @@ final class MainViewController: NSViewController {
     private let workspacePopup = NSPopUpButton()
     private let workspaceActionsButton = NSButton()
     private let searchField = NSSearchField()
-    private let pasteButton = NSButton(title: "Paste", target: nil, action: nil)
+    private let pasteButton = IconTitleButton(
+        title: "Add links from clipboard",
+        symbolName: "plus",
+        style: .pasteAction
+    )
     private let collectionView = ContextMenuCollectionView()
     private let scrollView = NSScrollView()
     private let contextMenu = NSMenu()
@@ -76,7 +80,6 @@ final class MainViewController: NSViewController {
         searchField.delegate = self
 
         pasteButton.translatesAutoresizingMaskIntoConstraints = false
-        pasteButton.bezelStyle = .rounded
         pasteButton.target = self
         pasteButton.action = #selector(pasteLink)
 
@@ -129,6 +132,7 @@ final class MainViewController: NSViewController {
         stack.orientation = .vertical
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.alignment = .centerX
 
         view.addSubview(stack)
 
@@ -143,9 +147,13 @@ final class MainViewController: NSViewController {
             workspaceActionsButton.widthAnchor.constraint(equalToConstant: 20),
             workspaceActionsButton.heightAnchor.constraint(equalToConstant: 20),
 
-            pasteButton.trailingAnchor.constraint(equalTo: bottomBar.trailingAnchor, constant: -12),
-            pasteButton.centerYAnchor.constraint(equalTo: bottomBar.centerYAnchor),
-            pasteButton.leadingAnchor.constraint(greaterThanOrEqualTo: bottomBar.leadingAnchor, constant: 12),
+            pasteButton.leadingAnchor.constraint(equalTo: bottomBar.leadingAnchor),
+            pasteButton.trailingAnchor.constraint(equalTo: bottomBar.trailingAnchor),
+            pasteButton.topAnchor.constraint(equalTo: bottomBar.topAnchor),
+            pasteButton.bottomAnchor.constraint(equalTo: bottomBar.bottomAnchor),
+
+            bottomBar.leadingAnchor.constraint(equalTo: stack.leadingAnchor),
+            bottomBar.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
 
             stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
@@ -153,7 +161,7 @@ final class MainViewController: NSViewController {
             stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -12),
 
             topBar.heightAnchor.constraint(equalToConstant: 30),
-            bottomBar.heightAnchor.constraint(equalToConstant: 36)
+            bottomBar.heightAnchor.constraint(equalToConstant: pasteButton.style.height)
         ])
 
         NSLayoutConstraint.activate([
