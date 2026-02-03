@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var window: NSWindow?
     private var mainViewController: MainViewController?
     private var preferencesWindowController: PreferencesWindowController?
@@ -25,24 +25,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.isOpaque = false
+        window.isReleasedWhenClosed = false
         window.backgroundColor = model.currentWorkspace.colorId.backgroundColor
         window.minSize = NSSize(width: 280, height: 420)
         window.maxSize = NSSize(width: 520, height: 1200)
         let windowAutosaveName = "ArcmarkMainWindow"
         window.setFrameAutosaveName(windowAutosaveName)
-        let restoredFrame = window.setFrameUsingName(windowAutosaveName)
+        let restoredSize = applySavedWindowSize(to: window)
+        let restoredFrame = restoredSize ? false : window.setFrameUsingName(windowAutosaveName)
         window.collectionBehavior = [.moveToActiveSpace]
         window.contentViewController = mainViewController
-        if !restoredFrame {
+        if !restoredSize && !restoredFrame {
             window.center()
         }
         ensureWindowVisible(window)
+        window.delegate = self
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
 
         self.window = window
         applyAlwaysOnTopFromDefaults()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let window {
+            saveWindowSize(window)
+        }
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        saveWindowSize(window)
     }
 
     private func ensureWindowVisible(_ window: NSWindow) {
@@ -54,6 +68,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             y: screenFrame.midY - window.frame.height / 2
         )
         window.setFrameOrigin(origin)
+    }
+
+    private func applySavedWindowSize(to window: NSWindow) -> Bool {
+        guard let sizeString = UserDefaults.standard.string(forKey: UserDefaultsKeys.mainWindowSize) else {
+            return false
+        }
+        let savedSize = NSSizeFromString(sizeString)
+        guard savedSize.width > 0, savedSize.height > 0 else { return false }
+
+        let clampedWidth = min(max(savedSize.width, window.minSize.width), window.maxSize.width)
+        let clampedHeight = min(max(savedSize.height, window.minSize.height), window.maxSize.height)
+        var frame = window.frame
+        frame.size = NSSize(width: clampedWidth, height: clampedHeight)
+        window.setFrame(frame, display: false)
+        return true
+    }
+
+    private func saveWindowSize(_ window: NSWindow) {
+        let sizeString = NSStringFromSize(window.frame.size)
+        UserDefaults.standard.set(sizeString, forKey: UserDefaultsKeys.mainWindowSize)
     }
 
     private func setupMenus() {
@@ -81,6 +115,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let windowMenu = NSMenu(title: "Window")
         windowMenuItem.submenu = windowMenu
         NSApplication.shared.windowsMenu = windowMenu
+        let showWindowItem = NSMenuItem(title: "Show Arcmark", action: #selector(showMainWindow), keyEquivalent: "")
+        showWindowItem.target = self
+        windowMenu.addItem(showWindowItem)
         let alwaysOnTopItem = NSMenuItem(title: "Always on Top", action: #selector(toggleAlwaysOnTop), keyEquivalent: "t")
         alwaysOnTopItem.keyEquivalentModifierMask = [.command, .option]
         windowMenu.addItem(alwaysOnTopItem)
@@ -96,6 +133,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let enabled = UserDefaults.standard.bool(forKey: UserDefaultsKeys.alwaysOnTopEnabled)
         alwaysOnTopMenuItem?.state = enabled ? .on : .off
         window?.level = enabled ? .floating : .normal
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showMainWindow()
+        return true
+    }
+
+    @objc private func showMainWindow() {
+        guard let window else { return }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc private func toggleAlwaysOnTop() {

@@ -4,12 +4,13 @@ enum UserDefaultsKeys {
     static let defaultBrowserBundleId = "defaultBrowserBundleId"
     static let alwaysOnTopEnabled = "alwaysOnTopEnabled"
     static let lastSelectedWorkspaceId = "lastSelectedWorkspaceId"
+    static let mainWindowSize = "mainWindowSize"
 }
 
 let nodePasteboardType = NSPasteboard.PasteboardType("com.arcmark.node")
 
 struct ListMetrics {
-    let rowHeight: CGFloat = 42
+    let rowHeight: CGFloat = 40
     let verticalGap: CGFloat = 4
     let leftPadding: CGFloat = 8
     let iconSize: CGFloat = 20
