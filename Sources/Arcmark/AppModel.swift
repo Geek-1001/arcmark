@@ -197,10 +197,6 @@ final class AppModel {
         return true
     }
 
-    func nodesForWorkspace(id: UUID) -> [Node] {
-        state.workspaces.first(where: { $0.id == id })?.items ?? []
-    }
-
     func location(of nodeId: UUID) -> NodeLocation? {
         findNodeLocation(id: nodeId, nodes: currentWorkspace.items)
     }
