@@ -28,7 +28,7 @@ struct Folder: Codable, Identifiable, Equatable {
     var isExpanded: Bool
 }
 
-enum Node: Codable, Identifiable, Equatable {
+enum Node: Codable, Identifiable, Equatable, Hashable {
     case folder(Folder)
     case link(Link)
 
@@ -59,6 +59,14 @@ enum Node: Codable, Identifiable, Equatable {
         case .link(let link):
             return link.title
         }
+    }
+
+    static func == (lhs: Node, rhs: Node) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 
     init(from decoder: Decoder) throws {
