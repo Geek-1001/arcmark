@@ -27,6 +27,8 @@ final class MainViewController: NSViewController {
     private let rowAnimationOffset: CGFloat = 10
     private weak var inlineRenameItem: NodeCollectionViewItem?
     private var inlineRenameNodeId: UUID?
+    private var pendingInlineRenameId: UUID?
+    private var suppressNextSelection = false
 
     init(model: AppModel) {
         self.model = model
@@ -187,6 +189,7 @@ final class MainViewController: NSViewController {
         let forceExpand = !currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let newRows = buildVisibleRows(nodes: filteredItems, depth: 0, forceExpand: forceExpand)
         applyVisibleRows(newRows)
+        handlePendingInlineRename()
         hasLoaded = true
     }
 
@@ -626,9 +629,12 @@ final class MainViewController: NSViewController {
         }
     }
 
-    func promptCreateFolder(parentId: UUID?) {
-        guard let name = promptForText(title: "New Folder", message: "Enter a folder name.", defaultValue: "New Folder") else { return }
-        model.addFolder(name: name, parentId: parentId)
+    func createFolderAndBeginRename(parentId: UUID?) {
+        if let parentId {
+            model.setFolderExpanded(id: parentId, isExpanded: true)
+        }
+        let newId = model.addFolder(name: "Untitled", parentId: parentId)
+        scheduleInlineRename(for: newId)
     }
 
     private func promptRenameNode(id: UUID, currentName: String) {
@@ -668,6 +674,7 @@ final class MainViewController: NSViewController {
     }
 
     private func handleInlineRenameCancelled() {
+        suppressNextSelection = true
         clearInlineRenameState()
     }
 
@@ -682,6 +689,27 @@ final class MainViewController: NSViewController {
     private func clearInlineRenameState() {
         inlineRenameItem = nil
         inlineRenameNodeId = nil
+    }
+
+    private func scheduleInlineRename(for nodeId: UUID) {
+        pendingInlineRenameId = nodeId
+    }
+
+    private func handlePendingInlineRename() {
+        guard let nodeId = pendingInlineRenameId else { return }
+        guard let index = visibleRows.firstIndex(where: { $0.id == nodeId }) else { return }
+        let indexPath = IndexPath(item: index, section: 0)
+        pendingInlineRenameId = nil
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.collectionView.scrollToItems(at: [indexPath], scrollPosition: .centeredVertically)
+            if self.collectionView.item(at: indexPath) is NodeCollectionViewItem {
+                self.beginInlineRename(nodeId: nodeId, indexPath: indexPath)
+            } else {
+                self.pendingInlineRenameId = nodeId
+            }
+        }
     }
 
     private func promptForText(title: String, message: String, defaultValue: String) -> String? {
@@ -806,6 +834,11 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             if self.isDraggingItems { return }
+            if self.suppressNextSelection {
+                self.suppressNextSelection = false
+                self.collectionView.deselectItems(at: indexPaths)
+                return
+            }
             if self.inlineRenameNodeId != nil {
                 self.collectionView.deselectItems(at: indexPaths)
                 return
@@ -973,12 +1006,12 @@ extension MainViewController: NSMenuDelegate {
     }
 
     @objc private func contextNewFolder() {
-        promptCreateFolder(parentId: nil)
+        createFolderAndBeginRename(parentId: nil)
     }
 
     @objc private func contextNewNestedFolder() {
         guard let nodeId = contextNodeId else { return }
-        promptCreateFolder(parentId: nodeId)
+        createFolderAndBeginRename(parentId: nodeId)
     }
 
     @objc private func contextRename() {
