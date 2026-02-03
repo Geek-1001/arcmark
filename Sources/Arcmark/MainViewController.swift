@@ -6,7 +6,7 @@ final class MainViewController: NSViewController {
 
     private let workspacePopup = NSPopUpButton()
     private let workspaceActionsButton = NSButton()
-    private let searchField = NSSearchField()
+    private let searchField = SearchBarView(style: .defaultSearch)
     private let pasteButton = IconTitleButton(
         title: "Add links from clipboard",
         symbolName: "plus",
@@ -76,8 +76,11 @@ final class MainViewController: NSViewController {
         workspaceActionsButton.action = #selector(showWorkspaceActionsMenu)
 
         searchField.translatesAutoresizingMaskIntoConstraints = false
-        searchField.placeholderString = "Search in workspace"
-        searchField.delegate = self
+        searchField.placeholder = "Search in workspace"
+        searchField.onTextChange = { [weak self] text in
+            self?.currentQuery = text
+            self?.reloadData()
+        }
 
         pasteButton.translatesAutoresizingMaskIntoConstraints = false
         pasteButton.target = self
@@ -951,15 +954,6 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
         if targetIndex < 0 { targetIndex = model.currentWorkspace.items.count }
         model.moveNode(id: nodeId, toParentId: targetParentId, index: targetIndex)
         return true
-    }
-}
-
-extension MainViewController: NSSearchFieldDelegate {
-    func controlTextDidChange(_ obj: Notification) {
-        if let field = obj.object as? NSSearchField, field == searchField {
-            currentQuery = field.stringValue
-            reloadData()
-        }
     }
 }
 
