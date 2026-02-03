@@ -27,6 +27,8 @@ final class MainViewController: NSViewController {
     private var pendingInsertedIds: Set<UUID> = []
     private let rowAnimationDuration: TimeInterval = 0.16
     private let rowAnimationOffset: CGFloat = 10
+    private weak var inlineRenameItem: NodeCollectionViewItem?
+    private var inlineRenameNodeId: UUID?
 
     init(model: AppModel) {
         self.model = model
@@ -199,6 +201,9 @@ final class MainViewController: NSViewController {
     }
 
     private func reloadData() {
+        if inlineRenameNodeId != nil, inlineRenameItem == nil {
+            clearInlineRenameState()
+        }
         reloadWorkspaceMenu()
         applyWorkspaceStyling()
         applyFilter()
@@ -628,6 +633,54 @@ final class MainViewController: NSViewController {
         model.renameNode(id: id, newName: newName)
     }
 
+    private func beginInlineRename(nodeId: UUID, indexPath: IndexPath) {
+        cancelInlineRename()
+        guard model.nodeById(nodeId) != nil,
+              let item = collectionView.item(at: indexPath) as? NodeCollectionViewItem else {
+            clearInlineRenameState()
+            return
+        }
+
+        inlineRenameNodeId = nodeId
+        inlineRenameItem = item
+        item.beginInlineRename(onCommit: { [weak self] newName in
+            self?.commitInlineRename(newName)
+        }, onCancel: { [weak self] in
+            self?.handleInlineRenameCancelled()
+        })
+    }
+
+    private func commitInlineRename(_ newName: String) {
+        guard let nodeId = inlineRenameNodeId else {
+            clearInlineRenameState()
+            return
+        }
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            handleInlineRenameCancelled()
+            return
+        }
+        model.renameNode(id: nodeId, newName: trimmed)
+        clearInlineRenameState()
+    }
+
+    private func handleInlineRenameCancelled() {
+        clearInlineRenameState()
+    }
+
+    private func cancelInlineRename() {
+        if let item = inlineRenameItem {
+            item.cancelInlineRename()
+        } else {
+            clearInlineRenameState()
+        }
+    }
+
+    private func clearInlineRenameState() {
+        inlineRenameItem = nil
+        inlineRenameNodeId = nil
+    }
+
     private func promptForText(title: String, message: String, defaultValue: String) -> String? {
         let alert = NSAlert()
         alert.messageText = title
@@ -758,6 +811,10 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             if self.isDraggingItems { return }
+            if self.inlineRenameNodeId != nil {
+                self.collectionView.deselectItems(at: indexPaths)
+                return
+            }
             if !self.collectionView.selectionIndexPaths.contains(indexPath) { return }
 
             switch row.node {
@@ -930,8 +987,9 @@ extension MainViewController: NSMenuDelegate {
     }
 
     @objc private func contextRename() {
-        guard let nodeId = contextNodeId, let node = model.nodeById(nodeId) else { return }
-        promptRenameNode(id: nodeId, currentName: node.displayName)
+        guard let indexPath = contextIndexPath,
+              let row = row(at: indexPath) else { return }
+        beginInlineRename(nodeId: row.id, indexPath: indexPath)
     }
 
     @objc private func contextDelete() {

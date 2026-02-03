@@ -31,4 +31,16 @@ final class NodeCollectionViewItem: NSCollectionViewItem {
     func refreshHoverState() {
         rowView.refreshHoverState()
     }
+
+    var isInlineRenaming: Bool {
+        rowView.isInlineRenaming
+    }
+
+    func beginInlineRename(onCommit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+        rowView.beginInlineRename(onCommit: onCommit, onCancel: onCancel)
+    }
+
+    func cancelInlineRename() {
+        rowView.cancelInlineRename()
+    }
 }
