@@ -22,6 +22,10 @@ final class MainViewController: NSViewController {
     private var contextIndexPath: IndexPath?
     private var isReloadScheduled = false
     private var isDraggingItems = false
+    private var hasLoaded = false
+    private var pendingInsertedIds: Set<UUID> = []
+    private let rowAnimationDuration: TimeInterval = 0.16
+    private let rowAnimationOffset: CGFloat = 10
 
     init(model: AppModel) {
         self.model = model
@@ -89,6 +93,7 @@ final class MainViewController: NSViewController {
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.isSelectable = true
+        collectionView.wantsLayer = true
         collectionView.backgroundColors = [.clear]
         collectionView.collectionViewLayout = makeCollectionLayout()
         collectionView.register(NodeCollectionViewItem.self, forItemWithIdentifier: NodeCollectionViewItem.identifier)
@@ -171,26 +176,7 @@ final class MainViewController: NSViewController {
     }
 
     private func makeCollectionLayout() -> NSCollectionViewLayout {
-        let metrics = listMetrics
-        let itemSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0),
-            heightDimension: .absolute(metrics.rowHeight)
-        )
-        let item = NSCollectionLayoutItem(layoutSize: itemSize)
-        let groupSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0),
-            heightDimension: .absolute(metrics.rowHeight)
-        )
-        let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
-        let section = NSCollectionLayoutSection(group: group)
-        section.interGroupSpacing = metrics.verticalGap
-        section.contentInsets = NSDirectionalEdgeInsets(
-            top: metrics.verticalGap,
-            leading: 0,
-            bottom: metrics.verticalGap,
-            trailing: 0
-        )
-        return NSCollectionViewCompositionalLayout(section: section)
+        ListFlowLayout(metrics: listMetrics)
     }
 
     private func bindModel() {
@@ -211,8 +197,9 @@ final class MainViewController: NSViewController {
         applyWorkspaceStyling()
         applyFilter()
         let forceExpand = !currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        visibleRows = buildVisibleRows(nodes: filteredItems, depth: 0, forceExpand: forceExpand)
-        collectionView.reloadData()
+        let newRows = buildVisibleRows(nodes: filteredItems, depth: 0, forceExpand: forceExpand)
+        applyVisibleRows(newRows)
+        hasLoaded = true
     }
 
     private func reloadWorkspaceMenu() {
@@ -286,6 +273,64 @@ final class MainViewController: NSViewController {
         return rows
     }
 
+    private func applyVisibleRows(_ newRows: [NodeListRow]) {
+        let queryActive = !currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if !hasLoaded || queryActive || collectionView.window == nil {
+            visibleRows = newRows
+            collectionView.reloadData()
+            return
+        }
+
+        let oldRows = visibleRows
+        let oldIds = oldRows.map { $0.id }
+        let newIds = newRows.map { $0.id }
+        let oldSet = Set(oldIds)
+        let newSet = Set(newIds)
+
+        if oldSet == newSet {
+            visibleRows = newRows
+            collectionView.reloadData()
+            return
+        }
+
+        var deletedIndexPaths: [IndexPath] = []
+        for (index, row) in oldRows.enumerated() where !newSet.contains(row.id) {
+            deletedIndexPaths.append(IndexPath(item: index, section: 0))
+        }
+
+        var insertedIndexPaths: [IndexPath] = []
+        for (index, row) in newRows.enumerated() where !oldSet.contains(row.id) {
+            insertedIndexPaths.append(IndexPath(item: index, section: 0))
+        }
+
+        let deletionSnapshots = makeDeletionSnapshots(for: deletedIndexPaths)
+
+        performListUpdates(
+            newRows: newRows,
+            insertedIndexPaths: insertedIndexPaths,
+            deletedIndexPaths: deletedIndexPaths
+        )
+        animateDeletionSnapshots(deletionSnapshots)
+    }
+
+    private func performListUpdates(newRows: [NodeListRow],
+                                    insertedIndexPaths: [IndexPath],
+                                    deletedIndexPaths: [IndexPath]) {
+        pendingInsertedIds = Set(insertedIndexPaths.compactMap { indexPath in
+            guard indexPath.item < newRows.count else { return nil }
+            return newRows[indexPath.item].id
+        })
+        visibleRows = newRows
+        collectionView.performBatchUpdates({
+            if !deletedIndexPaths.isEmpty {
+                collectionView.deleteItems(at: Set(deletedIndexPaths))
+            }
+            if !insertedIndexPaths.isEmpty {
+                collectionView.insertItems(at: Set(insertedIndexPaths))
+            }
+        }, completionHandler: nil)
+    }
+
     @objc private func handleScrollBoundsChanged() {
         for item in collectionView.visibleItems() {
             (item as? NodeCollectionViewItem)?.refreshHoverState()
@@ -295,6 +340,61 @@ final class MainViewController: NSViewController {
     private func row(at indexPath: IndexPath) -> NodeListRow? {
         guard indexPath.item >= 0, indexPath.item < visibleRows.count else { return nil }
         return visibleRows[indexPath.item]
+    }
+
+    private func animateInsert(item: NSCollectionViewItem) {
+        let view = item.view
+        view.wantsLayer = true
+        let finalOrigin = view.frame.origin
+        view.alphaValue = 0
+        view.frame.origin = NSPoint(x: finalOrigin.x, y: finalOrigin.y - rowAnimationOffset)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = rowAnimationDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.allowsImplicitAnimation = true
+            view.animator().setFrameOrigin(finalOrigin)
+            view.animator().alphaValue = 1
+        }
+    }
+
+    private func makeDeletionSnapshots(for indexPaths: [IndexPath]) -> [NSImageView] {
+        var snapshots: [NSImageView] = []
+        for indexPath in indexPaths {
+            guard let item = collectionView.item(at: indexPath) else { continue }
+            let view = item.view
+            guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            let image = NSImage(size: view.bounds.size)
+            image.addRepresentation(rep)
+            let frame = view.convert(view.bounds, to: collectionView)
+            let imageView = NSImageView(frame: frame)
+            imageView.image = image
+            imageView.imageScaling = .scaleAxesIndependently
+            collectionView.addSubview(imageView)
+            view.alphaValue = 0
+            snapshots.append(imageView)
+        }
+        return snapshots
+    }
+
+    private func animateDeletionSnapshots(_ snapshots: [NSImageView]) {
+        guard !snapshots.isEmpty else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = rowAnimationDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.allowsImplicitAnimation = true
+            for snapshot in snapshots {
+                let finalOrigin = NSPoint(x: snapshot.frame.origin.x, y: snapshot.frame.origin.y - rowAnimationOffset)
+                snapshot.animator().setFrameOrigin(finalOrigin)
+                snapshot.animator().alphaValue = 0
+            }
+        } completionHandler: {
+            DispatchQueue.main.async {
+                for snapshot in snapshots {
+                    snapshot.removeFromSuperview()
+                }
+            }
+        }
     }
 
     private func shouldDropOnItem(at indexPath: IndexPath, draggingInfo: NSDraggingInfo) -> Bool {
@@ -583,6 +683,17 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
         return nodeItem
     }
 
+    func collectionView(_ collectionView: NSCollectionView,
+                        willDisplay item: NSCollectionViewItem,
+                        forRepresentedObjectAt indexPath: IndexPath) {
+        guard let row = row(at: indexPath) else { return }
+        if pendingInsertedIds.remove(row.id) != nil {
+            animateInsert(item: item)
+        } else {
+            item.view.alphaValue = 1
+        }
+    }
+
     func collectionView(_ collectionView: NSCollectionView, canDragItemsAt indexPaths: Set<IndexPath>, with event: NSEvent) -> Bool {
         currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -778,7 +889,12 @@ extension MainViewController: NSMenuDelegate {
 private struct NodeListRow {
     let node: Node
     let depth: Int
+
+    var id: UUID {
+        node.id
+    }
 }
+
 
 private final class ContextMenuCollectionView: NSCollectionView {
     var onContextRequest: ((IndexPath?) -> Void)?
