@@ -10,6 +10,7 @@ final class NodeCollectionViewItem: NSCollectionViewItem {
 
     func configure(title: String,
                    icon: NSImage?,
+                   titleFont: NSFont,
                    depth: Int,
                    metrics: ListMetrics,
                    showDelete: Bool,
@@ -20,6 +21,7 @@ final class NodeCollectionViewItem: NSCollectionViewItem {
         rowView.configure(
             title: title,
             icon: icon,
+            titleFont: titleFont,
             showDelete: showDelete,
             metrics: metrics,
             onDelete: onDelete

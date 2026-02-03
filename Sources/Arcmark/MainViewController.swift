@@ -688,19 +688,20 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
 
         switch row.node {
         case .folder(let folder):
-            let iconName = folder.isExpanded ? "folder.fill" : "folder"
-            let icon = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)
+            let icon = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
             icon?.isTemplate = true
             nodeItem.configure(
                 title: folder.name,
                 icon: icon,
+                titleFont: listMetrics.folderTitleFont,
                 depth: row.depth,
                 metrics: listMetrics,
                 showDelete: false,
                 onDelete: nil
             )
         case .link(let link):
-            let placeholder = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
+            let globeIconConfig = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+            let placeholder = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?.withSymbolConfiguration(globeIconConfig)
             placeholder?.isTemplate = true
             var iconToUse = placeholder
             var shouldFetch = true
@@ -715,6 +716,7 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
             nodeItem.configure(
                 title: link.title,
                 icon: iconToUse,
+                titleFont: listMetrics.linkTitleFont,
                 depth: row.depth,
                 metrics: listMetrics,
                 showDelete: true,

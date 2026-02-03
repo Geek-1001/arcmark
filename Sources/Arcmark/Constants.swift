@@ -14,7 +14,10 @@ struct ListMetrics {
     let leftPadding: CGFloat = 8
     let iconSize: CGFloat = 20
     let indentWidth: CGFloat = 16
-    let titleFont: NSFont = NSFont.systemFont(ofSize: 14, weight: .regular)
+    let rowCornerRadius: CGFloat = 12
+    let iconCornerRadius: CGFloat = 4
+    let linkTitleFont: NSFont = NSFont.systemFont(ofSize: 14, weight: .regular)
+    let folderTitleFont: NSFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
     let titleColor: NSColor = NSColor.white.withAlphaComponent(0.92)
     let hoverBackgroundColor: NSColor = NSColor.black.withAlphaComponent(0.1)
     let deleteTintColor: NSColor = NSColor.black.withAlphaComponent(0.6)

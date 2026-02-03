@@ -28,10 +28,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.backgroundColor = model.currentWorkspace.colorId.backgroundColor
         window.minSize = NSSize(width: 280, height: 420)
         window.maxSize = NSSize(width: 520, height: 1200)
-        window.setFrameAutosaveName("ArcmarkMainWindow")
+        let windowAutosaveName = "ArcmarkMainWindow"
+        window.setFrameAutosaveName(windowAutosaveName)
+        let restoredFrame = window.setFrameUsingName(windowAutosaveName)
         window.collectionBehavior = [.moveToActiveSpace]
         window.contentViewController = mainViewController
-        window.center()
+        if !restoredFrame {
+            window.center()
+        }
         ensureWindowVisible(window)
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()

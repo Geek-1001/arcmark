@@ -29,13 +29,13 @@ final class NodeRowView: NSView {
 
     private func setupViews() {
         wantsLayer = true
-        layer?.cornerRadius = 12
+        layer?.cornerRadius = metrics.rowCornerRadius
         layer?.masksToBounds = true
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.imageScaling = .scaleProportionallyDown
         iconView.wantsLayer = true
-        iconView.layer?.cornerRadius = 8
+        iconView.layer?.cornerRadius = metrics.iconCornerRadius
         iconView.layer?.masksToBounds = true
 
         titleField.translatesAutoresizingMaskIntoConstraints = false
@@ -44,7 +44,9 @@ final class NodeRowView: NSView {
         deleteButton.translatesAutoresizingMaskIntoConstraints = false
         deleteButton.bezelStyle = .texturedRounded
         deleteButton.isBordered = false
-        deleteButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
+        let deleteIconConfig = NSImage.SymbolConfiguration(pointSize: 14, weight: .bold)
+        deleteButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)?
+            .withSymbolConfiguration(deleteIconConfig)
         deleteButton.target = self
         deleteButton.action = #selector(handleDelete)
         deleteButton.setButtonType(.momentaryChange)
@@ -77,6 +79,7 @@ final class NodeRowView: NSView {
 
     func configure(title: String,
                    icon: NSImage?,
+                   titleFont: NSFont,
                    showDelete: Bool,
                    metrics: ListMetrics,
                    onDelete: (() -> Void)?) {
@@ -84,7 +87,7 @@ final class NodeRowView: NSView {
         isHovered = false
         updateHoverState()
         titleField.stringValue = title
-        titleField.font = metrics.titleFont
+        titleField.font = titleFont
         titleField.textColor = metrics.titleColor
 
         iconView.image = icon
@@ -92,6 +95,8 @@ final class NodeRowView: NSView {
             iconView.contentTintColor = icon.isTemplate ? metrics.iconTintColor : nil
         }
 
+        layer?.cornerRadius = metrics.rowCornerRadius
+        iconView.layer?.cornerRadius = metrics.iconCornerRadius
         deleteButton.contentTintColor = metrics.deleteTintColor
         iconWidthConstraint?.constant = metrics.iconSize
         iconHeightConstraint?.constant = metrics.iconSize
