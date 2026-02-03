@@ -85,7 +85,8 @@ final class MainViewController: NSViewController {
         outlineView.headerView = nil
         outlineView.delegate = self
         outlineView.dataSource = self
-        outlineView.rowHeight = 28
+        outlineView.rowHeight = 40
+        outlineView.intercellSpacing = NSSize(width: 0, height: 8)
         outlineView.floatsGroupRows = false
         outlineView.usesAlternatingRowBackgroundColors = false
         outlineView.style = .sourceList
