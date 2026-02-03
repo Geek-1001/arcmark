@@ -9,14 +9,16 @@ final class MainViewController: NSViewController {
     private let urlField = NSTextField()
     private let addButton = NSButton(title: "Add", target: nil, action: nil)
     private let pasteButton = NSButton(title: "Paste", target: nil, action: nil)
-    private let outlineView = NSOutlineView()
+    private let collectionView = ContextMenuCollectionView()
     private let scrollView = NSScrollView()
     private let contextMenu = NSMenu()
+    private let listMetrics = ListMetrics()
 
     private var filteredItems: [Node] = []
+    private var visibleRows: [NodeListRow] = []
     private var currentQuery: String = ""
     private var contextNodeId: UUID?
-    private var isRestoringExpansion = false
+    private var contextIndexPath: IndexPath?
     private var isReloadScheduled = false
 
     init(model: AppModel) {
@@ -76,34 +78,28 @@ final class MainViewController: NSViewController {
         pasteButton.target = self
         pasteButton.action = #selector(pasteLink)
 
-        outlineView.translatesAutoresizingMaskIntoConstraints = true
-        outlineView.autoresizingMask = [.width, .height]
-        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("main"))
-        column.resizingMask = .autoresizingMask
-        outlineView.addTableColumn(column)
-        outlineView.outlineTableColumn = column
-        outlineView.headerView = nil
-        outlineView.delegate = self
-        outlineView.dataSource = self
-        outlineView.rowHeight = 46
-        outlineView.intercellSpacing = NSSize(width: 0, height: 12)
-        outlineView.floatsGroupRows = false
-        outlineView.usesAlternatingRowBackgroundColors = false
-        outlineView.style = .sourceList
-        outlineView.backgroundColor = .clear
-        outlineView.indentationPerLevel = 14
-        outlineView.doubleAction = #selector(handleDoubleClick)
-        outlineView.registerForDraggedTypes([nodePasteboardType])
-        outlineView.setDraggingSourceOperationMask(.move, forLocal: true)
+        collectionView.translatesAutoresizingMaskIntoConstraints = true
+        collectionView.autoresizingMask = [.width, .height]
+        collectionView.dataSource = self
+        collectionView.delegate = self
+        collectionView.isSelectable = false
+        collectionView.backgroundColors = [.clear]
+        collectionView.collectionViewLayout = makeCollectionLayout()
+        collectionView.register(NodeCollectionViewItem.self, forItemWithIdentifier: NodeCollectionViewItem.identifier)
+        collectionView.registerForDraggedTypes([nodePasteboardType])
+        collectionView.setDraggingSourceOperationMask(.move, forLocal: true)
+        collectionView.onContextRequest = { [weak self] indexPath in
+            self?.contextIndexPath = indexPath
+        }
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.documentView = outlineView
+        scrollView.documentView = collectionView
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = false
-        outlineView.frame = scrollView.bounds
+        collectionView.frame = scrollView.bounds
 
         contextMenu.delegate = self
-        outlineView.menu = contextMenu
+        collectionView.menu = contextMenu
 
         let topBar = NSView()
         topBar.translatesAutoresizingMaskIntoConstraints = false
@@ -161,6 +157,29 @@ final class MainViewController: NSViewController {
         ])
     }
 
+    private func makeCollectionLayout() -> NSCollectionViewLayout {
+        let metrics = listMetrics
+        let itemSize = NSCollectionLayoutSize(
+            widthDimension: .fractionalWidth(1.0),
+            heightDimension: .absolute(metrics.rowHeight)
+        )
+        let item = NSCollectionLayoutItem(layoutSize: itemSize)
+        let groupSize = NSCollectionLayoutSize(
+            widthDimension: .fractionalWidth(1.0),
+            heightDimension: .absolute(metrics.rowHeight)
+        )
+        let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
+        let section = NSCollectionLayoutSection(group: group)
+        section.interGroupSpacing = metrics.verticalGap
+        section.contentInsets = NSDirectionalEdgeInsets(
+            top: metrics.verticalGap,
+            leading: 0,
+            bottom: metrics.verticalGap,
+            trailing: 0
+        )
+        return NSCollectionViewCompositionalLayout(section: section)
+    }
+
     private func bindModel() {
         model.onChange = { [weak self] in
             guard let self else { return }
@@ -178,10 +197,9 @@ final class MainViewController: NSViewController {
         reloadWorkspaceMenu()
         applyWorkspaceStyling()
         applyFilter()
-        outlineView.reloadData()
-        isRestoringExpansion = true
-        expandPersistedFolders()
-        isRestoringExpansion = false
+        let forceExpand = !currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        visibleRows = buildVisibleRows(nodes: filteredItems, depth: 0, forceExpand: forceExpand)
+        collectionView.reloadData()
     }
 
     private func reloadWorkspaceMenu() {
@@ -244,24 +262,30 @@ final class MainViewController: NSViewController {
         }
     }
 
-    private func expandPersistedFolders() {
-        let forceExpand = !currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        expandFolders(filteredItems, force: forceExpand)
-    }
-
-
-    private func expandFolders(_ nodes: [Node], force: Bool) {
+    private func buildVisibleRows(nodes: [Node], depth: Int, forceExpand: Bool) -> [NodeListRow] {
+        var rows: [NodeListRow] = []
         for node in nodes {
-            switch node {
-            case .folder(let folder):
-                if folder.isExpanded || force {
-                    outlineView.expandItem(node)
-                }
-                expandFolders(folder.children, force: force)
-            case .link:
-                break
+            rows.append(NodeListRow(node: node, depth: depth))
+            if case .folder(let folder) = node, folder.isExpanded || forceExpand {
+                rows.append(contentsOf: buildVisibleRows(nodes: folder.children, depth: depth + 1, forceExpand: forceExpand))
             }
         }
+        return rows
+    }
+
+    private func row(at indexPath: IndexPath) -> NodeListRow? {
+        guard indexPath.item >= 0, indexPath.item < visibleRows.count else { return nil }
+        return visibleRows[indexPath.item]
+    }
+
+    private func shouldDropOnItem(at indexPath: IndexPath, draggingInfo: NSDraggingInfo) -> Bool {
+        let location = collectionView.convert(draggingInfo.draggingLocation, from: nil)
+        guard let frame = collectionView.layoutAttributesForItem(at: indexPath)?.frame else {
+            return true
+        }
+        let upper = frame.minY + frame.height * 0.25
+        let lower = frame.maxY - frame.height * 0.25
+        return location.y >= upper && location.y <= lower
     }
 
     private func normalizedUrl(from input: String) -> URL? {
@@ -465,57 +489,48 @@ final class MainViewController: NSViewController {
         }
     }
 
-    @objc private func handleDoubleClick() {
-        let row = outlineView.clickedRow
-        guard row >= 0, let node = outlineView.item(atRow: row) as? Node else { return }
-        if case .link(let link) = node, let url = URL(string: link.url) {
-            BrowserManager.open(url: url)
-        }
+    private func openLink(_ link: Link) {
+        guard let url = URL(string: link.url) else { return }
+        BrowserManager.open(url: url)
+    }
+
+    private func toggleFolder(_ folder: Folder) {
+        if !currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return }
+        model.setFolderExpanded(id: folder.id, isExpanded: !folder.isExpanded)
     }
 }
 
-extension MainViewController: NSOutlineViewDataSource, NSOutlineViewDelegate {
-    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
-        if let node = item as? Node {
-            switch node {
-            case .folder(let folder):
-                return folder.children.count
-            case .link:
-                return 0
-            }
-        }
-        return filteredItems.count
+extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelegate {
+    func numberOfSections(in collectionView: NSCollectionView) -> Int {
+        1
     }
 
-    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
-        if let node = item as? Node {
-            switch node {
-            case .folder(let folder):
-                return folder.children[index]
-            case .link:
-                return node
-            }
-        }
-        return filteredItems[index]
+    func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int {
+        visibleRows.count
     }
 
-    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
-        guard let node = item as? Node else { return false }
-        if case .folder = node { return true }
-        return false
-    }
+    func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
+        let item = collectionView.makeItem(withIdentifier: NodeCollectionViewItem.identifier, for: indexPath)
+        guard let nodeItem = item as? NodeCollectionViewItem else { return item }
+        guard let row = row(at: indexPath) else { return item }
 
-    func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
-        guard let node = item as? Node else { return nil }
-        let identifier = NSUserInterfaceItemIdentifier("NodeCell")
-        let view = outlineView.makeView(withIdentifier: identifier, owner: self) as? NodeCellView ?? NodeCellView()
-        view.identifier = identifier
-
-        switch node {
+        switch row.node {
         case .folder(let folder):
-            let icon = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
+            let iconName = folder.isExpanded ? "folder.fill" : "folder"
+            let icon = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)
             icon?.isTemplate = true
-            view.configure(title: folder.name, icon: icon, showDelete: false, onDelete: nil)
+            nodeItem.configure(
+                title: folder.name,
+                icon: icon,
+                depth: row.depth,
+                metrics: listMetrics,
+                showDelete: false,
+                onDelete: nil,
+                onClick: { [weak self] in
+                    self?.toggleFolder(folder)
+                },
+                onDoubleClick: nil
+            )
         case .link(let link):
             let placeholder = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
             placeholder?.isTemplate = true
@@ -528,83 +543,98 @@ extension MainViewController: NSOutlineViewDataSource, NSOutlineViewDelegate {
                 iconToUse = image
                 shouldFetch = false
             }
-            view.configure(title: link.title, icon: iconToUse, showDelete: true) { [weak self] in
-                self?.model.deleteNode(id: link.id)
-            }
+
+            nodeItem.configure(
+                title: link.title,
+                icon: iconToUse,
+                depth: row.depth,
+                metrics: listMetrics,
+                showDelete: true,
+                onDelete: { [weak self] in
+                    self?.model.deleteNode(id: link.id)
+                },
+                onClick: nil,
+                onDoubleClick: { [weak self] in
+                    self?.openLink(link)
+                }
+            )
 
             if shouldFetch, let url = URL(string: link.url) {
-                FaviconService.shared.favicon(for: url, cachedPath: link.faviconPath) { [weak self] image, path in
+                FaviconService.shared.favicon(for: url, cachedPath: link.faviconPath) { [weak self] _, path in
                     guard let self else { return }
                     if let path {
                         self.model.updateLinkFaviconPath(id: link.id, path: path)
                     }
                 }
             }
-
         }
 
-        return view
+        return nodeItem
     }
 
-    func outlineViewItemDidExpand(_ notification: Notification) {
-        guard let item = notification.userInfo?["NSObject"] as? Node else { return }
-        if isRestoringExpansion { return }
-        if !currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return }
-        if case .folder(let folder) = item {
-            model.setFolderExpanded(id: folder.id, isExpanded: true)
-        }
-    }
-
-    func outlineViewItemDidCollapse(_ notification: Notification) {
-        guard let item = notification.userInfo?["NSObject"] as? Node else { return }
-        if isRestoringExpansion { return }
-        if !currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return }
-        if case .folder(let folder) = item {
-            model.setFolderExpanded(id: folder.id, isExpanded: false)
-        }
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
-        guard let node = item as? Node else { return nil }
+    func collectionView(_ collectionView: NSCollectionView, pasteboardWriterForItemAt indexPath: IndexPath) -> NSPasteboardWriting? {
+        guard let row = row(at: indexPath) else { return nil }
         let pasteboardItem = NSPasteboardItem()
-        pasteboardItem.setString(node.id.uuidString, forType: nodePasteboardType)
+        pasteboardItem.setString(row.node.id.uuidString, forType: nodePasteboardType)
         return pasteboardItem
     }
 
-    func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
+    func collectionView(_ collectionView: NSCollectionView,
+                        validateDrop draggingInfo: NSDraggingInfo,
+                        proposedIndexPath proposedDropIndexPath: AutoreleasingUnsafeMutablePointer<NSIndexPath>,
+                        dropOperation proposedDropOperation: UnsafeMutablePointer<NSCollectionView.DropOperation>) -> NSDragOperation {
         if !currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return []
         }
+
+        let indexPath = proposedDropIndexPath.pointee as IndexPath
+        if indexPath.item < visibleRows.count,
+           let row = row(at: indexPath),
+           case .folder = row.node,
+           shouldDropOnItem(at: indexPath, draggingInfo: draggingInfo) {
+            proposedDropOperation.pointee = .on
+        } else {
+            proposedDropOperation.pointee = .before
+        }
+
         return .move
     }
 
-    func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo, item: Any?, childIndex index: Int) -> Bool {
-        guard let idString = info.draggingPasteboard.string(forType: nodePasteboardType),
+    func collectionView(_ collectionView: NSCollectionView,
+                        acceptDrop draggingInfo: NSDraggingInfo,
+                        indexPath: IndexPath,
+                        dropOperation: NSCollectionView.DropOperation) -> Bool {
+        guard let idString = draggingInfo.draggingPasteboard.string(forType: nodePasteboardType),
               let nodeId = UUID(uuidString: idString) else { return false }
 
         var targetParentId: UUID?
-        var targetIndex = index
+        var targetIndex: Int
 
-        if let node = item as? Node {
-            switch node {
+        if indexPath.item < visibleRows.count, let row = row(at: indexPath) {
+            switch row.node {
             case .folder(let folder):
-                if index == NSOutlineViewDropOnItemIndex {
+                if dropOperation == .on {
                     targetParentId = folder.id
                     targetIndex = folder.children.count
+                } else if let location = model.location(of: folder.id) {
+                    targetParentId = location.parentId
+                    targetIndex = location.index
                 } else {
-                    targetParentId = model.location(of: folder.id)?.parentId
+                    targetParentId = nil
+                    targetIndex = model.currentWorkspace.items.count
                 }
             case .link(let link):
                 if let location = model.location(of: link.id) {
                     targetParentId = location.parentId
                     targetIndex = location.index
+                } else {
+                    targetParentId = nil
+                    targetIndex = model.currentWorkspace.items.count
                 }
             }
         } else {
             targetParentId = nil
-            if targetIndex == NSOutlineViewDropOnItemIndex {
-                targetIndex = model.currentWorkspace.items.count
-            }
+            targetIndex = model.currentWorkspace.items.count
         }
 
         if targetIndex < 0 { targetIndex = model.currentWorkspace.items.count }
@@ -625,15 +655,16 @@ extension MainViewController: NSSearchFieldDelegate, NSTextFieldDelegate {
 extension MainViewController: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        let clickedRow = outlineView.clickedRow
-        if clickedRow < 0 {
+        guard let indexPath = contextIndexPath,
+              let row = row(at: indexPath) else {
+            contextNodeId = nil
             let newFolder = NSMenuItem(title: "New Folder…", action: #selector(contextNewFolder), keyEquivalent: "")
             newFolder.target = self
             menu.addItem(newFolder)
             return
         }
 
-        guard let node = outlineView.item(atRow: clickedRow) as? Node else { return }
+        let node = row.node
         contextNodeId = node.id
 
         switch node {
@@ -694,5 +725,21 @@ extension MainViewController: NSMenuDelegate {
         guard let nodeId = contextNodeId,
               let workspaceId = sender.representedObject as? UUID else { return }
         model.moveNodeToWorkspace(id: nodeId, workspaceId: workspaceId)
+    }
+}
+
+private struct NodeListRow {
+    let node: Node
+    let depth: Int
+}
+
+private final class ContextMenuCollectionView: NSCollectionView {
+    var onContextRequest: ((IndexPath?) -> Void)?
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let location = convert(event.locationInWindow, from: nil)
+        let indexPath = indexPathForItem(at: location)
+        onContextRequest?(indexPath)
+        return menu
     }
 }
