@@ -70,6 +70,9 @@ final class MainViewController: NSViewController {
         workspaceSwitcher.onAddWorkspace = { [weak self] in
             self?.promptCreateWorkspace()
         }
+        workspaceSwitcher.onWorkspaceRename = { [weak self] workspaceId, newName in
+            self?.model.renameWorkspace(id: workspaceId, newName: newName)
+        }
 
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.placeholder = "Search in workspace"
@@ -516,8 +519,7 @@ final class MainViewController: NSViewController {
 
     @objc private func renameWorkspaceFromMenu() {
         let workspace = model.currentWorkspace
-        guard let newName = promptForText(title: "Rename Workspace", message: "Enter a new name.", defaultValue: workspace.name) else { return }
-        model.renameWorkspace(id: workspace.id, newName: newName)
+        workspaceSwitcher.beginInlineRename(workspaceId: workspace.id)
     }
 
     @objc private func changeEmojiFromMenu() {

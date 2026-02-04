@@ -67,6 +67,10 @@ final class WorkspaceSwitcherView: NSView {
     private var workspaceButtons: [UUID: WorkspaceButton] = [:]
     private var addButton: AddWorkspaceButton?
 
+    // Inline rename tracking
+    private weak var inlineRenameButton: WorkspaceButton?
+    private var inlineRenameWorkspaceId: UUID?
+
     var style: Style {
         didSet {
             applyStyle()
@@ -94,6 +98,7 @@ final class WorkspaceSwitcherView: NSView {
     var onWorkspaceSelected: ((UUID) -> Void)?
     var onWorkspaceRightClick: ((UUID, NSPoint) -> Void)?
     var onAddWorkspace: (() -> Void)?
+    var onWorkspaceRename: ((UUID, String) -> Void)?
 
     init(style: Style = .defaultStyle) {
         self.style = style
@@ -325,6 +330,50 @@ final class WorkspaceSwitcherView: NSView {
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
+
+    // MARK: - Inline Rename
+
+    func beginInlineRename(workspaceId: UUID) {
+        cancelInlineRename()
+        guard let button = workspaceButtons[workspaceId] else { return }
+
+        inlineRenameWorkspaceId = workspaceId
+        inlineRenameButton = button
+        button.beginInlineRename(onCommit: { [weak self] newName in
+            self?.commitInlineRename(newName)
+        }, onCancel: { [weak self] in
+            self?.handleInlineRenameCancelled()
+        })
+    }
+
+    func cancelInlineRename() {
+        guard inlineRenameWorkspaceId != nil else { return }
+        inlineRenameButton?.cancelInlineRename()
+        clearInlineRenameState()
+    }
+
+    private func commitInlineRename(_ newName: String) {
+        guard let workspaceId = inlineRenameWorkspaceId else {
+            clearInlineRenameState()
+            return
+        }
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            handleInlineRenameCancelled()
+            return
+        }
+        onWorkspaceRename?(workspaceId, trimmed)
+        clearInlineRenameState()
+    }
+
+    private func handleInlineRenameCancelled() {
+        clearInlineRenameState()
+    }
+
+    private func clearInlineRenameState() {
+        inlineRenameButton = nil
+        inlineRenameWorkspaceId = nil
+    }
 }
 
 // MARK: - WorkspaceButton
@@ -332,15 +381,29 @@ final class WorkspaceSwitcherView: NSView {
 private final class WorkspaceButton: NSControl {
     private let workspaceId: UUID
     private let circleView = NSView()
-    private let titleLabel = NSTextField(labelWithString: "")
+    private let titleLabel = NSTextField(string: "")
     private let style: WorkspaceSwitcherView.Style
     private var trackingArea: NSTrackingArea?
     private var isHovered = false
+
+    // Inline editing state
+    private var isEditingTitle = false
+    private var editingOriginalTitle: String?
+    private var onEditCommit: ((String) -> Void)?
+    private var onEditCancel: (() -> Void)?
+    private var titleLabelWidthConstraint: NSLayoutConstraint?
+
+    // Fixed width for text field during inline editing (easily adjustable)
+    private let editingTextFieldWidth: CGFloat = 170
 
     var isSelected = false {
         didSet {
             updateAppearance()
         }
+    }
+
+    var isInlineRenaming: Bool {
+        isEditingTitle
     }
 
     var onTap: ((UUID) -> Void)?
@@ -365,9 +428,12 @@ private final class WorkspaceButton: NSControl {
 
         // Setup title
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.isEditable = false
+        titleLabel.isSelectable = false
         titleLabel.isBordered = false
         titleLabel.drawsBackground = false
+        titleLabel.focusRingType = .none
         titleLabel.stringValue = name
         titleLabel.font = NSFont.systemFont(ofSize: style.textSize, weight: style.textWeight)
 
@@ -463,6 +529,90 @@ private final class WorkspaceButton: NSControl {
             layer?.backgroundColor = NSColor.clear.cgColor
             titleLabel.textColor = style.unselectedTextColor.withAlphaComponent(style.unselectedTextOpacity)
             layer?.cornerRadius = style.buttonCornerRadius
+        }
+    }
+
+    func beginInlineRename(onCommit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+        guard !isEditingTitle else { return }
+        isEditingTitle = true
+        editingOriginalTitle = titleLabel.stringValue
+        onEditCommit = onCommit
+        onEditCancel = onCancel
+
+        // Set fixed width for editing
+        titleLabelWidthConstraint = titleLabel.widthAnchor.constraint(equalToConstant: editingTextFieldWidth)
+        titleLabelWidthConstraint?.isActive = true
+
+        // Preserve font when switching to editable mode
+        let currentFont = titleLabel.font ?? NSFont.systemFont(ofSize: style.textSize, weight: style.textWeight)
+        titleLabel.isEditable = true
+        titleLabel.isSelectable = true
+        titleLabel.font = currentFont
+        titleLabel.delegate = self
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.window?.makeFirstResponder(self.titleLabel)
+            if let editor = self.titleLabel.currentEditor() {
+                // Ensure font is set on the field editor as well
+                editor.font = currentFont
+                let length = (self.titleLabel.stringValue as NSString).length
+                editor.selectedRange = NSRange(location: 0, length: length)
+            }
+        }
+    }
+
+    func cancelInlineRename() {
+        guard isEditingTitle else { return }
+        titleLabel.stringValue = editingOriginalTitle ?? titleLabel.stringValue
+        finishInlineRename(commit: false)
+        if window?.firstResponder == titleLabel.currentEditor() {
+            window?.makeFirstResponder(nil)
+        }
+    }
+
+    private func finishInlineRename(commit: Bool) {
+        let commitHandler = onEditCommit
+        let cancelHandler = onEditCancel
+        let finalValue = titleLabel.stringValue
+
+        // Remove fixed width constraint
+        titleLabelWidthConstraint?.isActive = false
+        titleLabelWidthConstraint = nil
+
+        isEditingTitle = false
+        editingOriginalTitle = nil
+        onEditCommit = nil
+        onEditCancel = nil
+        titleLabel.isEditable = false
+        titleLabel.isSelectable = false
+        titleLabel.delegate = nil
+
+        // Ensure font is maintained after editing
+        titleLabel.font = NSFont.systemFont(ofSize: style.textSize, weight: style.textWeight)
+
+        if commit {
+            commitHandler?(finalValue)
+        } else {
+            cancelHandler?()
+        }
+    }
+}
+
+// MARK: - WorkspaceButton + NSTextFieldDelegate
+
+extension WorkspaceButton: NSTextFieldDelegate {
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard isEditingTitle else { return }
+        let movement = obj.userInfo?["NSTextMovement"] as? Int ?? NSOtherTextMovement
+        let trimmed = titleLabel.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if movement == NSReturnTextMovement, !trimmed.isEmpty {
+            titleLabel.stringValue = trimmed
+            finishInlineRename(commit: true)
+        } else {
+            titleLabel.stringValue = editingOriginalTitle ?? titleLabel.stringValue
+            finishInlineRename(commit: false)
         }
     }
 }
