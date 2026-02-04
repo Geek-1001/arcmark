@@ -15,6 +15,7 @@ final class IconTitleButton: NSControl {
         var horizontalPadding: CGFloat
         var verticalPadding: CGFloat
         var cornerRadius: CGFloat
+        var fillsWidth: Bool
 
         static var pasteAction: Style {
             Style(
@@ -30,7 +31,27 @@ final class IconTitleButton: NSControl {
                 iconTitleSpacing: 8,
                 horizontalPadding: 10,
                 verticalPadding: 10,
-                cornerRadius: 8
+                cornerRadius: 8,
+                fillsWidth: true
+            )
+        }
+
+        static var addWorkspace: Style {
+            Style(
+                backgroundColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0),
+                hoverBackgroundOpacity: 0.06,
+                pressedBackgroundOpacity: 0.10,
+                foregroundColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0),
+                foregroundInactiveOpacity: 0.80,
+                foregroundActiveOpacity: 1.00,
+                font: NSFont.systemFont(ofSize: 14, weight: .semibold),
+                iconPointSize: 14,
+                iconWeight: .medium,
+                iconTitleSpacing: 6,
+                horizontalPadding: 10,
+                verticalPadding: 10,
+                cornerRadius: 8,
+                fillsWidth: false
             )
         }
 
@@ -127,7 +148,12 @@ final class IconTitleButton: NSControl {
             titleField.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
 
-        titleField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        if style.fillsWidth {
+            titleField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        } else {
+            titleField.setContentCompressionResistancePriority(.required, for: .horizontal)
+            setContentHuggingPriority(.required, for: .horizontal)
+        }
         imageView.setContentCompressionResistancePriority(.required, for: .horizontal)
     }
 

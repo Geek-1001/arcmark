@@ -18,9 +18,6 @@ final class WorkspaceSwitcherView: NSView {
         var buttonVerticalPadding: CGFloat
         var buttonCornerRadius: CGFloat
         var buttonSpacing: CGFloat
-        var addButtonIconPointSize: CGFloat
-        var addButtonIconWeight: NSFont.Weight
-        var addButtonIconTitleSpacing: CGFloat
 
         static var defaultStyle: Style {
             Style(
@@ -39,10 +36,7 @@ final class WorkspaceSwitcherView: NSView {
                 buttonHorizontalPadding: 10,
                 buttonVerticalPadding: 10,
                 buttonCornerRadius: 8,
-                buttonSpacing: 4,
-                addButtonIconPointSize: 14,
-                addButtonIconWeight: .medium,
-                addButtonIconTitleSpacing: 6
+                buttonSpacing: 4
             )
         }
 
@@ -64,7 +58,7 @@ final class WorkspaceSwitcherView: NSView {
     private let leftShadowView = NSView()
     private let rightShadowView = NSView()
     private var workspaceButtons: [UUID: WorkspaceButton] = [:]
-    private var addButton: AddWorkspaceButton?
+    private var addButton: IconTitleButton?
 
     // Inline rename tracking
     private weak var inlineRenameButton: WorkspaceButton?
@@ -227,11 +221,14 @@ final class WorkspaceSwitcherView: NSView {
         }
 
         // Create "Add new workspace" button
-        let addBtn = AddWorkspaceButton(style: style)
+        let addBtn = IconTitleButton(
+            title: "Add new workspace",
+            symbolName: "plus",
+            style: .addWorkspace
+        )
         addBtn.translatesAutoresizingMaskIntoConstraints = false
-        addBtn.onTap = { [weak self] in
-            self?.onAddWorkspace?()
-        }
+        addBtn.target = self
+        addBtn.action = #selector(addWorkspaceTapped)
 
         contentView.addSubview(addBtn)
         addButton = addBtn
@@ -270,7 +267,10 @@ final class WorkspaceSwitcherView: NSView {
         for (_, button) in workspaceButtons {
             button.refreshHoverState()
         }
-        addButton?.refreshHoverState()
+    }
+
+    @objc private func addWorkspaceTapped() {
+        onAddWorkspace?()
     }
 
     private func updateShadows() {
@@ -615,126 +615,3 @@ extension WorkspaceButton: NSTextFieldDelegate {
     }
 }
 
-// MARK: - AddWorkspaceButton
-
-private final class AddWorkspaceButton: NSControl {
-    private let iconView = NSImageView()
-    private let titleLabel = NSTextField(labelWithString: "")
-    private let style: WorkspaceSwitcherView.Style
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false
-
-    var onTap: (() -> Void)?
-
-    init(style: WorkspaceSwitcherView.Style) {
-        self.style = style
-        super.init(frame: .zero)
-
-        wantsLayer = true
-        layer?.masksToBounds = true
-        layer?.cornerRadius = style.buttonCornerRadius
-
-        // Setup icon
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.imageScaling = .scaleProportionallyDown
-        let config = NSImage.SymbolConfiguration(pointSize: style.addButtonIconPointSize, weight: style.addButtonIconWeight)
-        if let image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)?.withSymbolConfiguration(config) {
-            iconView.image = image
-            iconView.image?.isTemplate = true
-        }
-
-        // Setup title
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.isEditable = false
-        titleLabel.isBordered = false
-        titleLabel.drawsBackground = false
-        titleLabel.stringValue = "Add new workspace"
-        titleLabel.font = NSFont.systemFont(ofSize: style.textSize, weight: style.textWeight)
-
-        addSubview(iconView)
-        addSubview(titleLabel)
-
-        NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: style.buttonHorizontalPadding),
-            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: style.addButtonIconPointSize),
-            iconView.heightAnchor.constraint(equalToConstant: style.addButtonIconPointSize),
-
-            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: style.addButtonIconTitleSpacing),
-            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -style.buttonHorizontalPadding),
-            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
-        ])
-
-        updateAppearance()
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-
-        if let existing = trackingArea {
-            removeTrackingArea(existing)
-        }
-
-        let options: NSTrackingArea.Options = [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect]
-        trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(trackingArea!)
-    }
-
-    override func layout() {
-        super.layout()
-        refreshHoverState()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        refreshHoverState()
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        isHovered = true
-        updateAppearance()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        isHovered = false
-        updateAppearance()
-    }
-
-    func refreshHoverState() {
-        guard let window else {
-            if isHovered {
-                isHovered = false
-                updateAppearance()
-            }
-            return
-        }
-        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        let hovered = bounds.contains(point)
-        if hovered != isHovered {
-            isHovered = hovered
-            updateAppearance()
-        }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        onTap?()
-    }
-
-    private func updateAppearance() {
-        if isHovered {
-            layer?.backgroundColor = style.unselectedTextColor.withAlphaComponent(style.hoverBackgroundOpacity).cgColor
-            titleLabel.textColor = style.unselectedTextColor.withAlphaComponent(style.unselectedTextOpacity)
-            iconView.contentTintColor = style.unselectedTextColor.withAlphaComponent(style.unselectedTextOpacity)
-        } else {
-            layer?.backgroundColor = NSColor.clear.cgColor
-            titleLabel.textColor = style.unselectedTextColor.withAlphaComponent(style.unselectedTextOpacity)
-            iconView.contentTintColor = style.unselectedTextColor.withAlphaComponent(style.unselectedTextOpacity)
-        }
-    }
-}
