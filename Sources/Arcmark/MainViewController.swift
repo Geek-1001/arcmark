@@ -486,11 +486,11 @@ final class MainViewController: NSViewController {
 
         let menu = NSMenu()
         let canDelete = model.workspaces.count > 1
+        guard let workspaceIndex = model.workspaces.firstIndex(where: { $0.id == workspaceId }) else { return }
+        let canMoveLeft = workspaceIndex > 0
+        let canMoveRight = workspaceIndex < model.workspaces.count - 1
 
-        let newItem = NSMenuItem(title: "New Workspace…", action: #selector(createWorkspaceFromMenu), keyEquivalent: "")
-        newItem.target = self
-        menu.addItem(newItem)
-
+        // Workspace Management
         let renameItem = NSMenuItem(title: "Rename Workspace…", action: #selector(renameWorkspaceFromMenu), keyEquivalent: "")
         renameItem.target = self
         menu.addItem(renameItem)
@@ -510,6 +510,29 @@ final class MainViewController: NSViewController {
         colorItem.submenu = colorSubmenu
         menu.addItem(colorItem)
 
+        menu.addItem(NSMenuItem.separator())
+
+        // Reordering
+        let moveLeftItem = NSMenuItem(title: "Move Left", action: #selector(moveWorkspaceLeft), keyEquivalent: "")
+        moveLeftItem.target = self
+        moveLeftItem.isEnabled = canMoveLeft
+        menu.addItem(moveLeftItem)
+
+        let moveRightItem = NSMenuItem(title: "Move Right", action: #selector(moveWorkspaceRight), keyEquivalent: "")
+        moveRightItem.target = self
+        moveRightItem.isEnabled = canMoveRight
+        menu.addItem(moveRightItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Creation
+        let newItem = NSMenuItem(title: "New Workspace…", action: #selector(createWorkspaceFromMenu), keyEquivalent: "")
+        newItem.target = self
+        menu.addItem(newItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Destructive Actions
         let deleteItem = NSMenuItem(title: "Delete Workspace…", action: #selector(deleteWorkspaceFromMenu), keyEquivalent: "")
         deleteItem.target = self
         deleteItem.isEnabled = canDelete
@@ -565,6 +588,16 @@ final class MainViewController: NSViewController {
         if alert.runModal() == .alertFirstButtonReturn {
             model.deleteWorkspace(id: workspace.id)
         }
+    }
+
+    @objc private func moveWorkspaceLeft() {
+        let workspace = model.currentWorkspace
+        model.moveWorkspace(id: workspace.id, direction: .left)
+    }
+
+    @objc private func moveWorkspaceRight() {
+        let workspace = model.currentWorkspace
+        model.moveWorkspace(id: workspace.id, direction: .right)
     }
 
     func promptCreateWorkspace() {

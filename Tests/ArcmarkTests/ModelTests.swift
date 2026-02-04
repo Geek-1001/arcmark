@@ -76,4 +76,47 @@ final class ModelTests: XCTestCase {
             XCTFail("Expected folder to remain for matching child")
         }
     }
+
+    func testWorkspaceReordering() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        // Create three workspaces
+        let id1 = model.createWorkspace(name: "First", colorId: .ember)
+        let id2 = model.createWorkspace(name: "Second", colorId: .ruby)
+        let id3 = model.createWorkspace(name: "Third", colorId: .moss)
+
+        // Initial order should be: Inbox (default), First, Second, Third
+        XCTAssertEqual(model.workspaces.count, 4)
+        XCTAssertEqual(model.workspaces[0].name, "Inbox")
+        XCTAssertEqual(model.workspaces[1].name, "First")
+        XCTAssertEqual(model.workspaces[2].name, "Second")
+        XCTAssertEqual(model.workspaces[3].name, "Third")
+
+        // Move "Second" to the right (swap with "Third")
+        model.moveWorkspace(id: id2, direction: .right)
+        XCTAssertEqual(model.workspaces[2].name, "Third")
+        XCTAssertEqual(model.workspaces[3].name, "Second")
+
+        // Move "Second" to the left (swap back with "Third")
+        model.moveWorkspace(id: id2, direction: .left)
+        XCTAssertEqual(model.workspaces[2].name, "Second")
+        XCTAssertEqual(model.workspaces[3].name, "Third")
+
+        // Move "First" to the left (swap with "Inbox")
+        model.moveWorkspace(id: id1, direction: .left)
+        XCTAssertEqual(model.workspaces[0].name, "First")
+        XCTAssertEqual(model.workspaces[1].name, "Inbox")
+
+        // Try to move "First" to the left again (should not move, already at start)
+        model.moveWorkspace(id: id1, direction: .left)
+        XCTAssertEqual(model.workspaces[0].name, "First")
+        XCTAssertEqual(model.workspaces[1].name, "Inbox")
+
+        // Try to move "Third" to the right (should not move, already at end)
+        model.moveWorkspace(id: id3, direction: .right)
+        XCTAssertEqual(model.workspaces[2].name, "Second")
+        XCTAssertEqual(model.workspaces[3].name, "Third")
+    }
 }

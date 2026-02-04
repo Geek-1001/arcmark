@@ -98,3 +98,8 @@ struct NodeLocation: Equatable {
     var parentId: UUID?
     var index: Int
 }
+
+enum WorkspaceMoveDirection {
+    case left
+    case right
+}
