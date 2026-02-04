@@ -4,8 +4,7 @@ import AppKit
 final class MainViewController: NSViewController {
     private let model: AppModel
 
-    private let workspacePopup = NSPopUpButton()
-    private let workspaceActionsButton = NSButton()
+    private let workspaceSwitcher = WorkspaceSwitcherView(style: .defaultStyle)
     private let searchField = SearchBarView(style: .defaultSearch)
     private let pasteButton = IconTitleButton(
         title: "Add links from clipboard",
@@ -61,19 +60,16 @@ final class MainViewController: NSViewController {
     }
 
     private func setupUI() {
-        workspacePopup.translatesAutoresizingMaskIntoConstraints = false
-        workspacePopup.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
-        workspacePopup.bezelStyle = .texturedRounded
-        workspacePopup.target = self
-        workspacePopup.action = #selector(workspaceChanged)
-
-        workspaceActionsButton.translatesAutoresizingMaskIntoConstraints = false
-        workspaceActionsButton.bezelStyle = .texturedRounded
-        workspaceActionsButton.isBordered = false
-        workspaceActionsButton.image = NSImage(systemSymbolName: "ellipsis.circle", accessibilityDescription: nil)
-        workspaceActionsButton.contentTintColor = NSColor.labelColor.withAlphaComponent(0.7)
-        workspaceActionsButton.target = self
-        workspaceActionsButton.action = #selector(showWorkspaceActionsMenu)
+        workspaceSwitcher.translatesAutoresizingMaskIntoConstraints = false
+        workspaceSwitcher.onWorkspaceSelected = { [weak self] workspaceId in
+            self?.model.selectWorkspace(id: workspaceId)
+        }
+        workspaceSwitcher.onWorkspaceRightClick = { [weak self] workspaceId, point in
+            self?.showWorkspaceContextMenu(for: workspaceId, at: point)
+        }
+        workspaceSwitcher.onAddWorkspace = { [weak self] in
+            self?.promptCreateWorkspace()
+        }
 
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.placeholder = "Search in workspace"
@@ -124,8 +120,7 @@ final class MainViewController: NSViewController {
 
         let topBar = NSView()
         topBar.translatesAutoresizingMaskIntoConstraints = false
-        topBar.addSubview(workspacePopup)
-        topBar.addSubview(workspaceActionsButton)
+        topBar.addSubview(workspaceSwitcher)
 
         let bottomBar = NSView()
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
@@ -140,15 +135,10 @@ final class MainViewController: NSViewController {
         view.addSubview(stack)
 
         NSLayoutConstraint.activate([
-            workspacePopup.leadingAnchor.constraint(equalTo: topBar.leadingAnchor, constant: 12),
-            workspacePopup.trailingAnchor.constraint(equalTo: workspaceActionsButton.leadingAnchor, constant: -6),
-            workspacePopup.topAnchor.constraint(equalTo: topBar.topAnchor),
-            workspacePopup.bottomAnchor.constraint(equalTo: topBar.bottomAnchor),
-
-            workspaceActionsButton.trailingAnchor.constraint(equalTo: topBar.trailingAnchor, constant: -12),
-            workspaceActionsButton.centerYAnchor.constraint(equalTo: topBar.centerYAnchor),
-            workspaceActionsButton.widthAnchor.constraint(equalToConstant: 20),
-            workspaceActionsButton.heightAnchor.constraint(equalToConstant: 20),
+            workspaceSwitcher.leadingAnchor.constraint(equalTo: topBar.leadingAnchor, constant: 12),
+            workspaceSwitcher.trailingAnchor.constraint(equalTo: topBar.trailingAnchor, constant: -12),
+            workspaceSwitcher.topAnchor.constraint(equalTo: topBar.topAnchor),
+            workspaceSwitcher.bottomAnchor.constraint(equalTo: topBar.bottomAnchor),
 
             pasteButton.leadingAnchor.constraint(equalTo: bottomBar.leadingAnchor),
             pasteButton.trailingAnchor.constraint(equalTo: bottomBar.trailingAnchor),
@@ -205,49 +195,18 @@ final class MainViewController: NSViewController {
     }
 
     private func reloadWorkspaceMenu() {
-        workspacePopup.removeAllItems()
-        let menu = NSMenu()
         let workspaces = model.workspaces
         let selectedId = model.currentWorkspace.id
 
-        for workspace in workspaces {
-            let item = NSMenuItem(title: "\(workspace.emoji) \(workspace.name)", action: nil, keyEquivalent: "")
-            item.representedObject = workspace.id
-            menu.addItem(item)
+        workspaceSwitcher.workspaces = workspaces.map { workspace in
+            WorkspaceSwitcherView.WorkspaceItem(
+                id: workspace.id,
+                name: workspace.name,
+                emoji: workspace.emoji,
+                colorId: workspace.colorId
+            )
         }
-
-        workspacePopup.menu = menu
-        if let index = workspaces.firstIndex(where: { $0.id == selectedId }) {
-            workspacePopup.selectItem(at: index)
-        }
-
-        updateWorkspaceActionsMenu(canDelete: workspaces.count > 1)
-    }
-
-    private func updateWorkspaceActionsMenu(canDelete: Bool) {
-        let menu = NSMenu()
-        let newItem = NSMenuItem(title: "New Workspace…", action: #selector(createWorkspaceFromMenu), keyEquivalent: "")
-        newItem.target = self
-        menu.addItem(newItem)
-
-        let renameItem = NSMenuItem(title: "Rename Workspace…", action: #selector(renameWorkspaceFromMenu), keyEquivalent: "")
-        renameItem.target = self
-        menu.addItem(renameItem)
-
-        let emojiItem = NSMenuItem(title: "Change Emoji…", action: #selector(changeEmojiFromMenu), keyEquivalent: "")
-        emojiItem.target = self
-        menu.addItem(emojiItem)
-
-        let colorItem = NSMenuItem(title: "Change Color…", action: #selector(changeColorFromMenu), keyEquivalent: "")
-        colorItem.target = self
-        menu.addItem(colorItem)
-
-        let deleteItem = NSMenuItem(title: "Delete Workspace…", action: #selector(deleteWorkspaceFromMenu), keyEquivalent: "")
-        deleteItem.target = self
-        deleteItem.isEnabled = canDelete
-        menu.addItem(deleteItem)
-
-        workspaceActionsButton.menu = menu
+        workspaceSwitcher.selectedWorkspaceId = selectedId
     }
 
     private func applyWorkspaceStyling() {
@@ -513,23 +472,45 @@ final class MainViewController: NSViewController {
         }
     }
 
-    @objc private func workspaceChanged() {
-        guard let item = workspacePopup.selectedItem else { return }
-        if let workspaceId = item.representedObject as? UUID {
+    private func showWorkspaceContextMenu(for workspaceId: UUID, at point: NSPoint) {
+        // Temporarily select the workspace for context menu actions
+        let previousWorkspaceId = model.currentWorkspace.id
+        if previousWorkspaceId != workspaceId {
             model.selectWorkspace(id: workspaceId)
-        } else {
-            workspacePopup.selectItem(at: model.workspaces.firstIndex(where: { $0.id == model.currentWorkspace.id }) ?? 0)
+        }
+
+        let menu = NSMenu()
+        let canDelete = model.workspaces.count > 1
+
+        let newItem = NSMenuItem(title: "New Workspace…", action: #selector(createWorkspaceFromMenu), keyEquivalent: "")
+        newItem.target = self
+        menu.addItem(newItem)
+
+        let renameItem = NSMenuItem(title: "Rename Workspace…", action: #selector(renameWorkspaceFromMenu), keyEquivalent: "")
+        renameItem.target = self
+        menu.addItem(renameItem)
+
+        let emojiItem = NSMenuItem(title: "Change Emoji…", action: #selector(changeEmojiFromMenu), keyEquivalent: "")
+        emojiItem.target = self
+        menu.addItem(emojiItem)
+
+        let colorItem = NSMenuItem(title: "Change Color…", action: #selector(changeColorFromMenu), keyEquivalent: "")
+        colorItem.target = self
+        menu.addItem(colorItem)
+
+        let deleteItem = NSMenuItem(title: "Delete Workspace…", action: #selector(deleteWorkspaceFromMenu), keyEquivalent: "")
+        deleteItem.target = self
+        deleteItem.isEnabled = canDelete
+        menu.addItem(deleteItem)
+
+        if view.window != nil {
+            let pointInView = view.convert(point, from: nil)
+            menu.popUp(positioning: nil, at: pointInView, in: view)
         }
     }
 
     @objc private func createWorkspaceFromMenu() {
         promptCreateWorkspace()
-    }
-
-    @objc private func showWorkspaceActionsMenu() {
-        guard let menu = workspaceActionsButton.menu else { return }
-        let location = NSPoint(x: workspaceActionsButton.bounds.midX, y: workspaceActionsButton.bounds.minY - 6)
-        menu.popUp(positioning: nil, at: location, in: workspaceActionsButton)
     }
 
     @objc private func renameWorkspaceFromMenu() {
