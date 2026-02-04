@@ -62,12 +62,20 @@ final class WorkspaceSwitcherView: NSView {
 
     private let scrollView = NSScrollView()
     private let contentView = NSView()
+    private let leftShadowView = NSView()
+    private let rightShadowView = NSView()
     private var workspaceButtons: [UUID: WorkspaceButton] = [:]
     private var addButton: AddWorkspaceButton?
 
     var style: Style {
         didSet {
             applyStyle()
+        }
+    }
+
+    var workspaceColor: WorkspaceColorId = .defaultColor() {
+        didSet {
+            updateShadows()
         }
     }
 
@@ -117,11 +125,21 @@ final class WorkspaceSwitcherView: NSView {
         scrollView.borderType = .noBorder
         scrollView.autohidesScrollers = true
         scrollView.scrollerStyle = .overlay
+        scrollView.contentView.postsBoundsChangedNotifications = true
 
         contentView.translatesAutoresizingMaskIntoConstraints = false
 
         scrollView.documentView = contentView
         addSubview(scrollView)
+
+        // Setup shadow views
+        leftShadowView.translatesAutoresizingMaskIntoConstraints = false
+        leftShadowView.wantsLayer = true
+        rightShadowView.translatesAutoresizingMaskIntoConstraints = false
+        rightShadowView.wantsLayer = true
+
+        addSubview(leftShadowView)
+        addSubview(rightShadowView)
 
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -129,8 +147,27 @@ final class WorkspaceSwitcherView: NSView {
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            contentView.heightAnchor.constraint(equalTo: scrollView.heightAnchor)
+            contentView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
+
+            leftShadowView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            leftShadowView.topAnchor.constraint(equalTo: topAnchor),
+            leftShadowView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            leftShadowView.widthAnchor.constraint(equalToConstant: 32),
+
+            rightShadowView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            rightShadowView.topAnchor.constraint(equalTo: topAnchor),
+            rightShadowView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            rightShadowView.widthAnchor.constraint(equalToConstant: 32)
         ])
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(scrollViewDidScroll),
+            name: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView
+        )
+
+        updateShadows()
     }
 
     private func applyStyle() {
@@ -223,6 +260,71 @@ final class WorkspaceSwitcherView: NSView {
             button.isSelected = (id == selectedWorkspaceId)
         }
     }
+
+    @objc private func scrollViewDidScroll() {
+        updateShadows()
+        // Refresh hover states for all buttons when scrolling
+        for (_, button) in workspaceButtons {
+            button.refreshHoverState()
+        }
+        addButton?.refreshHoverState()
+    }
+
+    private func updateShadows() {
+        let clipView = scrollView.contentView
+
+        let visibleRect = clipView.documentVisibleRect
+        let contentWidth = contentView.bounds.width
+
+        let canScrollLeft = visibleRect.origin.x > 0
+        let canScrollRight = visibleRect.origin.x + visibleRect.width < contentWidth
+
+        // Create gradients based on workspace color
+        let baseColor = workspaceColor.color
+
+        let shadowGradientOpacity = 0.80
+
+        if canScrollLeft {
+            let leftGradient = CAGradientLayer()
+            leftGradient.frame = leftShadowView.bounds
+            leftGradient.colors = [
+                baseColor.withAlphaComponent(shadowGradientOpacity).cgColor,
+                baseColor.withAlphaComponent(0.0).cgColor
+            ]
+            leftGradient.startPoint = CGPoint(x: 0, y: 0.5)
+            leftGradient.endPoint = CGPoint(x: 1, y: 0.5)
+            leftShadowView.layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
+            leftShadowView.layer?.addSublayer(leftGradient)
+            leftShadowView.isHidden = false
+        } else {
+            leftShadowView.isHidden = true
+        }
+
+        if canScrollRight {
+            let rightGradient = CAGradientLayer()
+            rightGradient.frame = rightShadowView.bounds
+            rightGradient.colors = [
+                baseColor.withAlphaComponent(0.0).cgColor,
+                baseColor.withAlphaComponent(shadowGradientOpacity).cgColor
+            ]
+            rightGradient.startPoint = CGPoint(x: 0, y: 0.5)
+            rightGradient.endPoint = CGPoint(x: 1, y: 0.5)
+            rightShadowView.layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
+            rightShadowView.layer?.addSublayer(rightGradient)
+            rightShadowView.isHidden = false
+        } else {
+            rightShadowView.isHidden = true
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        updateShadows()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 }
 
 // MARK: - WorkspaceButton
@@ -297,9 +399,19 @@ private final class WorkspaceButton: NSControl {
             removeTrackingArea(existing)
         }
 
-        let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeInKeyWindow]
+        let options: NSTrackingArea.Options = [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect]
         trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
         addTrackingArea(trackingArea!)
+    }
+
+    override func layout() {
+        super.layout()
+        refreshHoverState()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshHoverState()
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -312,6 +424,22 @@ private final class WorkspaceButton: NSControl {
         super.mouseExited(with: event)
         isHovered = false
         updateAppearance()
+    }
+
+    func refreshHoverState() {
+        guard let window else {
+            if isHovered {
+                isHovered = false
+                updateAppearance()
+            }
+            return
+        }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        let hovered = bounds.contains(point)
+        if hovered != isHovered {
+            isHovered = hovered
+            updateAppearance()
+        }
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -403,9 +531,19 @@ private final class AddWorkspaceButton: NSControl {
             removeTrackingArea(existing)
         }
 
-        let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeInKeyWindow]
+        let options: NSTrackingArea.Options = [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect]
         trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
         addTrackingArea(trackingArea!)
+    }
+
+    override func layout() {
+        super.layout()
+        refreshHoverState()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshHoverState()
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -418,6 +556,22 @@ private final class AddWorkspaceButton: NSControl {
         super.mouseExited(with: event)
         isHovered = false
         updateAppearance()
+    }
+
+    func refreshHoverState() {
+        guard let window else {
+            if isHovered {
+                isHovered = false
+                updateAppearance()
+            }
+            return
+        }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        let hovered = bounds.contains(point)
+        if hovered != isHovered {
+            isHovered = hovered
+            updateAppearance()
+        }
     }
 
     override func mouseDown(with event: NSEvent) {

@@ -135,8 +135,8 @@ final class MainViewController: NSViewController {
         view.addSubview(stack)
 
         NSLayoutConstraint.activate([
-            workspaceSwitcher.leadingAnchor.constraint(equalTo: topBar.leadingAnchor, constant: 12),
-            workspaceSwitcher.trailingAnchor.constraint(equalTo: topBar.trailingAnchor, constant: -12),
+            workspaceSwitcher.leadingAnchor.constraint(equalTo: topBar.leadingAnchor),
+            workspaceSwitcher.trailingAnchor.constraint(equalTo: topBar.trailingAnchor),
             workspaceSwitcher.topAnchor.constraint(equalTo: topBar.topAnchor),
             workspaceSwitcher.bottomAnchor.constraint(equalTo: topBar.bottomAnchor),
 
@@ -207,6 +207,7 @@ final class MainViewController: NSViewController {
             )
         }
         workspaceSwitcher.selectedWorkspaceId = selectedId
+        workspaceSwitcher.workspaceColor = model.currentWorkspace.colorId
     }
 
     private func applyWorkspaceStyling() {
