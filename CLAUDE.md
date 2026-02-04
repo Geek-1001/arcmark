@@ -8,6 +8,8 @@ Arcmark is a macOS bookmark management application built with Swift and AppKit. 
 
 ## Development Commands
 
+**IMPORTANT**: Never run `./scripts/run.sh` or any build/run scripts automatically. The user will run these scripts in the background when needed.
+
 ### Building and Testing
 ```bash
 # Build the project
