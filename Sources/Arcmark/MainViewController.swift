@@ -501,6 +501,7 @@ final class MainViewController: NSViewController {
             let colorMenuItem = NSMenuItem(title: colorId.name, action: #selector(changeColorTo(_:)), keyEquivalent: "")
             colorMenuItem.target = self
             colorMenuItem.representedObject = colorId
+            colorMenuItem.image = createColorPreviewImage(color: colorId.color)
             if colorId == model.currentWorkspace.colorId {
                 colorMenuItem.state = .on
             }
@@ -533,6 +534,25 @@ final class MainViewController: NSViewController {
         guard let colorId = sender.representedObject as? WorkspaceColorId else { return }
         let workspace = model.currentWorkspace
         model.updateWorkspaceColor(id: workspace.id, colorId: colorId)
+    }
+
+    private func createColorPreviewImage(color: NSColor, size: CGFloat = 12) -> NSImage {
+        let image = NSImage(size: NSSize(width: size, height: size))
+        image.lockFocus()
+
+        let rect = NSRect(x: 0, y: 0, width: size, height: size)
+        let path = NSBezierPath(ovalIn: rect)
+        color.setFill()
+        path.fill()
+
+        // Add subtle border
+        let borderColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.20)
+        borderColor.setStroke()
+        path.lineWidth = 1.5
+        path.stroke()
+
+        image.unlockFocus()
+        return image
     }
 
     @objc private func deleteWorkspaceFromMenu() {
