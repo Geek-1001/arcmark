@@ -6,6 +6,9 @@
 import AppKit
 
 final class SettingsContentViewController: NSViewController {
+    // Layout constants
+    private let horizontalPadding: CGFloat = 8
+
     // Browser section
     private let browserPopupContainer = NSView()
     private let browserPopup = NSPopUpButton()
@@ -201,19 +204,19 @@ final class SettingsContentViewController: NSViewController {
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
 
             // Window Settings Header
-            windowSettingsHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            windowSettingsHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
             windowSettingsHeader.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),
 
             // Always on Top Toggle
             alwaysOnTopToggle.leadingAnchor.constraint(equalTo: windowSettingsHeader.leadingAnchor),
             alwaysOnTopToggle.topAnchor.constraint(equalTo: windowSettingsHeader.bottomAnchor, constant: 16),
-            alwaysOnTopToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            alwaysOnTopToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             alwaysOnTopToggle.heightAnchor.constraint(equalToConstant: 28),
 
             // Attach Sidebar Toggle
             attachSidebarToggle.leadingAnchor.constraint(equalTo: alwaysOnTopToggle.leadingAnchor),
             attachSidebarToggle.topAnchor.constraint(equalTo: alwaysOnTopToggle.bottomAnchor, constant: 12),
-            attachSidebarToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            attachSidebarToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             attachSidebarToggle.heightAnchor.constraint(equalToConstant: 28),
 
             // Sidebar Position Label
@@ -223,15 +226,15 @@ final class SettingsContentViewController: NSViewController {
             // Position selector buttons
             sidebarPositionSelector.leadingAnchor.constraint(equalTo: sidebarPositionLabel.leadingAnchor),
             sidebarPositionSelector.topAnchor.constraint(equalTo: sidebarPositionLabel.bottomAnchor, constant: 10),
-            sidebarPositionSelector.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            sidebarPositionSelector.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
 
             // Separator 1
-            separator1.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
-            separator1.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            separator1.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            separator1.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             separator1.heightAnchor.constraint(equalToConstant: 1),
 
             // Browser Header
-            browserHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            browserHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
             browserHeader.topAnchor.constraint(equalTo: separator1.bottomAnchor, constant: 20),
 
             // Browser Label
@@ -241,7 +244,7 @@ final class SettingsContentViewController: NSViewController {
             // Browser Popup Container - full width
             browserPopupContainer.leadingAnchor.constraint(equalTo: browserLabel.leadingAnchor),
             browserPopupContainer.topAnchor.constraint(equalTo: browserLabel.bottomAnchor, constant: 8),
-            browserPopupContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            browserPopupContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             browserPopupContainer.heightAnchor.constraint(equalToConstant: 36),
 
             // Browser Popup inside container
@@ -250,13 +253,13 @@ final class SettingsContentViewController: NSViewController {
             browserPopup.centerYAnchor.constraint(equalTo: browserPopupContainer.centerYAnchor),
 
             // Separator 2
-            separator2.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
-            separator2.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            separator2.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            separator2.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             separator2.topAnchor.constraint(equalTo: browserPopupContainer.bottomAnchor, constant: 20),
             separator2.heightAnchor.constraint(equalToConstant: 1),
 
             // Permissions Header
-            permissionsHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            permissionsHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
             permissionsHeader.topAnchor.constraint(equalTo: separator2.bottomAnchor, constant: 20),
 
             // Permission Status Label
