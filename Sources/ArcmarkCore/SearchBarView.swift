@@ -130,7 +130,7 @@ final class SearchBarView: NSView, NSTextFieldDelegate {
         clearWidthConstraint = clearButton.widthAnchor.constraint(equalToConstant: max(style.clearIconPointSize, 16))
         clearHeightConstraint = clearButton.heightAnchor.constraint(equalToConstant: max(style.clearIconPointSize, 16))
         textLeadingConstraint = textField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: style.iconTitleSpacing)
-        textTrailingConstraint = textField.trailingAnchor.constraint(lessThanOrEqualTo: clearButton.leadingAnchor, constant: -style.clearSpacing)
+        textTrailingConstraint = textField.trailingAnchor.constraint(equalTo: clearButton.leadingAnchor, constant: -style.clearSpacing)
 
         NSLayoutConstraint.activate([
             iconLeadingConstraint!,
