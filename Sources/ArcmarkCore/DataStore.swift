@@ -68,6 +68,6 @@ final class DataStore {
             colorId: .defaultColor(),
             items: []
         )
-        return AppState(schemaVersion: 1, workspaces: [workspace], selectedWorkspaceId: workspace.id)
+        return AppState(schemaVersion: 1, workspaces: [workspace], selectedWorkspaceId: workspace.id, isSettingsSelected: false)
     }
 }
