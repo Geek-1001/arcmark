@@ -30,8 +30,8 @@ final class SettingsContentViewController: NSViewController {
 
     // Permissions section
     private let permissionStatusLabel = NSTextField(labelWithString: "")
-    private let openSettingsButton = NSButton(title: "Open System Settings", target: nil, action: nil)
-    private let refreshStatusButton = CustomTextButton(title: "Refresh Status")
+    private let openSettingsButton = SettingsButton(title: "Open System Settings")
+    private let refreshStatusButton = SettingsButton(title: "Refresh Status")
 
     // Scroll view
     private let scrollView = NSScrollView()
@@ -182,8 +182,6 @@ final class SettingsContentViewController: NSViewController {
         openSettingsButton.target = self
         openSettingsButton.action = #selector(openAccessibilitySettings)
         openSettingsButton.translatesAutoresizingMaskIntoConstraints = false
-        openSettingsButton.bezelStyle = .rounded
-        openSettingsButton.font = NSFont.systemFont(ofSize: 13)
 
         refreshStatusButton.target = self
         refreshStatusButton.action = #selector(refreshPermissionStatus)
@@ -277,10 +275,14 @@ final class SettingsContentViewController: NSViewController {
             // Refresh Status Button (below status label)
             refreshStatusButton.leadingAnchor.constraint(equalTo: permissionStatusLabel.leadingAnchor),
             refreshStatusButton.topAnchor.constraint(equalTo: permissionStatusLabel.bottomAnchor, constant: itemSpacing),
+            refreshStatusButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            refreshStatusButton.heightAnchor.constraint(equalToConstant: 36),
 
             // Open Settings Button (below refresh button)
             openSettingsButton.leadingAnchor.constraint(equalTo: refreshStatusButton.leadingAnchor),
             openSettingsButton.topAnchor.constraint(equalTo: refreshStatusButton.bottomAnchor, constant: itemSpacing),
+            openSettingsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            openSettingsButton.heightAnchor.constraint(equalToConstant: 36),
 
             // Bottom constraint to define content height - use greaterThanOrEqualTo to allow content to be anchored at top
             contentView.bottomAnchor.constraint(greaterThanOrEqualTo: openSettingsButton.bottomAnchor, constant: 24),
@@ -516,5 +518,71 @@ final class SettingsContentViewController: NSViewController {
 private final class FlippedContentView: NSView {
     override var isFlipped: Bool {
         return true
+    }
+}
+
+// MARK: - Settings Button
+
+/// A custom button with background and hover effect, styled like the dropdown container
+private final class SettingsButton: NSButton {
+    private let baseBackgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.08)
+    private let hoverBackgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.12)
+    private let textColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0)
+
+    private var trackingArea: NSTrackingArea?
+
+    init(title: String) {
+        super.init(frame: .zero)
+        self.title = title
+        setupButton()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupButton()
+    }
+
+    private func setupButton() {
+        wantsLayer = true
+        isBordered = false
+        bezelStyle = .regularSquare
+        font = NSFont.systemFont(ofSize: 13)
+
+        // Setup layer
+        layer?.backgroundColor = baseBackgroundColor.cgColor
+        layer?.cornerRadius = 8
+
+        // Set text color
+        let attributes: [NSAttributedString.Key: Any] = [
+            .foregroundColor: textColor,
+            .font: NSFont.systemFont(ofSize: 13)
+        ]
+        attributedTitle = NSAttributedString(string: title, attributes: attributes)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+
+        if let existingArea = trackingArea {
+            removeTrackingArea(existingArea)
+        }
+
+        let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeAlways]
+        trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
+        addTrackingArea(trackingArea!)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        layer?.backgroundColor = hoverBackgroundColor.cgColor
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        layer?.backgroundColor = baseBackgroundColor.cgColor
+    }
+
+    override var intrinsicContentSize: NSSize {
+        return NSSize(width: NSView.noIntrinsicMetric, height: 36)
     }
 }
