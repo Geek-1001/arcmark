@@ -11,13 +11,15 @@ final class AppModel {
         self.store = store
         self.state = store.load()
 
-        if let savedId = UserDefaults.standard.string(forKey: UserDefaultsKeys.lastSelectedWorkspaceId),
-           let uuid = UUID(uuidString: savedId),
-           state.workspaces.contains(where: { $0.id == uuid }) {
-            state.selectedWorkspaceId = uuid
-        }
-        if state.selectedWorkspaceId == nil {
-            state.selectedWorkspaceId = state.workspaces.first?.id
+        if !state.isSettingsSelected {
+            if let savedId = UserDefaults.standard.string(forKey: UserDefaultsKeys.lastSelectedWorkspaceId),
+               let uuid = UUID(uuidString: savedId),
+               state.workspaces.contains(where: { $0.id == uuid }) {
+                state.selectedWorkspaceId = uuid
+            }
+            if state.selectedWorkspaceId == nil {
+                state.selectedWorkspaceId = state.workspaces.first?.id
+            }
         }
     }
 
@@ -43,7 +45,14 @@ final class AppModel {
     func selectWorkspace(id: UUID) {
         guard state.workspaces.contains(where: { $0.id == id }) else { return }
         state.selectedWorkspaceId = id
+        state.isSettingsSelected = false
         UserDefaults.standard.set(id.uuidString, forKey: UserDefaultsKeys.lastSelectedWorkspaceId)
+        persist()
+    }
+
+    func selectSettings() {
+        state.isSettingsSelected = true
+        state.selectedWorkspaceId = nil
         persist()
     }
 
