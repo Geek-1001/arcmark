@@ -25,7 +25,6 @@ final class SettingsContentViewController: NSViewController {
     // Window settings section - custom components
     private let alwaysOnTopToggle = CustomToggle(title: "Always on Top")
     private let attachSidebarToggle = CustomToggle(title: "Attach to Window as Sidebar")
-    private let sidebarPositionLabel = NSTextField(labelWithString: "Sidebar Position:")
     private let sidebarPositionSelector = SidebarPositionSelector()
 
     // Permissions section
@@ -133,10 +132,6 @@ final class SettingsContentViewController: NSViewController {
         attachSidebarToggle.action = #selector(attachSidebarChanged)
         attachSidebarToggle.translatesAutoresizingMaskIntoConstraints = false
 
-        sidebarPositionLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-        sidebarPositionLabel.textColor = regularTextColor
-        sidebarPositionLabel.translatesAutoresizingMaskIntoConstraints = false
-
         // Setup position selector
         sidebarPositionSelector.translatesAutoresizingMaskIntoConstraints = false
         sidebarPositionSelector.onPositionChanged = { [weak self] _ in
@@ -147,11 +142,6 @@ final class SettingsContentViewController: NSViewController {
 
         // Browser Section
         let browserHeader = createSectionHeader("Browser")
-
-        let browserLabel = NSTextField(labelWithString: "Default Browser")
-        browserLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-        browserLabel.textColor = regularTextColor
-        browserLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // Browser popup container with styled background
         browserPopupContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -191,11 +181,9 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(windowSettingsHeader)
         contentView.addSubview(alwaysOnTopToggle)
         contentView.addSubview(attachSidebarToggle)
-        contentView.addSubview(sidebarPositionLabel)
         contentView.addSubview(sidebarPositionSelector)
         contentView.addSubview(separator1)
         contentView.addSubview(browserHeader)
-        contentView.addSubview(browserLabel)
         contentView.addSubview(browserPopupContainer)
         browserPopupContainer.addSubview(browserPopup)
         contentView.addSubview(separator2)
@@ -225,13 +213,9 @@ final class SettingsContentViewController: NSViewController {
             attachSidebarToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             attachSidebarToggle.heightAnchor.constraint(equalToConstant: 28),
 
-            // Sidebar Position Label
-            sidebarPositionLabel.leadingAnchor.constraint(equalTo: attachSidebarToggle.leadingAnchor),
-            sidebarPositionLabel.topAnchor.constraint(equalTo: attachSidebarToggle.bottomAnchor, constant: itemSpacing),
-
-            // Position selector buttons
-            sidebarPositionSelector.leadingAnchor.constraint(equalTo: sidebarPositionLabel.leadingAnchor),
-            sidebarPositionSelector.topAnchor.constraint(equalTo: sidebarPositionLabel.bottomAnchor, constant: controlLabelSpacing),
+            // Position selector buttons (directly below toggle)
+            sidebarPositionSelector.leadingAnchor.constraint(equalTo: attachSidebarToggle.leadingAnchor),
+            sidebarPositionSelector.topAnchor.constraint(equalTo: attachSidebarToggle.bottomAnchor, constant: itemSpacing),
             sidebarPositionSelector.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
 
             // Separator 1
@@ -243,13 +227,9 @@ final class SettingsContentViewController: NSViewController {
             browserHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
             browserHeader.topAnchor.constraint(equalTo: separator1.bottomAnchor, constant: sectionSpacing),
 
-            // Browser Label
-            browserLabel.leadingAnchor.constraint(equalTo: browserHeader.leadingAnchor),
-            browserLabel.topAnchor.constraint(equalTo: browserHeader.bottomAnchor, constant: sectionHeaderSpacing),
-
-            // Browser Popup Container
-            browserPopupContainer.leadingAnchor.constraint(equalTo: browserLabel.leadingAnchor),
-            browserPopupContainer.topAnchor.constraint(equalTo: browserLabel.bottomAnchor, constant: controlLabelSpacing),
+            // Browser Popup Container (directly below header)
+            browserPopupContainer.leadingAnchor.constraint(equalTo: browserHeader.leadingAnchor),
+            browserPopupContainer.topAnchor.constraint(equalTo: browserHeader.bottomAnchor, constant: sectionHeaderSpacing),
             browserPopupContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             browserPopupContainer.heightAnchor.constraint(equalToConstant: 36),
 
@@ -390,7 +370,6 @@ final class SettingsContentViewController: NSViewController {
         }
 
         // Update visibility and layout constraints
-        sidebarPositionLabel.isHidden = !shouldShowSidebarPosition
         sidebarPositionSelector.isHidden = !shouldShowSidebarPosition
 
         // Switch constraints based on visibility
