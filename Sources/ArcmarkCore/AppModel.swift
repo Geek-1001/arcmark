@@ -108,6 +108,16 @@ final class AppModel {
         persist()
     }
 
+    func reorderWorkspace(id: UUID, toIndex: Int) {
+        guard let currentIndex = state.workspaces.firstIndex(where: { $0.id == id }) else { return }
+        guard toIndex >= 0 && toIndex < state.workspaces.count else { return }
+        guard currentIndex != toIndex else { return }
+
+        let workspace = state.workspaces.remove(at: currentIndex)
+        state.workspaces.insert(workspace, at: toIndex)
+        persist()
+    }
+
     @discardableResult
     func addFolder(name: String, parentId: UUID?) -> UUID {
         let folder = Folder(id: UUID(), name: name, children: [], isExpanded: true)
