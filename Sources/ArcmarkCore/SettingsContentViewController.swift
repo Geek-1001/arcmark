@@ -27,6 +27,13 @@ final class SettingsContentViewController: NSViewController {
     private let attachSidebarToggle = CustomToggle(title: "Attach to Window as Sidebar")
     private let sidebarPositionSelector = SidebarPositionSelector()
 
+    // Workspace management section
+    private let workspaceCollectionView = WorkspaceContextMenuCollectionView()
+    private var workspaceCollectionViewHeightConstraint: NSLayoutConstraint?
+    private var contextWorkspaceId: UUID?
+    private var inlineRenameWorkspaceId: UUID?
+    private let workspaceDropIndicator = WorkspaceDropIndicatorView()
+
     // Permissions section
     private let permissionStatusLabel = NSTextField(labelWithString: "")
     private let openSettingsButton = SettingsButton(title: "Open System Settings")
@@ -37,7 +44,16 @@ final class SettingsContentViewController: NSViewController {
     private let importStatusLabel = NSTextField(labelWithString: "")
 
     // Reference to AppModel (will be set from MainViewController)
-    weak var appModel: AppModel?
+    weak var appModel: AppModel? {
+        didSet {
+            reloadWorkspaces()
+        }
+    }
+
+    // Called by MainViewController when workspaces change
+    func notifyWorkspacesChanged() {
+        reloadWorkspaces()
+    }
 
     // Scroll view
     private let scrollView = NSScrollView()
@@ -56,10 +72,12 @@ final class SettingsContentViewController: NSViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupScrollView()
+        setupWorkspaceCollectionView()
         setupUI()
         loadPreferences()
         loadBrowsers()
         updatePermissionStatus()
+        reloadWorkspaces()
 
         // Observe app activation to refresh permission status
         NotificationCenter.default.addObserver(
@@ -67,6 +85,14 @@ final class SettingsContentViewController: NSViewController {
             selector: #selector(applicationDidBecomeActive),
             name: NSApplication.didBecomeActiveNotification,
             object: nil
+        )
+
+        // Observe scroll bounds changes to refresh hover states
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWorkspaceScrollBoundsChanged),
+            name: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView
         )
     }
 
@@ -127,6 +153,37 @@ final class SettingsContentViewController: NSViewController {
         return separator
     }
 
+    private func setupWorkspaceCollectionView() {
+        let layout = ListFlowLayout(metrics: ListMetrics())
+        workspaceCollectionView.collectionViewLayout = layout
+        workspaceCollectionView.translatesAutoresizingMaskIntoConstraints = false
+        workspaceCollectionView.dataSource = self
+        workspaceCollectionView.delegate = self
+        workspaceCollectionView.isSelectable = true  // Changed to true to enable drag and drop
+        workspaceCollectionView.allowsMultipleSelection = false
+        workspaceCollectionView.backgroundColors = [.clear]
+        workspaceCollectionView.settingsController = self
+
+        // Set up context menu handler
+        workspaceCollectionView.onRightClick = { [weak self] workspaceId, event in
+            self?.showWorkspaceContextMenu(for: workspaceId, at: event)
+        }
+
+        // Register the workspace item
+        workspaceCollectionView.register(
+            WorkspaceCollectionViewItem.self,
+            forItemWithIdentifier: NSUserInterfaceItemIdentifier("WorkspaceItem")
+        )
+
+        // Register for drag types
+        workspaceCollectionView.registerForDraggedTypes([workspacePasteboardType])
+        workspaceCollectionView.setDraggingSourceOperationMask(.move, forLocal: true)
+
+        // Setup drop indicator
+        workspaceDropIndicator.translatesAutoresizingMaskIntoConstraints = false
+        workspaceCollectionView.addSubview(workspaceDropIndicator)
+    }
+
     private func setupUI() {
         // Window Settings Section
         let windowSettingsHeader = createSectionHeader("Window Settings")
@@ -146,6 +203,11 @@ final class SettingsContentViewController: NSViewController {
         }
 
         let separator1 = createSeparator()
+
+        // Workspace Management Section
+        let workspaceHeader = createSectionHeader("Manage Workspaces")
+
+        let separator2 = createSeparator()
 
         // Browser Section
         let browserHeader = createSectionHeader("Browser")
@@ -168,7 +230,7 @@ final class SettingsContentViewController: NSViewController {
             browserPopup.contentTintColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.80)
         }
 
-        let separator2 = createSeparator()
+        let separator3 = createSeparator()
 
         // Permissions Section
         let permissionsHeader = createSectionHeader("Permissions")
@@ -184,7 +246,7 @@ final class SettingsContentViewController: NSViewController {
         refreshStatusButton.action = #selector(refreshPermissionStatus)
         refreshStatusButton.translatesAutoresizingMaskIntoConstraints = false
 
-        let separator3 = createSeparator()
+        let separator4 = createSeparator()
 
         // Import & Export Section
         let importHeader = createSectionHeader("Import & Export")
@@ -208,15 +270,18 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(attachSidebarToggle)
         contentView.addSubview(sidebarPositionSelector)
         contentView.addSubview(separator1)
+        contentView.addSubview(workspaceHeader)
+        contentView.addSubview(workspaceCollectionView)
+        contentView.addSubview(separator2)
         contentView.addSubview(browserHeader)
         contentView.addSubview(browserPopupContainer)
         browserPopupContainer.addSubview(browserPopup)
-        contentView.addSubview(separator2)
+        contentView.addSubview(separator3)
         contentView.addSubview(permissionsHeader)
         contentView.addSubview(permissionStatusLabel)
         contentView.addSubview(openSettingsButton)
         contentView.addSubview(refreshStatusButton)
-        contentView.addSubview(separator3)
+        contentView.addSubview(separator4)
         contentView.addSubview(importHeader)
         contentView.addSubview(importButton)
         contentView.addSubview(importStatusLabel)
@@ -252,9 +317,24 @@ final class SettingsContentViewController: NSViewController {
             separator1.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             separator1.heightAnchor.constraint(equalToConstant: 1),
 
+            // Workspace Management Header
+            workspaceHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            workspaceHeader.topAnchor.constraint(equalTo: separator1.bottomAnchor, constant: sectionSpacing),
+
+                // Workspace Collection View - full width without horizontal padding
+            workspaceCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            workspaceCollectionView.topAnchor.constraint(equalTo: workspaceHeader.bottomAnchor, constant: sectionHeaderSpacing),
+            workspaceCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+
+            // Separator 2
+            separator2.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            separator2.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            separator2.topAnchor.constraint(equalTo: workspaceCollectionView.bottomAnchor, constant: sectionSpacing),
+            separator2.heightAnchor.constraint(equalToConstant: 1),
+
             // Browser Header
             browserHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
-            browserHeader.topAnchor.constraint(equalTo: separator1.bottomAnchor, constant: sectionSpacing),
+            browserHeader.topAnchor.constraint(equalTo: separator2.bottomAnchor, constant: sectionSpacing),
 
             // Browser Popup Container (directly below header)
             browserPopupContainer.leadingAnchor.constraint(equalTo: browserHeader.leadingAnchor),
@@ -267,15 +347,15 @@ final class SettingsContentViewController: NSViewController {
             browserPopup.trailingAnchor.constraint(equalTo: browserPopupContainer.trailingAnchor, constant: -12),
             browserPopup.centerYAnchor.constraint(equalTo: browserPopupContainer.centerYAnchor),
 
-            // Separator 2
-            separator2.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
-            separator2.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
-            separator2.topAnchor.constraint(equalTo: browserPopupContainer.bottomAnchor, constant: sectionSpacing),
-            separator2.heightAnchor.constraint(equalToConstant: 1),
+            // Separator 3
+            separator3.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            separator3.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            separator3.topAnchor.constraint(equalTo: browserPopupContainer.bottomAnchor, constant: sectionSpacing),
+            separator3.heightAnchor.constraint(equalToConstant: 1),
 
             // Permissions Header
             permissionsHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
-            permissionsHeader.topAnchor.constraint(equalTo: separator2.bottomAnchor, constant: sectionSpacing),
+            permissionsHeader.topAnchor.constraint(equalTo: separator3.bottomAnchor, constant: sectionSpacing),
 
             // Permission Status Label
             permissionStatusLabel.leadingAnchor.constraint(equalTo: permissionsHeader.leadingAnchor),
@@ -293,15 +373,15 @@ final class SettingsContentViewController: NSViewController {
             openSettingsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             openSettingsButton.heightAnchor.constraint(equalToConstant: 36),
 
-            // Separator 3
-            separator3.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
-            separator3.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
-            separator3.topAnchor.constraint(equalTo: refreshStatusButton.bottomAnchor, constant: sectionSpacing),
-            separator3.heightAnchor.constraint(equalToConstant: 1),
+            // Separator 4
+            separator4.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            separator4.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            separator4.topAnchor.constraint(equalTo: refreshStatusButton.bottomAnchor, constant: sectionSpacing),
+            separator4.heightAnchor.constraint(equalToConstant: 1),
 
             // Import & Export Header
             importHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
-            importHeader.topAnchor.constraint(equalTo: separator3.bottomAnchor, constant: sectionSpacing),
+            importHeader.topAnchor.constraint(equalTo: separator4.bottomAnchor, constant: sectionSpacing),
 
             // Import Button (below header)
             importButton.leadingAnchor.constraint(equalTo: importHeader.leadingAnchor),
@@ -324,6 +404,10 @@ final class SettingsContentViewController: NSViewController {
 
         // Activate the appropriate constraint based on initial state
         separator1ToSelectorConstraint?.isActive = true
+
+        // Setup workspace collection view height constraint (will be updated dynamically)
+        workspaceCollectionViewHeightConstraint = workspaceCollectionView.heightAnchor.constraint(equalToConstant: 0)
+        workspaceCollectionViewHeightConstraint?.isActive = true
     }
 
     private func loadPreferences() {
@@ -612,6 +696,9 @@ final class SettingsContentViewController: NSViewController {
         if let previousWorkspaceId = previousWorkspaceId {
             appModel.selectWorkspace(id: previousWorkspaceId)
         }
+
+        // Reload the workspace list to reflect the newly imported workspaces
+        reloadWorkspaces()
     }
 
     private func addNodeToWorkspace(_ node: Node, parentId: UUID?, appModel: AppModel) {
@@ -635,6 +722,310 @@ final class SettingsContentViewController: NSViewController {
 
     private func hideImportStatus() {
         importStatusLabel.isHidden = true
+    }
+
+    // MARK: - Workspace Management
+
+    private func reloadWorkspaces() {
+        guard let appModel = appModel else { return }
+
+        // Update collection view height based on workspace count
+        let metrics = ListMetrics()
+        let rowCount = appModel.workspaces.count
+        let totalHeight = CGFloat(rowCount) * metrics.rowHeight + CGFloat(rowCount - 1) * metrics.verticalGap
+        workspaceCollectionViewHeightConstraint?.constant = totalHeight
+
+        // Invalidate layout before reloading to ensure proper sizing
+        workspaceCollectionView.collectionViewLayout?.invalidateLayout()
+
+        workspaceCollectionView.reloadData()
+    }
+
+    private func handleWorkspaceDelete(id: UUID) {
+        guard let appModel = appModel else { return }
+
+        // Check if only one workspace
+        if appModel.workspaces.count <= 1 {
+            return
+        }
+
+        // Show confirmation alert
+        let alert = NSAlert()
+        alert.messageText = "Delete Workspace?"
+        alert.informativeText = "Are you sure you want to delete this workspace? All links and folders will be permanently removed."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Delete")
+
+        // Make Delete button destructive
+        if let deleteButton = alert.buttons.last {
+            deleteButton.hasDestructiveAction = true
+        }
+
+        alert.beginSheetModal(for: view.window!) { response in
+            if response == .alertSecondButtonReturn {
+                appModel.deleteWorkspace(id: id)
+                self.reloadWorkspaces()
+            }
+        }
+    }
+
+    private func handleWorkspaceRename(id: UUID, newName: String) {
+        guard let appModel = appModel else { return }
+        appModel.renameWorkspace(id: id, newName: newName)
+        reloadWorkspaces()
+    }
+
+    @objc private func handleWorkspaceRightClick(_ sender: NSMenuItem) {
+        guard let workspaceId = sender.representedObject as? UUID else { return }
+        contextWorkspaceId = workspaceId
+    }
+
+    private func showWorkspaceContextMenu(for workspaceId: UUID, at event: NSEvent) {
+        guard let appModel = appModel else { return }
+        guard let workspace = appModel.workspaces.first(where: { $0.id == workspaceId }) else { return }
+
+        contextWorkspaceId = workspaceId
+
+        let menu = NSMenu()
+
+        // Rename option
+        let renameItem = NSMenuItem(title: "Rename Workspace...", action: #selector(beginInlineRenameForContextWorkspace), keyEquivalent: "")
+        renameItem.target = self
+        menu.addItem(renameItem)
+
+        // Change Color submenu
+        let colorSubmenu = NSMenu()
+        for colorId in WorkspaceColorId.allCases {
+            let item = NSMenuItem(title: colorId.name, action: #selector(changeWorkspaceColor(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = colorId
+
+            // Add checkmark if current color
+            if workspace.colorId == colorId {
+                item.state = .on
+            }
+
+            // Add color indicator
+            let colorCircle = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
+                colorId.color.setFill()
+                let path = NSBezierPath(ovalIn: rect)
+                path.fill()
+                return true
+            }
+            item.image = colorCircle
+
+            colorSubmenu.addItem(item)
+        }
+
+        let colorItem = NSMenuItem(title: "Change Color", action: nil, keyEquivalent: "")
+        colorItem.submenu = colorSubmenu
+        menu.addItem(colorItem)
+
+        // Delete option
+        menu.addItem(.separator())
+        let deleteItem = NSMenuItem(title: "Delete Workspace...", action: #selector(deleteContextWorkspace), keyEquivalent: "")
+        deleteItem.target = self
+        deleteItem.isEnabled = appModel.workspaces.count > 1
+        menu.addItem(deleteItem)
+
+        NSMenu.popUpContextMenu(menu, with: event, for: workspaceCollectionView)
+    }
+
+    @objc private func beginInlineRenameForContextWorkspace() {
+        guard let workspaceId = contextWorkspaceId else { return }
+        guard let appModel = appModel else { return }
+        guard let index = appModel.workspaces.firstIndex(where: { $0.id == workspaceId }) else { return }
+
+        inlineRenameWorkspaceId = workspaceId
+
+        DispatchQueue.main.async {
+            let indexPath = IndexPath(item: index, section: 0)
+            if let item = self.workspaceCollectionView.item(at: indexPath) as? WorkspaceCollectionViewItem {
+                item.beginInlineRename()
+            }
+        }
+    }
+
+    @objc private func changeWorkspaceColor(_ sender: NSMenuItem) {
+        guard let workspaceId = contextWorkspaceId else { return }
+        guard let colorId = sender.representedObject as? WorkspaceColorId else { return }
+        guard let appModel = appModel else { return }
+
+        appModel.updateWorkspaceColor(id: workspaceId, colorId: colorId)
+        reloadWorkspaces()
+    }
+
+    @objc private func deleteContextWorkspace() {
+        guard let workspaceId = contextWorkspaceId else { return }
+        handleWorkspaceDelete(id: workspaceId)
+    }
+
+    @objc private func handleWorkspaceScrollBoundsChanged() {
+        for item in workspaceCollectionView.visibleItems() {
+            (item as? WorkspaceCollectionViewItem)?.refreshHoverState()
+        }
+    }
+}
+
+// MARK: - NSCollectionViewDataSource
+
+extension SettingsContentViewController: NSCollectionViewDataSource {
+    func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int {
+        return appModel?.workspaces.count ?? 0
+    }
+
+    func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
+        guard let appModel = appModel else {
+            return NSCollectionViewItem()
+        }
+
+        let item = collectionView.makeItem(
+            withIdentifier: NSUserInterfaceItemIdentifier("WorkspaceItem"),
+            for: indexPath
+        ) as! WorkspaceCollectionViewItem
+
+        let workspace = appModel.workspaces[indexPath.item]
+        let canDelete = appModel.workspaces.count > 1
+
+        item.configure(
+            workspace: workspace,
+            canDelete: canDelete,
+            onDelete: { [weak self] id in
+                self?.handleWorkspaceDelete(id: id)
+            },
+            onRenameCommit: { [weak self] id, newName in
+                self?.handleWorkspaceRename(id: id, newName: newName)
+            }
+        )
+
+        return item
+    }
+}
+
+
+// MARK: - NSCollectionViewDelegate
+
+extension SettingsContentViewController: NSCollectionViewDelegate, NSCollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: NSCollectionView, canDragItemsAt indexPaths: Set<IndexPath>, with event: NSEvent) -> Bool {
+        return true
+    }
+
+    func collectionView(_ collectionView: NSCollectionView, pasteboardWriterForItemAt indexPath: IndexPath) -> NSPasteboardWriting? {
+        guard let appModel = appModel else {
+            return nil
+        }
+        let workspace = appModel.workspaces[indexPath.item]
+
+        let pasteboardItem = NSPasteboardItem()
+        pasteboardItem.setString(workspace.id.uuidString, forType: workspacePasteboardType)
+        return pasteboardItem
+    }
+
+    func collectionView(_ collectionView: NSCollectionView, validateDrop draggingInfo: NSDraggingInfo, proposedIndexPath proposedDropIndexPath: AutoreleasingUnsafeMutablePointer<NSIndexPath>, dropOperation proposedDropOperation: UnsafeMutablePointer<NSCollectionView.DropOperation>) -> NSDragOperation {
+        // Only allow drop before items (for reordering)
+        proposedDropOperation.pointee = .before
+
+        // Show drop indicator
+        let indexPath = proposedDropIndexPath.pointee as IndexPath
+        let metrics = ListMetrics()
+
+        if indexPath.item == 0 {
+            // Drop at the beginning
+            let indicatorFrame = CGRect(
+                x: 0,
+                y: 0,
+                width: collectionView.bounds.width,
+                height: 2
+            )
+            workspaceDropIndicator.showLine(in: indicatorFrame)
+        } else if indexPath.item < (appModel?.workspaces.count ?? 0) {
+            // Drop between items
+            let y = CGFloat(indexPath.item) * (metrics.rowHeight + metrics.verticalGap) - metrics.verticalGap / 2
+            let indicatorFrame = CGRect(
+                x: 0,
+                y: y,
+                width: collectionView.bounds.width,
+                height: 2
+            )
+            workspaceDropIndicator.showLine(in: indicatorFrame)
+        } else {
+            // Drop at the end
+            let count = appModel?.workspaces.count ?? 0
+            let y = CGFloat(count) * (metrics.rowHeight + metrics.verticalGap) - metrics.verticalGap / 2
+            let indicatorFrame = CGRect(
+                x: 0,
+                y: y,
+                width: collectionView.bounds.width,
+                height: 2
+            )
+            workspaceDropIndicator.showLine(in: indicatorFrame)
+        }
+
+        return .move
+    }
+
+    func collectionView(_ collectionView: NSCollectionView, acceptDrop draggingInfo: NSDraggingInfo, indexPath: IndexPath, dropOperation: NSCollectionView.DropOperation) -> Bool {
+        // Hide drop indicator
+        workspaceDropIndicator.hide()
+
+        guard let appModel = appModel else {
+            return false
+        }
+        guard let pasteboardItem = draggingInfo.draggingPasteboard.pasteboardItems?.first else {
+            return false
+        }
+        guard let uuidString = pasteboardItem.string(forType: workspacePasteboardType) else {
+            return false
+        }
+        guard let workspaceId = UUID(uuidString: uuidString) else {
+            return false
+        }
+        guard let currentIndex = appModel.workspaces.firstIndex(where: { $0.id == workspaceId }) else {
+            return false
+        }
+
+        var targetIndex = indexPath.item
+
+        // Adjust target index if dragging within the same list
+        if currentIndex < targetIndex {
+            targetIndex -= 1
+        }
+
+        // Perform the reorder
+        appModel.reorderWorkspace(id: workspaceId, toIndex: targetIndex)
+        reloadWorkspaces()
+
+        return true
+    }
+
+    func collectionView(_ collectionView: NSCollectionView, draggingSession session: NSDraggingSession, endedAt screenPoint: NSPoint, dragOperation operation: NSDragOperation) {
+        // Hide drop indicator when drag ends
+        workspaceDropIndicator.hide()
+    }
+}
+
+// MARK: - Workspace Context Menu Collection View
+
+private final class WorkspaceContextMenuCollectionView: NSCollectionView {
+    var onRightClick: ((UUID, NSEvent) -> Void)?
+
+    weak var settingsController: SettingsContentViewController?
+
+    override func rightMouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if let indexPath = indexPathForItem(at: point),
+           let appModel = settingsController?.appModel {
+            let workspace = appModel.workspaces[indexPath.item]
+            onRightClick?(workspace.id, event)
+        } else {
+            super.rightMouseDown(with: event)
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        // Call super to allow drag operations
+        super.mouseDown(with: event)
     }
 }
 
@@ -803,5 +1194,38 @@ private final class SettingsButton: NSButton {
 
     override var intrinsicContentSize: NSSize {
         return NSSize(width: NSView.noIntrinsicMetric, height: 36)
+    }
+}
+
+// MARK: - Workspace Drop Indicator View
+
+private final class WorkspaceDropIndicatorView: NSView {
+    private let lineThickness: CGFloat = 2
+    private let accentColor = NSColor.controlAccentColor
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.masksToBounds = true
+        isHidden = true
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = true
+        layer?.masksToBounds = true
+        isHidden = true
+    }
+
+    func showLine(in frame: NSRect) {
+        isHidden = false
+        self.frame = frame
+        layer?.cornerRadius = lineThickness / 2
+        layer?.backgroundColor = accentColor.cgColor
+        layer?.borderWidth = 0
+    }
+
+    func hide() {
+        isHidden = true
     }
 }

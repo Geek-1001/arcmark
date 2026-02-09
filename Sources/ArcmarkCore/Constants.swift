@@ -17,6 +17,7 @@ enum UserDefaultsKeys {
 }
 
 let nodePasteboardType = NSPasteboard.PasteboardType("com.arcmark.node")
+let workspacePasteboardType = NSPasteboard.PasteboardType("com.arcmark.workspace")
 
 struct LayoutConstants {
     static let windowPadding: CGFloat = 8

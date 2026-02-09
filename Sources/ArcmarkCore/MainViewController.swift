@@ -218,6 +218,9 @@ final class MainViewController: NSViewController {
         }
         reloadWorkspaceMenu()
 
+        // Notify settings view that workspaces may have changed
+        settingsViewController.notifyWorkspacesChanged()
+
         // Clear selections when workspace changes
         let currentWorkspaceId = model.currentWorkspace.id
         if hasLoaded && currentWorkspaceId != lastWorkspaceId {
