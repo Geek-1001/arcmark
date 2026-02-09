@@ -48,7 +48,7 @@ final class WorkspaceRowView: NSView {
                 colorSquareBorderWidth: 1.5,
                 colorSquareCornerRadius: 6,
                 deleteButtonSize: 20,
-                handleLeading: 8,
+                handleLeading: 16,
                 colorSquareLeading: 8,
                 titleLeading: 14,
                 titleTrailing: 14,
