@@ -12,6 +12,8 @@ enum UserDefaultsKeys {
     static let mainWindowSize = "mainWindowSize"
     static let sidebarAttachmentEnabled = "sidebarAttachmentEnabled"
     static let sidebarPosition = "sidebarPosition"
+    static let lastArcImportDate = "lastArcImportDate"
+    static let arcImportCount = "arcImportCount"
 }
 
 let nodePasteboardType = NSPasteboard.PasteboardType("com.arcmark.node")

@@ -148,6 +148,7 @@ final class MainViewController: NSViewController {
         stack.alignment = .centerX
 
         // Setup settings view (initially hidden)
+        settingsViewController.appModel = model
         addChild(settingsViewController)
         settingsViewController.view.translatesAutoresizingMaskIntoConstraints = false
         settingsViewController.view.isHidden = true

@@ -29,21 +29,21 @@ struct Workspace: Codable, Identifiable, Equatable {
     var items: [Node]
 }
 
-struct Link: Codable, Identifiable, Equatable {
+struct Link: Codable, Identifiable, Equatable, Sendable {
     var id: UUID
     var title: String
     var url: String
     var faviconPath: String?
 }
 
-struct Folder: Codable, Identifiable, Equatable {
+struct Folder: Codable, Identifiable, Equatable, Sendable {
     var id: UUID
     var name: String
     var children: [Node]
     var isExpanded: Bool
 }
 
-enum Node: Codable, Identifiable, Equatable, Hashable {
+enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
     case folder(Folder)
     case link(Link)
 
