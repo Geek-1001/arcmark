@@ -32,6 +32,7 @@ struct ListMetrics {
     let folderTitleFont: NSFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
     let titleColor: NSColor = NSColor.black.withAlphaComponent(0.8)
     let hoverBackgroundColor: NSColor = NSColor.black.withAlphaComponent(0.1)
+    let selectedBackgroundColor: NSColor = NSColor.black.withAlphaComponent(0.4)
     let deleteTintColor: NSColor = NSColor.black.withAlphaComponent(0.5)
     let iconTintColor: NSColor = NSColor.black.withAlphaComponent(0.7)
 }
