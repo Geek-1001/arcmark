@@ -32,6 +32,13 @@ final class SettingsContentViewController: NSViewController {
     private let openSettingsButton = SettingsButton(title: "Open System Settings")
     private let refreshStatusButton = SettingsButton(title: "Refresh Status")
 
+    // Import & Export section
+    private let importButton = SettingsButton(title: "Import from Arc Browser")
+    private let importStatusLabel = NSTextField(labelWithString: "")
+
+    // Reference to AppModel (will be set from MainViewController)
+    weak var appModel: AppModel?
+
     // Scroll view
     private let scrollView = NSScrollView()
     private let contentView = FlippedContentView()
@@ -177,6 +184,24 @@ final class SettingsContentViewController: NSViewController {
         refreshStatusButton.action = #selector(refreshPermissionStatus)
         refreshStatusButton.translatesAutoresizingMaskIntoConstraints = false
 
+        let separator3 = createSeparator()
+
+        // Import & Export Section
+        let importHeader = createSectionHeader("Import & Export")
+
+        importButton.target = self
+        importButton.action = #selector(importFromArc)
+        importButton.translatesAutoresizingMaskIntoConstraints = false
+
+        importStatusLabel.font = NSFont.systemFont(ofSize: 11)
+        importStatusLabel.textColor = NSColor.secondaryLabelColor
+        importStatusLabel.maximumNumberOfLines = 0
+        importStatusLabel.lineBreakMode = .byWordWrapping
+        importStatusLabel.alignment = .center
+        importStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+        importStatusLabel.isHidden = true
+        importStatusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
         // Add all subviews to contentView
         contentView.addSubview(windowSettingsHeader)
         contentView.addSubview(alwaysOnTopToggle)
@@ -191,6 +216,10 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(permissionStatusLabel)
         contentView.addSubview(openSettingsButton)
         contentView.addSubview(refreshStatusButton)
+        contentView.addSubview(separator3)
+        contentView.addSubview(importHeader)
+        contentView.addSubview(importButton)
+        contentView.addSubview(importStatusLabel)
 
         // Layout constraints
         NSLayoutConstraint.activate([
@@ -264,8 +293,29 @@ final class SettingsContentViewController: NSViewController {
             openSettingsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             openSettingsButton.heightAnchor.constraint(equalToConstant: 36),
 
+            // Separator 3
+            separator3.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            separator3.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            separator3.topAnchor.constraint(equalTo: refreshStatusButton.bottomAnchor, constant: sectionSpacing),
+            separator3.heightAnchor.constraint(equalToConstant: 1),
+
+            // Import & Export Header
+            importHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            importHeader.topAnchor.constraint(equalTo: separator3.bottomAnchor, constant: sectionSpacing),
+
+            // Import Button (below header)
+            importButton.leadingAnchor.constraint(equalTo: importHeader.leadingAnchor),
+            importButton.topAnchor.constraint(equalTo: importHeader.bottomAnchor, constant: sectionHeaderSpacing),
+            importButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            importButton.heightAnchor.constraint(equalToConstant: 36),
+
+            // Import Status Label (below import button)
+            importStatusLabel.leadingAnchor.constraint(equalTo: importButton.leadingAnchor),
+            importStatusLabel.topAnchor.constraint(equalTo: importButton.bottomAnchor, constant: itemSpacing),
+            importStatusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+
             // Bottom constraint to define content height - use greaterThanOrEqualTo to allow content to be anchored at top
-            contentView.bottomAnchor.constraint(greaterThanOrEqualTo: openSettingsButton.bottomAnchor, constant: 24),
+            contentView.bottomAnchor.constraint(greaterThanOrEqualTo: importStatusLabel.bottomAnchor, constant: 24),
         ])
 
         // Setup dynamic constraints for separator1
@@ -488,6 +538,99 @@ final class SettingsContentViewController: NSViewController {
 
     @objc private func refreshPermissionStatus() {
         updatePermissionStatus()
+    }
+
+    @objc private func importFromArc() {
+        // Construct default Arc path
+        let arcPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Arc/StorableSidebar.json")
+
+        // Check if file exists
+        guard FileManager.default.fileExists(atPath: arcPath.path) else {
+            showImportStatus("Arc browser not found or no bookmarks available. Please ensure Arc is installed and has bookmarks.", isError: true)
+            return
+        }
+
+        // Import directly
+        Task { @MainActor [weak self] in
+            await self?.handleArcImport(fileURL: arcPath)
+        }
+    }
+
+    private func handleArcImport(fileURL: URL) async {
+        // Show loading state
+        showImportStatus("Importing from Arc...", isError: false)
+
+        // Perform import
+        let result = await ArcImportService.shared.importFromArc(fileURL: fileURL)
+
+        switch result {
+        case .success(let importResult):
+            // Apply to AppModel
+            applyImport(importResult)
+
+            // Show success message
+            let message = """
+            Successfully imported:
+            • \(importResult.workspacesCreated) workspaces
+            • \(importResult.linksImported) links
+            • \(importResult.foldersImported) folders
+            """
+            showImportStatus(message, isError: false)
+
+            // Hide message after 5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                self?.hideImportStatus()
+            }
+
+        case .failure(let error):
+            showImportStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func applyImport(_ result: ArcImportResult) {
+        guard let appModel = appModel else { return }
+
+        // Remember the currently selected workspace
+        let previousWorkspaceId = appModel.state.selectedWorkspaceId
+
+        for workspace in result.workspaces {
+            // Create the workspace using AppModel's method
+            _ = appModel.createWorkspace(name: workspace.name, colorId: workspace.colorId)
+
+            // The workspace is now selected, add all nodes to it
+            for node in workspace.nodes {
+                addNodeToWorkspace(node, parentId: nil, appModel: appModel)
+            }
+        }
+
+        // Restore the previously selected workspace
+        if let previousWorkspaceId = previousWorkspaceId {
+            appModel.selectWorkspace(id: previousWorkspaceId)
+        }
+    }
+
+    private func addNodeToWorkspace(_ node: Node, parentId: UUID?, appModel: AppModel) {
+        switch node {
+        case .link(let link):
+            appModel.addLink(urlString: link.url, title: link.title, parentId: parentId)
+        case .folder(let folder):
+            let folderId = appModel.addFolder(name: folder.name, parentId: parentId)
+            // Recursively add children
+            for child in folder.children {
+                addNodeToWorkspace(child, parentId: folderId, appModel: appModel)
+            }
+        }
+    }
+
+    private func showImportStatus(_ message: String, isError: Bool) {
+        importStatusLabel.stringValue = message
+        importStatusLabel.textColor = isError ? NSColor.systemRed : regularTextColor
+        importStatusLabel.isHidden = false
+    }
+
+    private func hideImportStatus() {
+        importStatusLabel.isHidden = true
     }
 }
 
