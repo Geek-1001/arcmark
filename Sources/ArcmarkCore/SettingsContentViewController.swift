@@ -559,10 +559,14 @@ final class SettingsContentViewController: NSViewController {
 
     private func handleArcImport(fileURL: URL) async {
         // Show loading state
+        importButton.setLoading(true)
         showImportStatus("Importing from Arc...", isError: false)
 
         // Perform import
         let result = await ArcImportService.shared.importFromArc(fileURL: fileURL)
+
+        // Hide loading state
+        importButton.setLoading(false)
 
         switch result {
         case .success(let importResult):
@@ -647,19 +651,38 @@ private final class FlippedContentView: NSView {
 
 /// A custom button with background and hover effect, styled like the dropdown container
 private final class SettingsButton: NSButton {
-    private let baseBackgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.08)
-    private let hoverBackgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.12)
-    private let textColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0)
+    // Style constants
+    private struct Style {
+        // Base color reference: #141414 = RGB(20, 20, 20) = (20/255, 20/255, 20/255)
+        private static let baseColorValue: CGFloat = 20.0 / 255.0  // 0.0784313725
+
+        // Enabled state
+        static let baseBackgroundColor = NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: 0.08)
+        static let hoverBackgroundColor = NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: 0.12)
+        static let textColor = NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: 1.0)
+
+        // Disabled state
+        static let disabledBackgroundColor = NSColor(calibratedRed: 191.0/255.0, green: 193.0/255.0, blue: 195.0/255.0, alpha: 1.0) // #BFC1C3
+        static let disabledTextColor = NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: 1.0) // #141414 (same as enabled)
+
+        static let cornerRadius: CGFloat = 8
+        static let fontSize: CGFloat = 13
+    }
 
     private var trackingArea: NSTrackingArea?
+    private var spinner: NSProgressIndicator?
+    private let originalTitle: String
+    private var isLoading: Bool = false
 
     init(title: String) {
+        self.originalTitle = title
         super.init(frame: .zero)
         self.title = title
         setupButton()
     }
 
     required init?(coder: NSCoder) {
+        self.originalTitle = ""
         super.init(coder: coder)
         setupButton()
     }
@@ -668,18 +691,84 @@ private final class SettingsButton: NSButton {
         wantsLayer = true
         isBordered = false
         bezelStyle = .regularSquare
-        font = NSFont.systemFont(ofSize: 13)
+        font = NSFont.systemFont(ofSize: Style.fontSize)
 
         // Setup layer
-        layer?.backgroundColor = baseBackgroundColor.cgColor
-        layer?.cornerRadius = 8
+        layer?.backgroundColor = Style.baseBackgroundColor.cgColor
+        layer?.cornerRadius = Style.cornerRadius
 
         // Set text color
+        updateTextColor(Style.textColor)
+    }
+
+    private func updateTextColor(_ color: NSColor) {
         let attributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: textColor,
-            .font: NSFont.systemFont(ofSize: 13)
+            .foregroundColor: color,
+            .font: NSFont.systemFont(ofSize: Style.fontSize)
         ]
-        attributedTitle = NSAttributedString(string: title, attributes: attributes)
+        attributedTitle = NSAttributedString(string: originalTitle, attributes: attributes)
+    }
+
+    func setLoading(_ loading: Bool) {
+        self.isLoading = loading
+
+        if loading {
+            // Create and add spinner if it doesn't exist
+            if spinner == nil {
+                let progressIndicator = NSProgressIndicator()
+                progressIndicator.style = .spinning
+                progressIndicator.controlSize = .small
+                progressIndicator.translatesAutoresizingMaskIntoConstraints = false
+
+                // Force aqua appearance so the spinner renders as dark/black instead of white
+                // This is necessary because NSProgressIndicator doesn't have a direct color API
+                progressIndicator.appearance = NSAppearance(named: .aqua)
+
+                addSubview(progressIndicator)
+
+                // Position spinner to the right of the text
+                NSLayoutConstraint.activate([
+                    progressIndicator.centerYAnchor.constraint(equalTo: centerYAnchor),
+                    progressIndicator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+                    progressIndicator.widthAnchor.constraint(equalToConstant: 16),
+                    progressIndicator.heightAnchor.constraint(equalToConstant: 16)
+                ])
+
+                spinner = progressIndicator
+            }
+
+            // Apply disabled background styling (without actually disabling the button)
+            layer?.backgroundColor = Style.disabledBackgroundColor.cgColor
+
+            // Update text color to #141414 with full opacity
+            let attributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: Style.disabledTextColor,
+                .font: NSFont.systemFont(ofSize: Style.fontSize)
+            ]
+            attributedTitle = NSAttributedString(string: originalTitle, attributes: attributes)
+
+            // Show and start spinner
+            spinner?.startAnimation(nil)
+            spinner?.isHidden = false
+        } else {
+            // Hide and stop spinner
+            spinner?.stopAnimation(nil)
+            spinner?.isHidden = true
+
+            // Restore enabled background styling
+            layer?.backgroundColor = Style.baseBackgroundColor.cgColor
+
+            // Restore text color
+            updateTextColor(Style.textColor)
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        // Prevent action if loading
+        if isLoading {
+            return
+        }
+        super.mouseDown(with: event)
     }
 
     override func updateTrackingAreas() {
@@ -696,12 +785,20 @@ private final class SettingsButton: NSButton {
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        layer?.backgroundColor = hoverBackgroundColor.cgColor
+        // Only show hover effect if not loading
+        if !isLoading {
+            layer?.backgroundColor = Style.hoverBackgroundColor.cgColor
+        }
     }
 
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        layer?.backgroundColor = baseBackgroundColor.cgColor
+        // Restore appropriate background based on loading state
+        if isLoading {
+            layer?.backgroundColor = Style.disabledBackgroundColor.cgColor
+        } else {
+            layer?.backgroundColor = Style.baseBackgroundColor.cgColor
+        }
     }
 
     override var intrinsicContentSize: NSSize {
