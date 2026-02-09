@@ -230,6 +230,63 @@ final class AppModel {
         nodeById(id, nodes: currentWorkspace.items)
     }
 
+    func findNode(id: UUID, in nodes: [Node]) -> Node? {
+        for node in nodes {
+            if node.id == id {
+                return node
+            }
+            if case .folder(let folder) = node,
+               let found = findNode(id: id, in: folder.children) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    func moveNodesToWorkspace(nodeIds: [UUID], toWorkspaceId: UUID) {
+        guard toWorkspaceId != currentWorkspace.id else { return }
+        guard !nodeIds.isEmpty else { return }
+
+        var nodesToMove: [Node] = []
+
+        updateWorkspace(id: currentWorkspace.id, notify: false) { workspace in
+            for nodeId in nodeIds {
+                if let removed = removeNode(id: nodeId, nodes: &workspace.items) {
+                    nodesToMove.append(removed)
+                }
+            }
+        }
+
+        updateWorkspace(id: toWorkspaceId) { workspace in
+            workspace.items.append(contentsOf: nodesToMove)
+        }
+    }
+
+    @discardableResult
+    func groupNodesInNewFolder(nodeIds: [UUID], folderName: String) -> UUID? {
+        guard !nodeIds.isEmpty else { return nil }
+
+        var nodesToGroup: [Node] = []
+
+        updateWorkspace(id: currentWorkspace.id, notify: false) { workspace in
+            for nodeId in nodeIds {
+                if let removed = removeNode(id: nodeId, nodes: &workspace.items) {
+                    nodesToGroup.append(removed)
+                }
+            }
+        }
+
+        guard !nodesToGroup.isEmpty else { return nil }
+
+        let folder = Folder(id: UUID(), name: folderName, children: nodesToGroup, isExpanded: true)
+
+        updateWorkspace(id: currentWorkspace.id) { workspace in
+            workspace.items.append(.folder(folder))
+        }
+
+        return folder.id
+    }
+
     private func insertNode(_ node: Node, parentId: UUID?) {
         updateWorkspace(id: currentWorkspace.id) { workspace in
             insertNode(node, parentId: parentId, index: nil, nodes: &workspace.items)
