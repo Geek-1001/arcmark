@@ -1,5 +1,5 @@
 import XCTest
-@testable import Arcmark
+@testable import ArcmarkCore
 
 final class ModelTests: XCTestCase {
     private func makeStore() -> DataStore {
@@ -11,7 +11,7 @@ final class ModelTests: XCTestCase {
         let link = Link(id: UUID(), title: "Example", url: "https://example.com", faviconPath: nil)
         let folder = Folder(id: UUID(), name: "Folder", children: [.link(link)], isExpanded: true)
         let workspace = Workspace(id: UUID(), name: "Inbox", colorId: .ember, items: [.folder(folder)])
-        let state = AppState(schemaVersion: 1, workspaces: [workspace], selectedWorkspaceId: workspace.id)
+        let state = AppState(schemaVersion: 1, workspaces: [workspace], selectedWorkspaceId: workspace.id, isSettingsSelected: false)
 
         let data = try JSONEncoder().encode(state)
         let decoded = try JSONDecoder().decode(AppState.self, from: data)

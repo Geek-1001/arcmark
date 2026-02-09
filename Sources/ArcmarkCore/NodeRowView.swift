@@ -6,6 +6,7 @@ final class NodeRowView: NSView {
     private let deleteButton = NSButton()
     private var trackingArea: NSTrackingArea?
     private var isHovered = false
+    private var isSelected = false
     private var showsDeleteButton = false
     private var metrics = ListMetrics()
     private var onDelete: (() -> Void)?
@@ -92,10 +93,12 @@ final class NodeRowView: NSView {
                    titleFont: NSFont,
                    showDelete: Bool,
                    metrics: ListMetrics,
-                   onDelete: (() -> Void)?) {
+                   onDelete: (() -> Void)?,
+                   isSelected: Bool) {
         self.metrics = metrics
+        self.isSelected = isSelected
         isHovered = false
-        updateHoverState()
+        updateVisualState()
         if isEditingTitle {
             if let original = editingOriginalTitle, original != title {
                 cancelInlineRename()
@@ -188,20 +191,20 @@ final class NodeRowView: NSView {
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
         isHovered = true
-        updateHoverState()
+        updateVisualState()
     }
 
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
         isHovered = false
-        updateHoverState()
+        updateVisualState()
     }
 
     func refreshHoverState() {
         guard let window else {
             if isHovered {
                 isHovered = false
-                updateHoverState()
+                updateVisualState()
             }
             return
         }
@@ -209,13 +212,21 @@ final class NodeRowView: NSView {
         let hovered = bounds.contains(point)
         if hovered != isHovered {
             isHovered = hovered
-            updateHoverState()
+            updateVisualState()
         }
     }
 
-    private func updateHoverState() {
-        layer?.backgroundColor = isHovered ? metrics.hoverBackgroundColor.cgColor : NSColor.clear.cgColor
-        deleteButton.isHidden = !(showsDeleteButton && isHovered)
+    private func updateVisualState() {
+        if isSelected {
+            layer?.backgroundColor = metrics.selectedBackgroundColor.cgColor
+            deleteButton.isHidden = true
+        } else if isHovered {
+            layer?.backgroundColor = metrics.hoverBackgroundColor.cgColor
+            deleteButton.isHidden = !showsDeleteButton
+        } else {
+            layer?.backgroundColor = NSColor.clear.cgColor
+            deleteButton.isHidden = true
+        }
     }
 
     private func finishInlineRename(commit: Bool) {

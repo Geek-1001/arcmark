@@ -34,6 +34,9 @@ final class MainViewController: NSViewController {
     private var pendingInlineRenameId: UUID?
     private var pendingWorkspaceRenameId: UUID?
     private var suppressNextSelection = false
+    fileprivate var selectedNodeIds: Set<UUID> = []
+    private var lastWorkspaceId: UUID?
+    fileprivate var isBulkContextMenu = false
 
     init(model: AppModel) {
         self.model = model
@@ -82,6 +85,7 @@ final class MainViewController: NSViewController {
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.placeholder = "Search in workspace"
         searchField.onTextChange = { [weak self] text in
+            self?.clearSelections()
             self?.currentQuery = text
             self?.reloadData()
         }
@@ -106,6 +110,9 @@ final class MainViewController: NSViewController {
         }
         collectionView.onDragExit = { [weak self] in
             self?.hideDropIndicator()
+        }
+        collectionView.onBackgroundClick = { [weak self] in
+            self?.clearSelections()
         }
         dropIndicator.isHidden = true
         collectionView.addSubview(dropIndicator)
@@ -183,6 +190,8 @@ final class MainViewController: NSViewController {
             settingsViewController.view.topAnchor.constraint(equalTo: topBar.bottomAnchor, constant: 10),
             settingsViewController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -LayoutConstants.windowPadding)
         ])
+
+        // Background click handling is done in ContextMenuCollectionView.mouseDown
     }
 
     private func makeCollectionLayout() -> NSCollectionViewLayout {
@@ -208,8 +217,16 @@ final class MainViewController: NSViewController {
         }
         reloadWorkspaceMenu()
 
+        // Clear selections when workspace changes
+        let currentWorkspaceId = model.currentWorkspace.id
+        if hasLoaded && currentWorkspaceId != lastWorkspaceId {
+            clearSelections()
+            lastWorkspaceId = currentWorkspaceId
+        }
+
         // Check if settings is selected
         if model.state.isSettingsSelected {
+            clearSelections()
             showSettingsContent()
         } else {
             showWorkspaceContent()
@@ -363,7 +380,7 @@ final class MainViewController: NSViewController {
         }
     }
 
-    private func row(at indexPath: IndexPath) -> NodeListRow? {
+    fileprivate func row(at indexPath: IndexPath) -> NodeListRow? {
         guard indexPath.item >= 0, indexPath.item < visibleRows.count else { return nil }
         return visibleRows[indexPath.item]
     }
@@ -725,6 +742,29 @@ final class MainViewController: NSViewController {
         pendingInlineRenameId = nodeId
     }
 
+    private func toggleSelection(for nodeId: UUID) {
+        if selectedNodeIds.contains(nodeId) {
+            selectedNodeIds.remove(nodeId)
+        } else {
+            selectedNodeIds.insert(nodeId)
+        }
+        reloadVisibleSelection()
+    }
+
+    private func clearSelections() {
+        guard !selectedNodeIds.isEmpty else { return }
+        selectedNodeIds.removeAll()
+        reloadVisibleSelection()
+    }
+
+    private func reloadVisibleSelection() {
+        for (index, _) in visibleRows.enumerated() {
+            let indexPath = IndexPath(item: index, section: 0)
+            collectionView.reloadItems(at: [indexPath])
+        }
+    }
+
+
     private func handlePendingInlineRename() {
         guard let nodeId = pendingInlineRenameId else { return }
         guard let index = visibleRows.firstIndex(where: { $0.id == nodeId }) else { return }
@@ -806,6 +846,8 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
         guard let nodeItem = item as? NodeCollectionViewItem else { return item }
         guard let row = row(at: indexPath) else { return item }
 
+        let isSelected = selectedNodeIds.contains(row.node.id)
+
         switch row.node {
         case .folder(let folder):
             let icon = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
@@ -817,7 +859,8 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
                 depth: row.depth,
                 metrics: listMetrics,
                 showDelete: false,
-                onDelete: nil
+                onDelete: nil,
+                isSelected: isSelected
             )
         case .link(let link):
             let globeIconConfig = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
@@ -842,7 +885,9 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
                 showDelete: true,
                 onDelete: { [weak self] in
                     self?.model.deleteNode(id: link.id)
-                }
+                    self?.clearSelections()
+                },
+                isSelected: isSelected
             )
 
             if shouldFetch, let url = URL(string: link.url) {
@@ -870,7 +915,15 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
     }
 
     func collectionView(_ collectionView: NSCollectionView, canDragItemsAt indexPaths: Set<IndexPath>, with event: NSEvent) -> Bool {
-        currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+
+        guard selectedNodeIds.isEmpty else {
+            return false
+        }
+
+        return true
     }
 
     func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
@@ -888,6 +941,18 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
                 return
             }
             if !self.collectionView.selectionIndexPaths.contains(indexPath) { return }
+
+            // Check for Cmd key modifier for multi-selection
+            if NSEvent.modifierFlags.contains(.command) {
+                self.toggleSelection(for: row.node.id)
+                self.collectionView.deselectItems(at: indexPaths)
+                return
+            }
+
+            // Clear selections on regular click
+            if !self.selectedNodeIds.isEmpty {
+                self.clearSelections()
+            }
 
             switch row.node {
             case .folder(let folder):
@@ -993,6 +1058,13 @@ extension MainViewController: NSCollectionViewDataSource, NSCollectionViewDelega
 extension MainViewController: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
+
+        // Check for bulk selection context menu
+        if isBulkContextMenu && selectedNodeIds.count > 0 {
+            populateBulkContextMenu(menu)
+            return
+        }
+
         guard let indexPath = contextIndexPath,
               let row = row(at: indexPath) else {
             contextNodeId = nil
@@ -1065,7 +1137,109 @@ extension MainViewController: NSMenuDelegate {
               let workspaceId = sender.representedObject as? UUID else { return }
         model.moveNodeToWorkspace(id: nodeId, workspaceId: workspaceId)
     }
+
+    private func populateBulkContextMenu(_ menu: NSMenu) {
+        let count = selectedNodeIds.count
+
+        // 1. Move to Workspace submenu
+        let moveItem = NSMenuItem(title: "Move to…", action: nil, keyEquivalent: "")
+        let moveSubmenu = NSMenu()
+        for workspace in model.state.workspaces where workspace.id != model.currentWorkspace.id {
+            let item = NSMenuItem(title: workspace.name, action: #selector(bulkMoveToWorkspace), keyEquivalent: "")
+            item.target = self
+            item.representedObject = workspace.id
+            moveSubmenu.addItem(item)
+        }
+        moveItem.submenu = moveSubmenu
+        menu.addItem(moveItem)
+
+        // 2. Group in New Folder
+        let groupItem = NSMenuItem(title: "Group in New Folder", action: #selector(bulkGroupInFolder), keyEquivalent: "")
+        groupItem.target = self
+        menu.addItem(groupItem)
+
+        // 3. Copy Links (only if there are links)
+        let nodes = selectedNodeIds.compactMap { id in
+            model.findNode(id: id, in: model.currentWorkspace.items)
+        }
+        let linkCount = nodes.filter { node in
+            if case .link = node { return true }
+            return false
+        }.count
+
+        if linkCount > 0 {
+            let copyItem = NSMenuItem(title: "Copy \(linkCount) Link\(linkCount > 1 ? "s" : "")", action: #selector(bulkCopyLinks), keyEquivalent: "")
+            copyItem.target = self
+            menu.addItem(copyItem)
+        }
+
+        menu.addItem(NSMenuItem.separator())
+
+        // 4. Delete All
+        let deleteItem = NSMenuItem(title: "Delete \(count) Item\(count > 1 ? "s" : "")…", action: #selector(bulkDelete), keyEquivalent: "")
+        deleteItem.target = self
+        menu.addItem(deleteItem)
+    }
+
+    @objc private func bulkMoveToWorkspace(_ sender: NSMenuItem) {
+        guard let workspaceId = sender.representedObject as? UUID else { return }
+        let nodeIds = Array(selectedNodeIds)
+        model.moveNodesToWorkspace(nodeIds: nodeIds, toWorkspaceId: workspaceId)
+        clearSelections()
+    }
+
+    @objc private func bulkGroupInFolder() {
+        let nodeIds = Array(selectedNodeIds)
+        guard !nodeIds.isEmpty else { return }
+
+        let folderId = model.groupNodesInNewFolder(nodeIds: nodeIds, folderName: "Untitled")
+        clearSelections()
+
+        if let folderId = folderId {
+            scheduleInlineRename(for: folderId)
+        }
+    }
+
+    @objc private func bulkCopyLinks() {
+        let nodes = selectedNodeIds.compactMap { id in
+            model.findNode(id: id, in: model.currentWorkspace.items)
+        }
+        let urls = nodes.compactMap { node -> String? in
+            if case .link(let link) = node {
+                return link.url
+            }
+            return nil
+        }
+
+        guard !urls.isEmpty else { return }
+
+        let joined = urls.joined(separator: "\n")
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(joined, forType: .string)
+
+        clearSelections()
+    }
+
+    @objc private func bulkDelete() {
+        let count = selectedNodeIds.count
+        guard count > 0 else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Delete \(count) Item\(count > 1 ? "s" : "")"
+        alert.informativeText = "This action cannot be undone."
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Cancel")
+        alert.alertStyle = .warning
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            for nodeId in selectedNodeIds {
+                model.deleteNode(id: nodeId)
+            }
+            clearSelections()
+        }
+    }
 }
+
 
 private struct NodeListRow {
     let node: Node
@@ -1125,14 +1299,41 @@ private final class DropIndicatorView: NSView {
 private final class ContextMenuCollectionView: NSCollectionView {
     var onContextRequest: ((IndexPath?) -> Void)?
     var onDragExit: (() -> Void)?
+    var onBackgroundClick: (() -> Void)?
 
     override var mouseDownCanMoveWindow: Bool {
         false
     }
 
+    override func mouseDown(with event: NSEvent) {
+        let location = convert(event.locationInWindow, from: nil)
+        let indexPath = indexPathForItem(at: location)
+
+        // If clicking on empty space, notify the callback
+        if indexPath == nil {
+            onBackgroundClick?()
+        }
+
+        // Always call super to allow normal click handling
+        super.mouseDown(with: event)
+    }
+
     override func menu(for event: NSEvent) -> NSMenu? {
         let location = convert(event.locationInWindow, from: nil)
         let indexPath = indexPathForItem(at: location)
+
+        // Check if clicked item is in selection for bulk context menu
+        if let mainVC = delegate as? MainViewController {
+            if let indexPath = indexPath,
+               let row = mainVC.row(at: indexPath),
+               mainVC.selectedNodeIds.contains(row.node.id),
+               mainVC.selectedNodeIds.count > 0 {
+                mainVC.isBulkContextMenu = true
+            } else {
+                mainVC.isBulkContextMenu = false
+            }
+        }
+
         onContextRequest?(indexPath)
         return menu
     }
