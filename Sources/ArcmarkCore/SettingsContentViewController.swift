@@ -163,6 +163,15 @@ final class SettingsContentViewController: NSViewController {
         workspaceCollectionView.backgroundColors = [.clear]
         workspaceCollectionView.settingsController = self
 
+        // Observe frame changes to invalidate layout when collection view is resized
+        workspaceCollectionView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(workspaceCollectionViewFrameDidChange),
+            name: NSView.frameDidChangeNotification,
+            object: workspaceCollectionView
+        )
+
         // Set up context menu handler
         workspaceCollectionView.onRightClick = { [weak self] workspaceId, event in
             self?.showWorkspaceContextMenu(for: workspaceId, at: event)
@@ -733,6 +742,9 @@ final class SettingsContentViewController: NSViewController {
         let totalHeight = CGFloat(rowCount) * metrics.rowHeight + CGFloat(rowCount - 1) * metrics.verticalGap
         workspaceCollectionViewHeightConstraint?.constant = totalHeight
 
+        // Invalidate layout before reloading to ensure proper sizing
+        workspaceCollectionView.collectionViewLayout?.invalidateLayout()
+
         workspaceCollectionView.reloadData()
     }
 
@@ -861,6 +873,11 @@ final class SettingsContentViewController: NSViewController {
             (item as? WorkspaceCollectionViewItem)?.refreshHoverState()
         }
     }
+
+    @objc private func workspaceCollectionViewFrameDidChange() {
+        // Invalidate layout to trigger recalculation of item sizes
+        workspaceCollectionView.collectionViewLayout?.invalidateLayout()
+    }
 }
 
 // MARK: - NSCollectionViewDataSource
@@ -903,9 +920,14 @@ extension SettingsContentViewController: NSCollectionViewDataSource {
 extension SettingsContentViewController: NSCollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> NSSize {
         let metrics = ListMetrics()
-        // Use bounds.width instead of frame.width for more reliable sizing
-        // Subtract a small amount to prevent layout warnings
-        let width = max(0, collectionView.bounds.width - 1)
+        // Use bounds.width for dynamic sizing based on actual view dimensions
+        // If bounds width is zero (during initial setup), use the enclosing scroll view's width
+        var width = collectionView.bounds.width
+        if width <= 1 {
+            width = scrollView.bounds.width
+        }
+        // Ensure minimum width and subtract small amount to prevent layout warnings
+        width = max(100, width - 1)
         return NSSize(width: width, height: metrics.rowHeight)
     }
 }
