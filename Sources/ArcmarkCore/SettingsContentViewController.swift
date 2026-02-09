@@ -184,10 +184,8 @@ final class SettingsContentViewController: NSViewController {
         )
 
         // Register for drag types
-        print("[Drag Setup] Registering for drag types: \(workspacePasteboardType)")
         workspaceCollectionView.registerForDraggedTypes([workspacePasteboardType])
         workspaceCollectionView.setDraggingSourceOperationMask(.move, forLocal: true)
-        print("[Drag Setup] Collection view setup complete")
 
         // Setup drop indicator
         workspaceDropIndicator.translatesAutoresizingMaskIntoConstraints = false
@@ -936,18 +934,14 @@ extension SettingsContentViewController: NSCollectionViewDelegateFlowLayout {
 
 extension SettingsContentViewController: NSCollectionViewDelegate {
     func collectionView(_ collectionView: NSCollectionView, canDragItemsAt indexPaths: Set<IndexPath>, with event: NSEvent) -> Bool {
-        print("[Drag] canDragItemsAt called for indexPaths: \(indexPaths)")
         return true
     }
 
     func collectionView(_ collectionView: NSCollectionView, pasteboardWriterForItemAt indexPath: IndexPath) -> NSPasteboardWriting? {
-        print("[Drag] pasteboardWriterForItemAt called for indexPath: \(indexPath)")
         guard let appModel = appModel else {
-            print("[Drag] pasteboardWriterForItemAt: appModel is nil")
             return nil
         }
         let workspace = appModel.workspaces[indexPath.item]
-        print("[Drag] Creating pasteboard item for workspace: \(workspace.name) (\(workspace.id))")
 
         let pasteboardItem = NSPasteboardItem()
         pasteboardItem.setString(workspace.id.uuidString, forType: workspacePasteboardType)
@@ -955,7 +949,6 @@ extension SettingsContentViewController: NSCollectionViewDelegate {
     }
 
     func collectionView(_ collectionView: NSCollectionView, validateDrop draggingInfo: NSDraggingInfo, proposedIndexPath proposedDropIndexPath: AutoreleasingUnsafeMutablePointer<NSIndexPath>, dropOperation proposedDropOperation: UnsafeMutablePointer<NSCollectionView.DropOperation>) -> NSDragOperation {
-        print("[Drag] validateDrop called at proposedIndexPath: \(proposedDropIndexPath.pointee)")
         // Only allow drop before items (for reordering)
         proposedDropOperation.pointee = .before
 
@@ -999,29 +992,22 @@ extension SettingsContentViewController: NSCollectionViewDelegate {
     }
 
     func collectionView(_ collectionView: NSCollectionView, acceptDrop draggingInfo: NSDraggingInfo, indexPath: IndexPath, dropOperation: NSCollectionView.DropOperation) -> Bool {
-        print("[Drag] acceptDrop called at indexPath: \(indexPath)")
-
         // Hide drop indicator
         workspaceDropIndicator.hide()
 
         guard let appModel = appModel else {
-            print("[Drag] acceptDrop: appModel is nil")
             return false
         }
         guard let pasteboardItem = draggingInfo.draggingPasteboard.pasteboardItems?.first else {
-            print("[Drag] acceptDrop: no pasteboard items")
             return false
         }
         guard let uuidString = pasteboardItem.string(forType: workspacePasteboardType) else {
-            print("[Drag] acceptDrop: no UUID string in pasteboard")
             return false
         }
         guard let workspaceId = UUID(uuidString: uuidString) else {
-            print("[Drag] acceptDrop: invalid UUID string")
             return false
         }
         guard let currentIndex = appModel.workspaces.firstIndex(where: { $0.id == workspaceId }) else {
-            print("[Drag] acceptDrop: workspace not found")
             return false
         }
 
@@ -1031,8 +1017,6 @@ extension SettingsContentViewController: NSCollectionViewDelegate {
         if currentIndex < targetIndex {
             targetIndex -= 1
         }
-
-        print("[Drag] Reordering workspace from index \(currentIndex) to \(targetIndex)")
 
         // Perform the reorder
         appModel.reorderWorkspace(id: workspaceId, toIndex: targetIndex)
@@ -1066,7 +1050,6 @@ private final class WorkspaceContextMenuCollectionView: NSCollectionView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        print("[WorkspaceCollectionView] mouseDown called")
         // Call super to allow drag operations
         super.mouseDown(with: event)
     }
