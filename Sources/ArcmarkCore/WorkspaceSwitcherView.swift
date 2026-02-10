@@ -23,20 +23,20 @@ final class WorkspaceSwitcherView: NSView {
             Style(
                 textSize: 14,
                 textWeight: .semibold,
-                unselectedTextColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0), // #141414
-                unselectedTextOpacity: 0.80,
-                selectedBackgroundColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0), // #141414
-                selectedTextColor: NSColor.white,
-                hoverBackgroundOpacity: 0.06,
-                circleSize: 12,
+                unselectedTextColor: ThemeConstants.Colors.darkGray,
+                unselectedTextOpacity: ThemeConstants.Opacity.high,
+                selectedBackgroundColor: ThemeConstants.Colors.darkGray,
+                selectedTextColor: ThemeConstants.Colors.white,
+                hoverBackgroundOpacity: ThemeConstants.Opacity.minimal,
+                circleSize: ThemeConstants.Sizing.iconSmall,
                 circleBorderWidth: 2,
-                circleBorderColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0), // #141414
+                circleBorderColor: ThemeConstants.Colors.darkGray,
                 circleBorderOpacity: 0.20,
-                circleTextGap: 6,
-                buttonHorizontalPadding: 10,
-                buttonVerticalPadding: 10,
-                buttonCornerRadius: 8,
-                buttonSpacing: 4
+                circleTextGap: ThemeConstants.Spacing.small,
+                buttonHorizontalPadding: ThemeConstants.Spacing.regular,
+                buttonVerticalPadding: ThemeConstants.Spacing.regular,
+                buttonCornerRadius: ThemeConstants.CornerRadius.medium,
+                buttonSpacing: ThemeConstants.Spacing.tiny
             )
         }
 
@@ -404,12 +404,10 @@ final class WorkspaceSwitcherView: NSView {
 
 // MARK: - SettingsButton
 
-private final class SettingsButton: NSControl {
+private final class SettingsButton: BaseControl {
     private let iconView = NSImageView()
     private let titleLabel = NSTextField(string: "Settings")
     private let style: WorkspaceSwitcherView.Style
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false
 
     var isSelected = false {
         didSet {
@@ -423,7 +421,6 @@ private final class SettingsButton: NSControl {
         self.style = style
         super.init(frame: .zero)
 
-        wantsLayer = true
         layer?.masksToBounds = true
 
         // Setup icon
@@ -463,57 +460,11 @@ private final class SettingsButton: NSControl {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-
-        if let existing = trackingArea {
-            removeTrackingArea(existing)
-        }
-
-        let options: NSTrackingArea.Options = [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect]
-        trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(trackingArea!)
-    }
-
-    override func layout() {
-        super.layout()
-        refreshHoverState()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        refreshHoverState()
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        isHovered = true
+    override func handleHoverStateChanged() {
         updateAppearance()
     }
 
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        isHovered = false
-        updateAppearance()
-    }
-
-    func refreshHoverState() {
-        guard let window else {
-            if isHovered {
-                isHovered = false
-                updateAppearance()
-            }
-            return
-        }
-        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        let hovered = bounds.contains(point)
-        if hovered != isHovered {
-            isHovered = hovered
-            updateAppearance()
-        }
-    }
-
-    override func mouseDown(with event: NSEvent) {
+    override func performAction() {
         onTap?()
     }
 
@@ -540,13 +491,11 @@ private final class SettingsButton: NSControl {
 
 // MARK: - WorkspaceButton
 
-private final class WorkspaceButton: NSControl {
+private final class WorkspaceButton: BaseControl {
     private let workspaceId: UUID
     private let circleView = NSView()
     private let titleLabel = NSTextField(string: "")
     private let style: WorkspaceSwitcherView.Style
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false
 
     // Inline editing state
     private var isEditingTitle = false
@@ -576,7 +525,6 @@ private final class WorkspaceButton: NSControl {
         self.style = style
         super.init(frame: .zero)
 
-        wantsLayer = true
         layer?.masksToBounds = true
 
         // Setup circle
@@ -620,54 +568,8 @@ private final class WorkspaceButton: NSControl {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-
-        if let existing = trackingArea {
-            removeTrackingArea(existing)
-        }
-
-        let options: NSTrackingArea.Options = [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect]
-        trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(trackingArea!)
-    }
-
-    override func layout() {
-        super.layout()
-        refreshHoverState()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        refreshHoverState()
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        isHovered = true
+    override func handleHoverStateChanged() {
         updateAppearance()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        isHovered = false
-        updateAppearance()
-    }
-
-    func refreshHoverState() {
-        guard let window else {
-            if isHovered {
-                isHovered = false
-                updateAppearance()
-            }
-            return
-        }
-        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        let hovered = bounds.contains(point)
-        if hovered != isHovered {
-            isHovered = hovered
-            updateAppearance()
-        }
     }
 
     override func mouseDown(with event: NSEvent) {
