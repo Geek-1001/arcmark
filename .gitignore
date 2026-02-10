@@ -6,3 +6,9 @@ DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+
+# Resources (icons and images - add your actual assets to git manually)
+# This prevents accidentally committing temporary/test assets
+Resources/*.png
+Resources/*.icns
+!Resources/README.md
