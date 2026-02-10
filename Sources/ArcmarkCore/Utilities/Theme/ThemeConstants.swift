@@ -30,12 +30,11 @@ struct ThemeConstants {
 
     // MARK: - Typography
 
-    @MainActor
     struct Fonts {
-        static let bodyRegular = NSFont.systemFont(ofSize: 14, weight: .regular)
-        static let bodySemibold = NSFont.systemFont(ofSize: 14, weight: .semibold)
-        static let bodyMedium = NSFont.systemFont(ofSize: 14, weight: .medium)
-        static let bodyBold = NSFont.systemFont(ofSize: 14, weight: .bold)
+        nonisolated(unsafe) static let bodyRegular = NSFont.systemFont(ofSize: 14, weight: .regular)
+        nonisolated(unsafe) static let bodySemibold = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        nonisolated(unsafe) static let bodyMedium = NSFont.systemFont(ofSize: 14, weight: .medium)
+        nonisolated(unsafe) static let bodyBold = NSFont.systemFont(ofSize: 14, weight: .bold)
 
         static func systemFont(size: CGFloat, weight: NSFont.Weight) -> NSFont {
             NSFont.systemFont(ofSize: size, weight: weight)
@@ -77,12 +76,11 @@ struct ThemeConstants {
 
     // MARK: - Animation
 
-    @MainActor
     struct Animation {
         static let durationFast: TimeInterval = 0.15
         static let durationNormal: TimeInterval = 0.2
         static let durationSlow: TimeInterval = 0.3
 
-        static let timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        nonisolated(unsafe) static let timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
     }
 }
