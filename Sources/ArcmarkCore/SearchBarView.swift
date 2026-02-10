@@ -20,21 +20,21 @@ final class SearchBarView: NSView, NSTextFieldDelegate {
 
         static var defaultSearch: Style {
             Style(
-                baseColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0),
-                backgroundOpacity: 0.10,
-                placeholderOpacity: 0.60,
-                textOpacity: 1.00,
-                iconOpacity: 0.80,
-                font: NSFont.systemFont(ofSize: 14, weight: .medium),
-                iconPointSize: 18,
+                baseColor: ThemeConstants.Colors.darkGray,
+                backgroundOpacity: ThemeConstants.Opacity.extraSubtle,
+                placeholderOpacity: ThemeConstants.Opacity.medium,
+                textOpacity: ThemeConstants.Opacity.full,
+                iconOpacity: ThemeConstants.Opacity.high,
+                font: ThemeConstants.Fonts.bodyMedium,
+                iconPointSize: ThemeConstants.Sizing.iconMedium,
                 iconWeight: .medium,
-                clearIconPointSize: 12,
+                clearIconPointSize: ThemeConstants.Sizing.iconSmall,
                 clearIconWeight: .medium,
-                iconTitleSpacing: 10,
-                clearSpacing: 8,
-                horizontalPadding: 10,
-                verticalPadding: 10,
-                cornerRadius: 8
+                iconTitleSpacing: ThemeConstants.Spacing.regular,
+                clearSpacing: ThemeConstants.Spacing.medium,
+                horizontalPadding: ThemeConstants.Spacing.regular,
+                verticalPadding: ThemeConstants.Spacing.regular,
+                cornerRadius: ThemeConstants.CornerRadius.medium
             )
         }
 

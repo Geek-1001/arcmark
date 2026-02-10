@@ -22,6 +22,9 @@ let package = Package(
             name: "ArcmarkApp",
             dependencies: ["ArcmarkCore"]
         ),
-        .testTarget(name: "ArcmarkTests", dependencies: ["ArcmarkCore"])
+        .testTarget(
+            name: "ArcmarkTests",
+            dependencies: ["ArcmarkCore"]
+        )
     ]
 )

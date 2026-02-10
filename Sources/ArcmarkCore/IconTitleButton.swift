@@ -1,6 +1,6 @@
 import AppKit
 
-final class IconTitleButton: NSControl {
+final class IconTitleButton: BaseControl {
     struct Style {
         var backgroundColor: NSColor
         var hoverBackgroundOpacity: CGFloat
@@ -19,38 +19,38 @@ final class IconTitleButton: NSControl {
 
         static var pasteAction: Style {
             Style(
-                backgroundColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0),
-                hoverBackgroundOpacity: 0.06,
-                pressedBackgroundOpacity: 0.10,
-                foregroundColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0),
-                foregroundInactiveOpacity: 0.80,
-                foregroundActiveOpacity: 1.00,
-                font: NSFont.systemFont(ofSize: 14, weight: .medium),
-                iconPointSize: 18,
+                backgroundColor: ThemeConstants.Colors.darkGray,
+                hoverBackgroundOpacity: ThemeConstants.Opacity.minimal,
+                pressedBackgroundOpacity: ThemeConstants.Opacity.extraSubtle,
+                foregroundColor: ThemeConstants.Colors.darkGray,
+                foregroundInactiveOpacity: ThemeConstants.Opacity.high,
+                foregroundActiveOpacity: ThemeConstants.Opacity.full,
+                font: ThemeConstants.Fonts.bodyMedium,
+                iconPointSize: ThemeConstants.Sizing.iconMedium,
                 iconWeight: .medium,
-                iconTitleSpacing: 8,
-                horizontalPadding: 10,
-                verticalPadding: 10,
-                cornerRadius: 8,
+                iconTitleSpacing: ThemeConstants.Spacing.medium,
+                horizontalPadding: ThemeConstants.Spacing.regular,
+                verticalPadding: ThemeConstants.Spacing.regular,
+                cornerRadius: ThemeConstants.CornerRadius.medium,
                 fillsWidth: true
             )
         }
 
         static var addWorkspace: Style {
             Style(
-                backgroundColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0),
-                hoverBackgroundOpacity: 0.06,
-                pressedBackgroundOpacity: 0.10,
-                foregroundColor: NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0),
-                foregroundInactiveOpacity: 0.80,
-                foregroundActiveOpacity: 1.00,
-                font: NSFont.systemFont(ofSize: 14, weight: .semibold),
-                iconPointSize: 14,
+                backgroundColor: ThemeConstants.Colors.darkGray,
+                hoverBackgroundOpacity: ThemeConstants.Opacity.minimal,
+                pressedBackgroundOpacity: ThemeConstants.Opacity.extraSubtle,
+                foregroundColor: ThemeConstants.Colors.darkGray,
+                foregroundInactiveOpacity: ThemeConstants.Opacity.high,
+                foregroundActiveOpacity: ThemeConstants.Opacity.full,
+                font: ThemeConstants.Fonts.bodySemibold,
+                iconPointSize: ThemeConstants.Sizing.iconSmall,
                 iconWeight: .medium,
-                iconTitleSpacing: 6,
-                horizontalPadding: 10,
-                verticalPadding: 10,
-                cornerRadius: 8,
+                iconTitleSpacing: ThemeConstants.Spacing.small,
+                horizontalPadding: ThemeConstants.Spacing.regular,
+                verticalPadding: ThemeConstants.Spacing.regular,
+                cornerRadius: ThemeConstants.CornerRadius.medium,
                 fillsWidth: false
             )
         }
@@ -64,9 +64,6 @@ final class IconTitleButton: NSControl {
 
     private let imageView = NSImageView()
     private let titleField = NSTextField(labelWithString: "")
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false
-    private var isPressed = false
     private var iconWidthConstraint: NSLayoutConstraint?
     private var iconHeightConstraint: NSLayoutConstraint?
     private var iconLeadingConstraint: NSLayoutConstraint?
@@ -112,12 +109,7 @@ final class IconTitleButton: NSControl {
         applyStyle()
     }
 
-    override var mouseDownCanMoveWindow: Bool {
-        false
-    }
-
     private func setupView() {
-        wantsLayer = true
         layer?.masksToBounds = true
         setAccessibilityRole(.button)
         setAccessibilityLabel(titleField.stringValue)
@@ -178,87 +170,12 @@ final class IconTitleButton: NSControl {
         updateAppearance()
     }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let options: NSTrackingArea.Options = [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect]
-        let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func layout() {
-        super.layout()
-        refreshHoverState()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        refreshHoverState()
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        isHovered = true
+    override func handleHoverStateChanged() {
         updateAppearance()
     }
 
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        isHovered = false
+    override func handlePressedStateChanged() {
         updateAppearance()
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        guard isEnabled else { return }
-        isPressed = true
-        updateAppearance()
-
-        guard let window else { return }
-        var keepTracking = true
-        while keepTracking {
-            guard let nextEvent = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) else { continue }
-            let point = convert(nextEvent.locationInWindow, from: nil)
-            let inside = bounds.contains(point)
-
-            switch nextEvent.type {
-            case .leftMouseDragged:
-                if isPressed != inside || isHovered != inside {
-                    isPressed = inside
-                    isHovered = inside
-                    updateAppearance()
-                }
-            case .leftMouseUp:
-                isPressed = false
-                updateAppearance()
-                if inside {
-                    sendAction(action, to: target)
-                }
-                keepTracking = false
-            default:
-                break
-            }
-        }
-
-        refreshHoverState()
-    }
-
-    private func refreshHoverState() {
-        guard let window else {
-            if isHovered {
-                isHovered = false
-                updateAppearance()
-            }
-            return
-        }
-        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        let hovered = bounds.contains(point)
-        if hovered != isHovered {
-            isHovered = hovered
-            updateAppearance()
-        }
     }
 
     private func updateAppearance() {

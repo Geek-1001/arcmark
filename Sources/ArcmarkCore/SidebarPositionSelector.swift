@@ -13,9 +13,9 @@ final class SidebarPositionSelector: NSControl {
     private var hoveredButton: NSView?
     private var pressedButton: NSView?
 
-    private let buttonHeight: CGFloat = 36
-    private let spacing: CGFloat = 8
-    private let cornerRadius: CGFloat = 8
+    private let buttonHeight: CGFloat = ThemeConstants.Sizing.buttonHeight + 4
+    private let spacing: CGFloat = ThemeConstants.Spacing.medium
+    private let cornerRadius: CGFloat = ThemeConstants.CornerRadius.medium
 
     var selectedPosition: String? {
         didSet {
@@ -53,11 +53,11 @@ final class SidebarPositionSelector: NSControl {
 
         leftIcon.translatesAutoresizingMaskIntoConstraints = false
         leftIcon.image = NSImage(systemSymbolName: "chevron.left", accessibilityDescription: nil)
-        leftIcon.contentTintColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.80)
+        leftIcon.contentTintColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.high)
 
         leftLabel.translatesAutoresizingMaskIntoConstraints = false
         leftLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-        leftLabel.textColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.80)
+        leftLabel.textColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.high)
         leftLabel.isEditable = false
         leftLabel.isBordered = false
         leftLabel.backgroundColor = .clear
@@ -69,11 +69,11 @@ final class SidebarPositionSelector: NSControl {
 
         rightIcon.translatesAutoresizingMaskIntoConstraints = false
         rightIcon.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)
-        rightIcon.contentTintColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.80)
+        rightIcon.contentTintColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.high)
 
         rightLabel.translatesAutoresizingMaskIntoConstraints = false
         rightLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-        rightLabel.textColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.80)
+        rightLabel.textColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.high)
         rightLabel.isEditable = false
         rightLabel.isBordered = false
         rightLabel.backgroundColor = .clear
@@ -233,7 +233,7 @@ final class SidebarPositionSelector: NSControl {
     }
 
     private func updateAppearance(animated: Bool) {
-        let darkGray = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0)
+        let darkGray = ThemeConstants.Colors.darkGray
 
         let updateButton: (NSView, NSImageView, NSTextField, String) -> Void = { button, icon, label, value in
             let isSelected = self.selectedPosition == value
@@ -245,25 +245,25 @@ final class SidebarPositionSelector: NSControl {
             if isSelected {
                 backgroundColor = darkGray
             } else if isPressed {
-                backgroundColor = darkGray.withAlphaComponent(0.10)
+                backgroundColor = darkGray.withAlphaComponent(ThemeConstants.Opacity.extraSubtle)
             } else if isHovered {
-                backgroundColor = darkGray.withAlphaComponent(0.06)
+                backgroundColor = darkGray.withAlphaComponent(ThemeConstants.Opacity.minimal)
             } else {
-                backgroundColor = darkGray.withAlphaComponent(0.15)
+                backgroundColor = darkGray.withAlphaComponent(ThemeConstants.Opacity.subtle)
             }
 
             // Text and icon color
             let foregroundColor: NSColor
             if isSelected {
-                foregroundColor = .white
+                foregroundColor = ThemeConstants.Colors.white
             } else {
-                foregroundColor = darkGray.withAlphaComponent(self.isEnabled ? 0.80 : 0.40)
+                foregroundColor = darkGray.withAlphaComponent(self.isEnabled ? ThemeConstants.Opacity.high : ThemeConstants.Opacity.low)
             }
 
             if animated {
                 NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.15
-                    context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    context.duration = ThemeConstants.Animation.durationFast
+                    context.timingFunction = ThemeConstants.Animation.timingFunction
                     button.layer?.backgroundColor = backgroundColor.cgColor
                     icon.contentTintColor = foregroundColor
                     label.textColor = foregroundColor

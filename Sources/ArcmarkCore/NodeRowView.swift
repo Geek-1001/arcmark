@@ -1,11 +1,9 @@
 import AppKit
 
-final class NodeRowView: NSView {
+final class NodeRowView: BaseView {
     private let iconView = NSImageView()
-    private let titleField = NSTextField(string: "")
+    private let editableTitle = InlineEditableTextField()
     private let deleteButton = NSButton()
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false
     private var isSelected = false
     private var showsDeleteButton = false
     private var metrics = ListMetrics()
@@ -13,10 +11,6 @@ final class NodeRowView: NSView {
     private var iconLeadingConstraint: NSLayoutConstraint?
     private var iconWidthConstraint: NSLayoutConstraint?
     private var iconHeightConstraint: NSLayoutConstraint?
-    private var isEditingTitle = false
-    private var editingOriginalTitle: String?
-    private var onEditCommit: ((String) -> Void)?
-    private var onEditCancel: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -28,12 +22,7 @@ final class NodeRowView: NSView {
         setupViews()
     }
 
-    override var mouseDownCanMoveWindow: Bool {
-        false
-    }
-
     private func setupViews() {
-        wantsLayer = true
         layer?.cornerRadius = metrics.rowCornerRadius
         layer?.masksToBounds = true
 
@@ -43,14 +32,7 @@ final class NodeRowView: NSView {
         iconView.layer?.cornerRadius = metrics.iconCornerRadius
         iconView.layer?.masksToBounds = true
 
-        titleField.translatesAutoresizingMaskIntoConstraints = false
-        titleField.lineBreakMode = .byTruncatingTail
-        titleField.isEditable = false
-        titleField.isSelectable = false
-        titleField.isBordered = false
-        titleField.drawsBackground = false
-        titleField.focusRingType = .none
-        titleField.delegate = self
+        editableTitle.translatesAutoresizingMaskIntoConstraints = false
 
         deleteButton.translatesAutoresizingMaskIntoConstraints = false
         deleteButton.bezelStyle = .texturedRounded
@@ -63,7 +45,7 @@ final class NodeRowView: NSView {
         deleteButton.setButtonType(.momentaryChange)
 
         addSubview(iconView)
-        addSubview(titleField)
+        addSubview(editableTitle)
         addSubview(deleteButton)
 
         iconLeadingConstraint = iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16)
@@ -76,9 +58,9 @@ final class NodeRowView: NSView {
             iconWidthConstraint!,
             iconHeightConstraint!,
 
-            titleField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
-            titleField.centerYAnchor.constraint(equalTo: centerYAnchor),
-            titleField.trailingAnchor.constraint(lessThanOrEqualTo: deleteButton.leadingAnchor, constant: -14),
+            editableTitle.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
+            editableTitle.centerYAnchor.constraint(equalTo: centerYAnchor),
+            editableTitle.trailingAnchor.constraint(lessThanOrEqualTo: deleteButton.leadingAnchor, constant: -14),
 
             deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             deleteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -97,18 +79,17 @@ final class NodeRowView: NSView {
                    isSelected: Bool) {
         self.metrics = metrics
         self.isSelected = isSelected
-        isHovered = false
         updateVisualState()
-        if isEditingTitle {
-            if let original = editingOriginalTitle, original != title {
+        if editableTitle.isEditing {
+            if editableTitle.text != title {
                 cancelInlineRename()
-                titleField.stringValue = title
+                editableTitle.text = title
             }
         } else {
-            titleField.stringValue = title
+            editableTitle.text = title
         }
-        titleField.font = titleFont
-        titleField.textColor = metrics.titleColor
+        editableTitle.font = titleFont
+        editableTitle.textColor = metrics.titleColor
 
         iconView.image = icon
         if let icon {
@@ -132,88 +113,23 @@ final class NodeRowView: NSView {
     }
 
     var isInlineRenaming: Bool {
-        isEditingTitle
+        editableTitle.isEditing
     }
 
     func beginInlineRename(onCommit: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
-        guard !isEditingTitle else { return }
-        isEditingTitle = true
-        editingOriginalTitle = titleField.stringValue
-        onEditCommit = onCommit
-        onEditCancel = onCancel
-        titleField.isEditable = true
-        titleField.isSelectable = true
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.window?.makeFirstResponder(self.titleField)
-            if let editor = self.titleField.currentEditor() {
-                let length = (self.titleField.stringValue as NSString).length
-                editor.selectedRange = NSRange(location: 0, length: length)
-            }
-        }
+        editableTitle.beginInlineRename(onCommit: onCommit, onCancel: onCancel)
     }
 
     func cancelInlineRename() {
-        guard isEditingTitle else { return }
-        titleField.stringValue = editingOriginalTitle ?? titleField.stringValue
-        finishInlineRename(commit: false)
-        if window?.firstResponder == titleField.currentEditor() {
-            window?.makeFirstResponder(nil)
-        }
+        editableTitle.cancelInlineRename()
     }
 
     @objc private func handleDelete() {
         onDelete?()
     }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let options: NSTrackingArea.Options = [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect]
-        let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func layout() {
-        super.layout()
-        refreshHoverState()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        refreshHoverState()
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        isHovered = true
+    override func handleHoverStateChanged() {
         updateVisualState()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        isHovered = false
-        updateVisualState()
-    }
-
-    func refreshHoverState() {
-        guard let window else {
-            if isHovered {
-                isHovered = false
-                updateVisualState()
-            }
-            return
-        }
-        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        let hovered = bounds.contains(point)
-        if hovered != isHovered {
-            isHovered = hovered
-            updateVisualState()
-        }
     }
 
     private func updateVisualState() {
@@ -226,41 +142,6 @@ final class NodeRowView: NSView {
         } else {
             layer?.backgroundColor = NSColor.clear.cgColor
             deleteButton.isHidden = true
-        }
-    }
-
-    private func finishInlineRename(commit: Bool) {
-        let commitHandler = onEditCommit
-        let cancelHandler = onEditCancel
-        let finalValue = titleField.stringValue
-        isEditingTitle = false
-        editingOriginalTitle = nil
-        onEditCommit = nil
-        onEditCancel = nil
-        titleField.isEditable = false
-        titleField.isSelectable = false
-        titleField.isBordered = false
-        titleField.drawsBackground = false
-        if commit {
-            commitHandler?(finalValue)
-        } else {
-            cancelHandler?()
-        }
-    }
-}
-
-extension NodeRowView: NSTextFieldDelegate {
-    func controlTextDidEndEditing(_ obj: Notification) {
-        guard isEditingTitle else { return }
-        let movement = obj.userInfo?["NSTextMovement"] as? Int ?? NSOtherTextMovement
-        let trimmed = titleField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if movement == NSReturnTextMovement, !trimmed.isEmpty {
-            titleField.stringValue = trimmed
-            finishInlineRename(commit: true)
-        } else {
-            titleField.stringValue = editingOriginalTitle ?? titleField.stringValue
-            finishInlineRename(commit: false)
         }
     }
 }

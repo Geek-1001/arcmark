@@ -1,13 +1,10 @@
 import AppKit
 
 /// A custom toggle switch control that matches Arcmark's design aesthetic
-final class CustomToggle: NSControl {
+final class CustomToggle: BaseControl {
     private let titleLabel = NSTextField(labelWithString: "")
     private let switchContainer = NSView()
     private let switchThumb = NSView()
-    private var trackingArea: NSTrackingArea?
-    private var isHovered = false
-    private var isPressed = false
     private var thumbLeadingConstraint: NSLayoutConstraint?
 
     private let switchWidth: CGFloat = 32
@@ -51,19 +48,14 @@ final class CustomToggle: NSControl {
         setupView()
     }
 
-    override var mouseDownCanMoveWindow: Bool {
-        false
-    }
-
     private func setupView() {
-        wantsLayer = true
         setAccessibilityRole(.checkBox)
         setAccessibilityLabel(titleLabel.stringValue)
 
         // Title label
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = NSFont.systemFont(ofSize: 14, weight: .regular)
-        titleLabel.textColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0)
+        titleLabel.font = ThemeConstants.Fonts.bodyRegular
+        titleLabel.textColor = ThemeConstants.Colors.darkGray
         titleLabel.lineBreakMode = .byTruncatingTail
 
         // Switch container
@@ -103,74 +95,29 @@ final class CustomToggle: NSControl {
         updateAppearance(animated: false)
     }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let options: NSTrackingArea.Options = [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect]
-        let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        isHovered = true
+    override func handleHoverStateChanged() {
         updateAppearance(animated: true)
     }
 
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        isHovered = false
-        updateAppearance(animated: true)
+    override func handlePressedStateChanged() {
+        updateAppearance(animated: !isPressed)
     }
 
-    override func mouseDown(with event: NSEvent) {
-        guard isEnabled else { return }
-        isPressed = true
-        updateAppearance(animated: false)
-
-        guard let window else { return }
-        var keepTracking = true
-        while keepTracking {
-            guard let nextEvent = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) else { continue }
-            let point = convert(nextEvent.locationInWindow, from: nil)
-            let inside = bounds.contains(point)
-
-            switch nextEvent.type {
-            case .leftMouseDragged:
-                if isPressed != inside {
-                    isPressed = inside
-                    updateAppearance(animated: false)
-                }
-            case .leftMouseUp:
-                isPressed = false
-                if inside {
-                    isOn.toggle()
-                } else {
-                    updateAppearance(animated: true)
-                }
-                keepTracking = false
-            default:
-                break
-            }
-        }
+    override func performAction() {
+        isOn.toggle()
     }
 
     private func updateAppearance(animated: Bool) {
-        let darkGray = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0)
-
         // Switch background color
         let backgroundColor: NSColor
         if isOn {
-            backgroundColor = darkGray
+            backgroundColor = ThemeConstants.Colors.darkGray
         } else {
-            backgroundColor = darkGray.withAlphaComponent(0.15)
+            backgroundColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.subtle)
         }
 
         // Thumb color
-        let thumbColor = NSColor.white
+        let thumbColor = ThemeConstants.Colors.white
 
         // Position thumb
         let thumbLeadingOffset = isOn ? (switchWidth - thumbSize - thumbInset) : thumbInset
@@ -180,8 +127,8 @@ final class CustomToggle: NSControl {
 
         if animated {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.2
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                context.duration = ThemeConstants.Animation.durationNormal
+                context.timingFunction = ThemeConstants.Animation.timingFunction
 
                 switchContainer.layer?.backgroundColor = backgroundColor.cgColor
                 switchThumb.layer?.backgroundColor = thumbColor.cgColor
