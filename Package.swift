@@ -24,10 +24,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ArcmarkTests",
-            dependencies: ["ArcmarkCore"],
-            swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency=minimal")
-            ]
+            dependencies: ["ArcmarkCore"]
         )
     ]
 )
