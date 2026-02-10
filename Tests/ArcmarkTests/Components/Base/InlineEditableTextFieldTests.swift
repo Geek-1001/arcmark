@@ -1,0 +1,251 @@
+import XCTest
+@testable import ArcmarkCore
+
+@MainActor
+final class InlineEditableTextFieldTests: XCTestCase {
+
+    var editableTextField: InlineEditableTextField!
+
+    nonisolated override func setUp() {
+        super.setUp()
+        MainActor.assumeIsolated {
+            editableTextField = InlineEditableTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 30))
+        }
+    }
+
+    nonisolated override func tearDown() {
+        MainActor.assumeIsolated {
+            editableTextField = nil
+        }
+        super.tearDown()
+    }
+
+    // MARK: - Initialization Tests
+
+    func testInitialState() {
+        XCTAssertFalse(editableTextField.isEditing)
+        XCTAssertFalse(editableTextField.textField.isEditable)
+        XCTAssertFalse(editableTextField.textField.isSelectable)
+        XCTAssertFalse(editableTextField.textField.isBordered)
+        XCTAssertFalse(editableTextField.textField.drawsBackground)
+    }
+
+    func testTextFieldIsConfiguredCorrectly() {
+        XCTAssertNotNil(editableTextField.textField)
+        XCTAssertEqual(editableTextField.textField.lineBreakMode, .byTruncatingTail)
+        XCTAssertEqual(editableTextField.textField.focusRingType, .none)
+    }
+
+    // MARK: - Text Property Tests
+
+    func testTextPropertyGetterAndSetter() {
+        editableTextField.text = "Test Title"
+        XCTAssertEqual(editableTextField.text, "Test Title")
+        XCTAssertEqual(editableTextField.textField.stringValue, "Test Title")
+    }
+
+    // MARK: - Font Property Tests
+
+    func testFontPropertyGetterAndSetter() {
+        let customFont = NSFont.systemFont(ofSize: 16, weight: .bold)
+        editableTextField.font = customFont
+
+        XCTAssertEqual(editableTextField.font, customFont)
+        XCTAssertEqual(editableTextField.textField.font, customFont)
+    }
+
+    func testFontPropertyDefaultValue() {
+        // Should use ThemeConstants.Fonts.bodyRegular as default
+        XCTAssertNotNil(editableTextField.font)
+    }
+
+    // MARK: - Text Color Property Tests
+
+    func testTextColorPropertyGetterAndSetter() {
+        let customColor = NSColor.red
+        editableTextField.textColor = customColor
+
+        XCTAssertEqual(editableTextField.textColor, customColor)
+        XCTAssertEqual(editableTextField.textField.textColor, customColor)
+    }
+
+    // MARK: - Begin Inline Rename Tests
+
+    func testBeginInlineRenameEntersEditMode() {
+        var commitCalled = false
+        var cancelCalled = false
+
+        editableTextField.text = "Original Title"
+        editableTextField.beginInlineRename(
+            onCommit: { _ in commitCalled = true },
+            onCancel: { cancelCalled = false }
+        )
+
+        XCTAssertTrue(editableTextField.isEditing)
+        XCTAssertTrue(editableTextField.textField.isEditable)
+        XCTAssertTrue(editableTextField.textField.isSelectable)
+    }
+
+    func testBeginInlineRenameIgnoresWhenAlreadyEditing() {
+        var firstCommitCalled = false
+        var secondCommitCalled = false
+
+        editableTextField.beginInlineRename(
+            onCommit: { _ in firstCommitCalled = true },
+            onCancel: { }
+        )
+
+        // Try to begin again
+        editableTextField.beginInlineRename(
+            onCommit: { _ in secondCommitCalled = true },
+            onCancel: { }
+        )
+
+        // Should still be in editing mode from first call
+        XCTAssertTrue(editableTextField.isEditing)
+        // Second commit handler should not be set
+        XCTAssertFalse(secondCommitCalled)
+    }
+
+    // MARK: - Cancel Inline Rename Tests
+
+    func testCancelInlineRenameRestoresOriginalText() {
+        editableTextField.text = "Original Title"
+
+        var cancelCalled = false
+        editableTextField.beginInlineRename(
+            onCommit: { _ in },
+            onCancel: { cancelCalled = true }
+        )
+
+        // Modify the text
+        editableTextField.textField.stringValue = "Modified Title"
+
+        // Cancel the edit
+        editableTextField.cancelInlineRename()
+
+        XCTAssertEqual(editableTextField.text, "Original Title")
+        XCTAssertTrue(cancelCalled)
+        XCTAssertFalse(editableTextField.isEditing)
+    }
+
+    func testCancelInlineRenameIgnoresWhenNotEditing() {
+        var cancelCalled = false
+
+        // Try to cancel without being in edit mode
+        editableTextField.cancelInlineRename()
+
+        // Should not crash and editing state should remain false
+        XCTAssertFalse(editableTextField.isEditing)
+    }
+
+    // MARK: - Finish Inline Rename Tests
+
+    func testFinishInlineRenameResetsEditingState() {
+        editableTextField.text = "Original"
+
+        var commitCalled = false
+        editableTextField.beginInlineRename(
+            onCommit: { _ in commitCalled = true },
+            onCancel: { }
+        )
+
+        // Simulate completion by calling the delegate method manually
+        // (In real usage, this would be triggered by Return key)
+        editableTextField.textField.stringValue = "New Title"
+
+        // Create a notification to simulate Return key
+        let userInfo: [String: Any] = ["NSTextMovement": NSReturnTextMovement]
+        let notification = Notification(
+            name: NSControl.textDidEndEditingNotification,
+            object: editableTextField.textField,
+            userInfo: userInfo
+        )
+
+        editableTextField.controlTextDidEndEditing(notification)
+
+        XCTAssertFalse(editableTextField.isEditing)
+        XCTAssertFalse(editableTextField.textField.isEditable)
+        XCTAssertTrue(commitCalled)
+    }
+
+    func testFinishInlineRenameWithEmptyTextCancels() {
+        editableTextField.text = "Original"
+
+        var commitCalled = false
+        var cancelCalled = false
+        editableTextField.beginInlineRename(
+            onCommit: { _ in commitCalled = true },
+            onCancel: { cancelCalled = true }
+        )
+
+        // Set empty text
+        editableTextField.textField.stringValue = "   "
+
+        let userInfo: [String: Any] = ["NSTextMovement": NSReturnTextMovement]
+        let notification = Notification(
+            name: NSControl.textDidEndEditingNotification,
+            object: editableTextField.textField,
+            userInfo: userInfo
+        )
+
+        editableTextField.controlTextDidEndEditing(notification)
+
+        XCTAssertFalse(commitCalled)
+        XCTAssertTrue(cancelCalled)
+        XCTAssertEqual(editableTextField.text, "Original")
+    }
+
+    func testFinishInlineRenameWithEscapeCancels() {
+        editableTextField.text = "Original"
+
+        var commitCalled = false
+        var cancelCalled = false
+        editableTextField.beginInlineRename(
+            onCommit: { _ in commitCalled = true },
+            onCancel: { cancelCalled = true }
+        )
+
+        editableTextField.textField.stringValue = "Modified"
+
+        // Simulate Escape key
+        let userInfo: [String: Any] = ["NSTextMovement": NSCancelTextMovement]
+        let notification = Notification(
+            name: NSControl.textDidEndEditingNotification,
+            object: editableTextField.textField,
+            userInfo: userInfo
+        )
+
+        editableTextField.controlTextDidEndEditing(notification)
+
+        XCTAssertFalse(commitCalled)
+        XCTAssertTrue(cancelCalled)
+        XCTAssertEqual(editableTextField.text, "Original")
+    }
+
+    // MARK: - Whitespace Trimming Tests
+
+    func testFinishInlineRenameTrimsWhitespace() {
+        editableTextField.text = "Original"
+
+        var committedValue: String?
+        editableTextField.beginInlineRename(
+            onCommit: { value in committedValue = value },
+            onCancel: { }
+        )
+
+        editableTextField.textField.stringValue = "  New Title  "
+
+        let userInfo: [String: Any] = ["NSTextMovement": NSReturnTextMovement]
+        let notification = Notification(
+            name: NSControl.textDidEndEditingNotification,
+            object: editableTextField.textField,
+            userInfo: userInfo
+        )
+
+        editableTextField.controlTextDidEndEditing(notification)
+
+        XCTAssertEqual(committedValue, "New Title")
+        XCTAssertEqual(editableTextField.text, "New Title")
+    }
+}

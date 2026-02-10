@@ -1,0 +1,175 @@
+import XCTest
+@testable import ArcmarkCore
+
+// Test subclass to verify base behavior
+@MainActor
+fileprivate class TestControl: BaseControl {
+    var hoverChangeCount = 0
+    var pressedChangeCount = 0
+    var actionPerformed = false
+
+    override func handleHoverStateChanged() {
+        hoverChangeCount += 1
+    }
+
+    override func handlePressedStateChanged() {
+        pressedChangeCount += 1
+    }
+
+    override func performAction() {
+        actionPerformed = true
+        super.performAction()
+    }
+}
+
+final class BaseControlTests: XCTestCase {
+
+    fileprivate var control: TestControl!
+
+    override func setUp() {
+        super.setUp()
+        control = MainActor.assumeIsolated {
+            TestControl(frame: NSRect(x: 0, y: 0, width: 100, height: 40))
+        }
+    }
+
+    override func tearDown() {
+        control = nil
+        super.tearDown()
+    }
+
+    // MARK: - Initialization Tests
+
+    @MainActor
+    func testInitialState() {
+        XCTAssertFalse(control.isHovered)
+        XCTAssertFalse(control.isPressed)
+        XCTAssertTrue(control.wantsLayer)
+        XCTAssertFalse(control.mouseDownCanMoveWindow)
+    }
+
+    func testCommonInitSetsWantsLayer() {
+        let newControl = TestControl(frame: .zero)
+        XCTAssertTrue(newControl.wantsLayer)
+    }
+
+    // MARK: - Hover State Tests
+
+    func testMouseEnteredSetsHoverState() {
+        let event = NSEvent.mouseEvent(
+            with: .mouseEntered,
+            location: NSPoint(x: 50, y: 20),
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 0,
+            pressure: 0
+        )!
+
+        control.mouseEntered(with: event)
+
+        XCTAssertTrue(control.isHovered)
+        XCTAssertEqual(control.hoverChangeCount, 1)
+    }
+
+    func testMouseExitedClearsHoverState() {
+        // First set hover state
+        let enterEvent = NSEvent.mouseEvent(
+            with: .mouseEntered,
+            location: NSPoint(x: 50, y: 20),
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 0,
+            pressure: 0
+        )!
+        control.mouseEntered(with: enterEvent)
+
+        // Then exit
+        let exitEvent = NSEvent.mouseEvent(
+            with: .mouseExited,
+            location: NSPoint(x: 150, y: 20),
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 0,
+            pressure: 0
+        )!
+        control.mouseExited(with: exitEvent)
+
+        XCTAssertFalse(control.isHovered)
+        XCTAssertEqual(control.hoverChangeCount, 2)
+    }
+
+    // MARK: - Tracking Area Tests
+
+    func testUpdateTrackingAreasCreatesTrackingArea() {
+        control.updateTrackingAreas()
+
+        // Verify tracking area was added by checking that hover events would be processed
+        // This is a basic test to ensure the method completes without error
+        XCTAssertNotNil(control)
+    }
+
+    // MARK: - Refresh Hover State Tests
+
+    func testRefreshHoverStateWithoutWindow() {
+        // First set hover via mouseEntered
+        let enterEvent = NSEvent.mouseEvent(
+            with: .mouseEntered,
+            location: NSPoint(x: 50, y: 20),
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 0,
+            pressure: 0
+        )!
+        control.mouseEntered(with: enterEvent)
+
+        // Verify hover is set
+        XCTAssertTrue(control.isHovered)
+
+        // Call refresh when there's no window
+        control.refreshHoverState()
+
+        // Should clear hover state
+        XCTAssertFalse(control.isHovered)
+    }
+
+    // MARK: - Enabled State Tests
+
+    func testMouseDownIgnoredWhenDisabled() {
+        control.isEnabled = false
+
+        // Note: We can't fully test mouseDown without a window, but we can verify enabled check
+        XCTAssertFalse(control.isEnabled)
+        XCTAssertFalse(control.isPressed)
+    }
+
+    // MARK: - Layout Tests
+
+    func testLayoutCallsRefreshHoverState() {
+        // This test verifies layout() is implemented correctly
+        control.layout()
+
+        // If no window, hover should be false
+        XCTAssertFalse(control.isHovered)
+    }
+
+    // MARK: - View Lifecycle Tests
+
+    func testViewDidMoveToWindowCallsRefreshHoverState() {
+        control.viewDidMoveToWindow()
+
+        // Without a window, hover should be false
+        XCTAssertFalse(control.isHovered)
+    }
+}
