@@ -1,12 +1,37 @@
 #!/bin/bash
 # Build Arcmark as a proper macOS app bundle
+#
+# Usage:
+#   ./scripts/build.sh           # Build app only
+#   ./scripts/build.sh --dmg     # Build app and create DMG
 
 set -e  # Exit on error
+
+# Parse arguments
+CREATE_DMG=false
+if [ "$1" = "--dmg" ]; then
+    CREATE_DMG=true
+fi
 
 echo "🔨 Building Arcmark..."
 
 # Ensure we're in the project root
 cd "$(dirname "$0")/.."
+
+# Read version from VERSION file and update Bundler.toml
+if [ -f "VERSION" ]; then
+    VERSION=$(cat VERSION | tr -d '[:space:]')
+    echo "📌 Version: $VERSION"
+
+    # Update version in Bundler.toml if it differs
+    if grep -q "^version = " Bundler.toml; then
+        CURRENT_VERSION=$(grep "^version = " Bundler.toml | head -1 | sed "s/version = '\(.*\)'/\1/" | tr -d "'")
+        if [ "$CURRENT_VERSION" != "$VERSION" ]; then
+            echo "  → Updating Bundler.toml version to $VERSION"
+            sed -i '' "s/^version = .*/version = '$VERSION'/" Bundler.toml
+        fi
+    fi
+fi
 
 # Build the app bundle using swift-bundler
 mint run swift-bundler bundle -c release
@@ -42,4 +67,12 @@ echo "📦 App bundle: .build/bundler/Arcmark.app"
 echo ""
 echo "🔍 Verification:"
 echo "  Bundle ID: $(defaults read "$(pwd)/$INFO_PLIST" CFBundleIdentifier 2>/dev/null || echo 'ERROR: Not found')"
+echo "  Version: $(defaults read "$(pwd)/$INFO_PLIST" CFBundleShortVersionString 2>/dev/null || echo 'Not set')"
 echo "  Code Sign: $(codesign -dvv ".build/bundler/Arcmark.app" 2>&1 | grep "^Identifier=" | cut -d= -f2)"
+
+# Create DMG if requested
+if [ "$CREATE_DMG" = true ]; then
+    echo ""
+    echo "────────────────────────────────────────"
+    ./scripts/create-dmg.sh
+fi
