@@ -12,25 +12,23 @@ Arcmark is a macOS bookmark management application built with Swift and AppKit. 
 
 ### Building and Testing
 ```bash
-# Build the app bundle (creates .build/bundler/Arcmark.app)
-./scripts/build.sh
+# Development builds (ad-hoc signing)
+./scripts/build.sh                  # Build app only
+./scripts/build.sh --dmg            # Build app and create DMG
 
-# Build the app and create DMG installer
-./scripts/build.sh --dmg
+# Production builds (Developer ID + notarization)
+./scripts/build.sh --production     # Build with Developer ID signing
+./scripts/build.sh --production --dmg  # Build and create notarized DMG
 
-# Create DMG from existing build
-./scripts/create-dmg.sh
+# Other commands
+./scripts/create-dmg.sh             # Create DMG from existing build
+./scripts/run.sh                    # Build and run the app
 
-# Build and run the app
-./scripts/run.sh
+# Testing
+swift test                          # Run all tests
+swift test --filter ModelTests.testJSONRoundTrip  # Run single test
 
-# Run tests
-swift test
-
-# Run a single test
-swift test --filter ModelTests.testJSONRoundTrip
-
-# Build for release with Swift PM (library only)
+# Library build (Swift PM only)
 swift build -c release
 ```
 
@@ -38,9 +36,12 @@ swift build -c release
 - Reads version from `VERSION` file and syncs to Bundler.toml
 - Builds the app with Swift Bundler
 - Patches Info.plist to ensure CFBundleIdentifier is present
-- Code signs the app with an ad-hoc signature
+- Code signs the app (ad-hoc for development, Developer ID for production)
 - Verifies the build
 - Optionally creates a DMG installer with `--dmg` flag
+- Optionally notarizes the DMG with `--production --dmg`
+
+**Production Signing**: For distribution outside the Mac App Store, use `--production` flag with proper code signing credentials configured in `.notarization-config`. See [docs/PRODUCTION_SIGNING.md](docs/PRODUCTION_SIGNING.md) for setup.
 
 See [docs/BUILD_AND_CODESIGN.md](docs/BUILD_AND_CODESIGN.md) for detailed information about the build process, code signing, and verification.
 

@@ -5,6 +5,7 @@ This document describes how to build and distribute Arcmark for beta testing and
 **See also:**
 - [ASSETS.md](ASSETS.md) - App icon and DMG background specifications
 - [BUILD_AND_CODESIGN.md](BUILD_AND_CODESIGN.md) - Build system and code signing details
+- [PRODUCTION_SIGNING.md](PRODUCTION_SIGNING.md) - Production code signing and notarization setup
 
 ## Version Management
 
@@ -45,35 +46,53 @@ The version is configured in three places (automatically synchronized):
 
 ## Building for Distribution
 
-### Standard Build (App Bundle Only)
+### Development Builds (Ad-hoc Signing)
 
-To build the app without creating a DMG:
+For local testing and early development:
 
 ```bash
+# Build app only
 ./scripts/build.sh
-```
 
-This creates: `.build/bundler/Arcmark.app`
-
-### Build with DMG Installer
-
-To build the app and create a DMG installer for distribution:
-
-```bash
+# Build app and create DMG
 ./scripts/build.sh --dmg
 ```
 
-This creates:
-- `.build/bundler/Arcmark.app` - The application bundle
-- `.build/dmg/Arcmark-X.Y.Z.dmg` - Distributable DMG installer
+**Note**: These builds use ad-hoc signing. Users will see security warnings when launching.
 
-### DMG Creation Only
+### Production Builds (Developer ID + Notarization)
 
-If you've already built the app and just want to create a DMG:
+For distribution to beta testers and public release:
 
+**First-time setup** (one-time):
+1. Follow the guide in [PRODUCTION_SIGNING.md](PRODUCTION_SIGNING.md)
+2. Create your `.notarization-config` file with credentials
+
+**Build commands**:
 ```bash
-./scripts/create-dmg.sh
+# Build with Developer ID signing (no DMG)
+./scripts/build.sh --production
+
+# Build and create fully notarized DMG (recommended)
+./scripts/build.sh --production --dmg
 ```
+
+**What happens with `--production --dmg`**:
+1. App is built and signed with your Developer ID certificate
+2. Hardened runtime is enabled for notarization
+3. DMG is created with the signed app
+4. DMG is submitted to Apple for notarization (~2-5 minutes)
+5. Notarization ticket is stapled to the DMG
+6. Result: DMG launches without security warnings ✨
+
+### Build Comparison
+
+| Build Type | Command | Code Signing | Notarization | User Experience |
+|------------|---------|--------------|--------------|-----------------|
+| Development | `./scripts/build.sh` | Ad-hoc | No | Security warnings |
+| Development DMG | `./scripts/build.sh --dmg` | Ad-hoc | No | Security warnings |
+| Production | `./scripts/build.sh --production` | Developer ID | No | Click-through warning |
+| Production DMG | `./scripts/build.sh --production --dmg` | Developer ID | Yes | No warnings! ✨ |
 
 ## DMG Installer Features
 
@@ -176,20 +195,35 @@ To update to a new version:
 2. **Download** the new DMG file
 3. **Follow** the same installation steps above (this will replace the old version)
 
-## Code Signing Notes
+## Code Signing
 
-**Current Status**: The app uses ad-hoc code signing (development only).
+### Development Signing (Default)
 
-**For Production**: You'll need to:
-1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/) ($99/year)
-2. Create a Developer ID Application certificate
-3. Update `scripts/build.sh` to use your certificate:
-   ```bash
-   codesign --force --deep --sign "Developer ID Application: Your Name (TEAM_ID)" ".build/bundler/Arcmark.app"
-   ```
-4. Consider adding [notarization](https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution) to avoid Gatekeeper warnings
+By default, builds use ad-hoc signing for local development:
+- No Apple Developer account required
+- Fast builds
+- ⚠️ Users see security warnings
 
-See [BUILD_AND_CODESIGN.md](BUILD_AND_CODESIGN.md) for more details on code signing.
+### Production Signing (Recommended for Distribution)
+
+For production distribution with no security warnings:
+
+**Requirements**:
+- Apple Developer Program membership ($99/year)
+- Developer ID Application certificate
+- App-specific password for notarization
+
+**Setup**: Follow the step-by-step guide in [PRODUCTION_SIGNING.md](PRODUCTION_SIGNING.md)
+
+**Build**: Use `./scripts/build.sh --production --dmg`
+
+**Benefits**:
+- ✅ No security warnings for users
+- ✅ Professional appearance
+- ✅ Required for public distribution
+- ✅ Builds trust with users
+
+See [PRODUCTION_SIGNING.md](PRODUCTION_SIGNING.md) for complete setup instructions.
 
 ## Build Artifacts
 
