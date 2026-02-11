@@ -2,16 +2,32 @@
 # Build Arcmark as a proper macOS app bundle
 #
 # Usage:
-#   ./scripts/build.sh           # Build app only
-#   ./scripts/build.sh --dmg     # Build app and create DMG
+#   ./scripts/build.sh                  # Build with ad-hoc signing (development)
+#   ./scripts/build.sh --dmg            # Build with ad-hoc signing and create DMG
+#   ./scripts/build.sh --production     # Build with Developer ID signing (production)
+#   ./scripts/build.sh --production --dmg  # Build and create notarized DMG
 
 set -e  # Exit on error
 
 # Parse arguments
 CREATE_DMG=false
-if [ "$1" = "--dmg" ]; then
-    CREATE_DMG=true
-fi
+PRODUCTION=false
+
+for arg in "$@"; do
+    case $arg in
+        --dmg)
+            CREATE_DMG=true
+            ;;
+        --production)
+            PRODUCTION=true
+            ;;
+        *)
+            echo "Unknown argument: $arg"
+            echo "Usage: $0 [--production] [--dmg]"
+            exit 1
+            ;;
+    esac
+done
 
 echo "🔨 Building Arcmark..."
 
@@ -56,9 +72,40 @@ else
     fi
 fi
 
-# Code sign the app with ad-hoc signature
+# Code sign the app
 echo "🔏 Code signing app..."
-codesign --force --deep --sign - ".build/bundler/Arcmark.app" 2>&1 | grep -v "replacing existing signature" || true
+
+if [ "$PRODUCTION" = true ]; then
+    # Production signing with Developer ID
+    if [ ! -f ".notarization-config" ]; then
+        echo "❌ Error: .notarization-config not found"
+        echo "   See docs/PRODUCTION_SIGNING.md for setup instructions"
+        exit 1
+    fi
+
+    # Load signing identity from config
+    source .notarization-config
+
+    if [ -z "$SIGNING_IDENTITY" ]; then
+        echo "❌ Error: SIGNING_IDENTITY not set in .notarization-config"
+        exit 1
+    fi
+
+    echo "  → Using Developer ID: $SIGNING_IDENTITY"
+
+    # Sign with hardened runtime for notarization
+    codesign --force --deep \
+        --sign "$SIGNING_IDENTITY" \
+        --options runtime \
+        --timestamp \
+        ".build/bundler/Arcmark.app" 2>&1 | grep -v "replacing existing signature" || true
+
+    echo "  ✓ Signed with Developer ID (hardened runtime enabled)"
+else
+    # Development signing with ad-hoc signature
+    codesign --force --deep --sign - ".build/bundler/Arcmark.app" 2>&1 | grep -v "replacing existing signature" || true
+    echo "  ✓ Signed with ad-hoc signature (development only)"
+fi
 
 # Verify the build
 echo ""
@@ -74,5 +121,9 @@ echo "  Code Sign: $(codesign -dvv ".build/bundler/Arcmark.app" 2>&1 | grep "^Id
 if [ "$CREATE_DMG" = true ]; then
     echo ""
     echo "────────────────────────────────────────"
-    ./scripts/create-dmg.sh
+    if [ "$PRODUCTION" = true ]; then
+        ./scripts/create-dmg.sh --notarize
+    else
+        ./scripts/create-dmg.sh
+    fi
 fi
