@@ -46,6 +46,12 @@ TEMP_DMG="$OUTPUT_DIR/temp.dmg"
 # Clean up any existing DMG files
 rm -f "$DMG_PATH" "$TEMP_DMG"
 
+# Unmount any previously mounted volumes with this name
+if [ -d "/Volumes/$VOLUME_NAME" ]; then
+    echo "  → Cleaning up previously mounted volume..."
+    hdiutil detach "/Volumes/$VOLUME_NAME" 2>/dev/null || true
+fi
+
 # Create a temporary directory for DMG contents
 DMG_STAGING="$OUTPUT_DIR/dmg-staging"
 rm -rf "$DMG_STAGING"
@@ -96,40 +102,91 @@ else
 fi
 
 # Use AppleScript to customize the DMG window
-# Build the AppleScript with optional background image line
-APPLESCRIPT="tell application \"Finder\"
-    tell disk \"$VOLUME_NAME\"
+echo "  → Applying Finder customizations..."
+
+# First, set up basic window properties
+osascript <<EOF
+tell application "Finder"
+    tell disk "$VOLUME_NAME"
         open
         set current view of container window to icon view
         set toolbar visible of container window to false
         set statusbar visible of container window to false
-        set the bounds of container window to {100, 100, 600, 400}
+        set the bounds of container window to {100, 100, 700, 500}
+
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
-        set icon size of viewOptions to 128"
+        set icon size of viewOptions to 180
+        set text size of viewOptions to 14
 
+        -- Position icons (adjusted for larger icons)
+        set position of item "Arcmark.app" of container window to {160, 200}
+        set position of item "Applications" of container window to {460, 200}
+
+        -- Update view
+        update without registering applications
+        delay 1
+    end tell
+end tell
+EOF
+
+# Set background image if available (done separately to avoid path issues)
 if [ "$USE_BACKGROUND" = true ]; then
-    APPLESCRIPT="$APPLESCRIPT
-        set background picture of viewOptions to file \".background:background.png\""
+    echo "  → Setting background image..."
+
+    # Try to set the background image using multiple approaches
+    # Method 1: Try using POSIX file with alias
+    if osascript -e "tell application \"Finder\" to tell disk \"$VOLUME_NAME\" to set background picture of icon view options of container window to alias ((POSIX file \"$MOUNT_POINT/.background/background.png\") as text)" 2>/dev/null; then
+        echo "     ✓ Background image set successfully"
+    # Method 2: Try using file reference directly
+    elif osascript <<EOF 2>/dev/null
+tell application "Finder"
+    tell disk "$VOLUME_NAME"
+        set viewOptions to icon view options of container window
+        set theFile to POSIX file "$MOUNT_POINT/.background/background.png" as alias
+        set background picture of viewOptions to theFile
+        update without registering applications
+    end tell
+end tell
+EOF
+    then
+        echo "     ✓ Background image set successfully (alternate method)"
+    else
+        echo "  ⚠️  Warning: Could not set background image"
+        echo "     The DMG will be created without a custom background"
+    fi
+
+    # Brief delay to ensure settings are applied
+    sleep 1
 fi
 
-APPLESCRIPT="$APPLESCRIPT
-        set position of item \"Arcmark.app\" of container window to {125, 150}
-        set position of item \"Applications\" of container window to {375, 150}
-        close
-        open
-        update without registering applications
-        delay 2
-    end tell
-end tell"
-
-osascript -e "$APPLESCRIPT"
+# Close the Finder window before unmounting
+osascript <<EOF > /dev/null 2>&1
+tell application "Finder"
+    if exists disk "$VOLUME_NAME" then
+        close window of disk "$VOLUME_NAME"
+    end if
+end tell
+EOF
 
 # Ensure changes are written to disk
 sync
+sleep 2
 
 echo "  → Unmounting temporary DMG..."
-hdiutil detach "$DEVICE" > /dev/null
+# Try multiple unmount approaches
+if ! hdiutil detach "$DEVICE" 2>/dev/null; then
+    if ! hdiutil detach "$MOUNT_POINT" 2>/dev/null; then
+        hdiutil detach "$MOUNT_POINT" -force || true
+    fi
+fi
+
+# Verify unmount succeeded
+if mount | grep -q "$VOLUME_NAME"; then
+    echo "  ⚠️  Warning: Volume still mounted, forcing unmount..."
+    hdiutil detach "/Volumes/$VOLUME_NAME" -force || true
+    sleep 1
+fi
 
 echo "  → Converting to compressed DMG..."
 hdiutil convert "$TEMP_DMG" \
@@ -140,6 +197,15 @@ hdiutil convert "$TEMP_DMG" \
 # Clean up
 rm -f "$TEMP_DMG"
 rm -rf "$DMG_STAGING"
+
+# Remove any stray Volumes folders created in project root
+# This includes both "Volumes" and folders with unusual names like "\n/"
+if [ -d "Volumes" ]; then
+    rm -rf "Volumes"
+fi
+if [ -d $'\n/' ]; then
+    rm -rf $'\n/'
+fi
 
 echo ""
 echo "✅ DMG created successfully!"
