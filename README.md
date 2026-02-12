@@ -23,6 +23,14 @@ https://github.com/user-attachments/assets/acc90f08-66c8-42de-9453-8699c2c2f47a
 
 **Local-first** - All bookmarks stored in a single JSON file (`~/Library/Application Support/Arcmark/data.json`).
 
+## Download
+
+**Latest Release**: [Download Arcmark v0.1.0](https://github.com/Geek-1001/arcmark/releases/latest)
+
+### System Requirements
+- macOS 13.0 or later
+- Accessibility permissions (required for browser window attachment); Not needed if you intend to use it as a standalone window.
+
 ## Features
 
 ### Browser Integration
@@ -42,21 +50,13 @@ https://github.com/user-attachments/assets/acc90f08-66c8-42de-9453-8699c2c2f47a
   <img src="./Resources/screenshots/screenshot-2-settings.png" alt="Arcmark settings" width="100%">
 </p>
 
-## Download
-
-**Latest Release**: [Download Arcmark v0.1.0](#)
-
-### System Requirements
-- macOS 13.0 or later
-- Accessibility permissions (required for browser window attachment); Not needed if you intend to use it as a standalone window.
-
 ## Installation
 
-1. Download the latest `.dmg` file from the [Releases](#) page
+1. Download the latest `.dmg` file from the [Releases](https://github.com/Geek-1001/arcmark/releases) page
 2. Open the downloaded DMG file
 3. Drag **Arcmark.app** to your **Applications** folder
 
-![Installation](resources/screenshots/screenshot-3-dmg.png)
+![Installation](./Resources/screenshots/screenshot-3-dmg.png)
 
 4. Launch Arcmark from your Applications folder
 
