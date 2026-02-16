@@ -72,6 +72,11 @@ final class WindowAttachmentService {
         attachToBrowser()
     }
 
+    func forceUpdate() {
+        guard isEnabled else { return }
+        updateArcmarkPosition(forceShow: true)
+    }
+
     func disable() {
         print("WindowAttachmentService: Disabling attachment")
 
