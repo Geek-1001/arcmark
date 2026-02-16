@@ -494,6 +494,10 @@ final class MainViewController: NSViewController {
         nodeListViewController.scheduleInlineRename(for: newId)
     }
 
+    @objc func paste(_ sender: Any?) {
+        pasteLink()
+    }
+
     @objc private func pasteLink() {
         guard let pasted = NSPasteboard.general.string(forType: .string) else { return }
         let urls = extractUrls(from: pasted)
