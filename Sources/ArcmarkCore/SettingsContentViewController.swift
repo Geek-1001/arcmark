@@ -27,6 +27,9 @@ final class SettingsContentViewController: NSViewController {
     private let attachSidebarToggle = CustomToggle(title: "Attach to Window as Sidebar")
     private let sidebarPositionSelector = SidebarPositionSelector()
 
+    // Keyboard Shortcuts section
+    private let shortcutRecorder = ShortcutRecorderView()
+
     // Workspace management section
     private let workspaceCollectionView = WorkspaceContextMenuCollectionView()
     private var workspaceCollectionViewHeightConstraint: NSLayoutConstraint?
@@ -204,6 +207,16 @@ final class SettingsContentViewController: NSViewController {
 
         let separator1 = createSeparator()
 
+        // Keyboard Shortcuts Section
+        let shortcutsHeader = createSectionHeader("Keyboard Shortcuts")
+
+        shortcutRecorder.translatesAutoresizingMaskIntoConstraints = false
+        shortcutRecorder.onShortcutChanged = { [weak self] shortcut in
+            self?.shortcutChanged(shortcut)
+        }
+
+        let separatorKS = createSeparator()
+
         // Workspace Management Section
         let workspaceHeader = createSectionHeader("Manage Workspaces")
 
@@ -270,6 +283,9 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(attachSidebarToggle)
         contentView.addSubview(sidebarPositionSelector)
         contentView.addSubview(separator1)
+        contentView.addSubview(shortcutsHeader)
+        contentView.addSubview(shortcutRecorder)
+        contentView.addSubview(separatorKS)
         contentView.addSubview(workspaceHeader)
         contentView.addSubview(workspaceCollectionView)
         contentView.addSubview(separator2)
@@ -317,9 +333,24 @@ final class SettingsContentViewController: NSViewController {
             separator1.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             separator1.heightAnchor.constraint(equalToConstant: 1),
 
+            // Keyboard Shortcuts Header
+            shortcutsHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            shortcutsHeader.topAnchor.constraint(equalTo: separator1.bottomAnchor, constant: sectionSpacing),
+
+            // Shortcut Recorder
+            shortcutRecorder.leadingAnchor.constraint(equalTo: shortcutsHeader.leadingAnchor),
+            shortcutRecorder.topAnchor.constraint(equalTo: shortcutsHeader.bottomAnchor, constant: sectionHeaderSpacing),
+            shortcutRecorder.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+
+            // Separator KS
+            separatorKS.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            separatorKS.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            separatorKS.topAnchor.constraint(equalTo: shortcutRecorder.bottomAnchor, constant: sectionSpacing),
+            separatorKS.heightAnchor.constraint(equalToConstant: 1),
+
             // Workspace Management Header
             workspaceHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
-            workspaceHeader.topAnchor.constraint(equalTo: separator1.bottomAnchor, constant: sectionSpacing),
+            workspaceHeader.topAnchor.constraint(equalTo: separatorKS.bottomAnchor, constant: sectionSpacing),
 
                 // Workspace Collection View - full width without horizontal padding
             workspaceCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
@@ -422,6 +453,14 @@ final class SettingsContentViewController: NSViewController {
         // Load sidebar position
         let positionString = UserDefaults.standard.string(forKey: UserDefaultsKeys.sidebarPosition) ?? "right"
         sidebarPositionSelector.selectedPosition = positionString
+
+        // Load keyboard shortcut
+        if let data = UserDefaults.standard.data(forKey: UserDefaultsKeys.toggleSidebarShortcut),
+           let shortcut = try? JSONDecoder().decode(KeyboardShortcut.self, from: data) {
+            shortcutRecorder.configure(shortcut: shortcut)
+        } else {
+            shortcutRecorder.configure(shortcut: .defaultToggleSidebar)
+        }
 
         // Apply mutual exclusion and enable states
         updateControlStates()
@@ -591,6 +630,17 @@ final class SettingsContentViewController: NSViewController {
                 userInfo: ["position": position]
             )
         }
+    }
+
+    private func shortcutChanged(_ shortcut: KeyboardShortcut?) {
+        if let shortcut = shortcut {
+            if let data = try? JSONEncoder().encode(shortcut) {
+                UserDefaults.standard.set(data, forKey: UserDefaultsKeys.toggleSidebarShortcut)
+            }
+        } else {
+            UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.toggleSidebarShortcut)
+        }
+        NotificationCenter.default.post(name: .toggleSidebarShortcutChanged, object: nil)
     }
 
     @objc private func browserChanged() {
