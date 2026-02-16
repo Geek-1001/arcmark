@@ -35,7 +35,7 @@ final class AppModel {
         if let first = state.workspaces.first {
             return first
         }
-        let fallback = Workspace(id: UUID(), name: "Inbox", colorId: .defaultColor(), items: [])
+        let fallback = Workspace(id: UUID(), name: "Inbox", colorId: .defaultColor(), items: [], pinnedLinks: [])
         state.workspaces = [fallback]
         state.selectedWorkspaceId = fallback.id
         persist()
@@ -243,6 +243,42 @@ final class AppModel {
         }
         logger.debug("Updated title for \(link.url, privacy: .public) -> \(trimmed, privacy: .public)")
         return true
+    }
+
+    // MARK: - Pinned Links
+
+    var canPinMore: Bool {
+        currentWorkspace.pinnedLinks.count < Workspace.maxPinnedLinks
+    }
+
+    func pinnedLinkById(_ id: UUID) -> Link? {
+        currentWorkspace.pinnedLinks.first(where: { $0.id == id })
+    }
+
+    func pinLink(id: UUID) {
+        guard canPinMore else { return }
+        guard let node = nodeById(id), case .link(let link) = node else { return }
+        guard !currentWorkspace.pinnedLinks.contains(where: { $0.id == id }) else { return }
+
+        updateWorkspace(id: currentWorkspace.id) { workspace in
+            _ = removeNode(id: id, nodes: &workspace.items)
+            workspace.pinnedLinks.append(link)
+        }
+    }
+
+    func unpinLink(id: UUID) {
+        updateWorkspace(id: currentWorkspace.id) { workspace in
+            guard let index = workspace.pinnedLinks.firstIndex(where: { $0.id == id }) else { return }
+            let link = workspace.pinnedLinks.remove(at: index)
+            workspace.items.append(.link(link))
+        }
+    }
+
+    func updatePinnedLinkFaviconPath(id: UUID, path: String?) {
+        updateWorkspace(id: currentWorkspace.id) { workspace in
+            guard let index = workspace.pinnedLinks.firstIndex(where: { $0.id == id }) else { return }
+            workspace.pinnedLinks[index].faviconPath = path
+        }
     }
 
     func location(of nodeId: UUID) -> NodeLocation? {

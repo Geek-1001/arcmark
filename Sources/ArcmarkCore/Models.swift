@@ -27,6 +27,26 @@ struct Workspace: Codable, Identifiable, Equatable {
     var name: String
     var colorId: WorkspaceColorId
     var items: [Node]
+    var pinnedLinks: [Link]
+
+    static let maxPinnedLinks = 9
+
+    init(id: UUID, name: String, colorId: WorkspaceColorId, items: [Node], pinnedLinks: [Link] = []) {
+        self.id = id
+        self.name = name
+        self.colorId = colorId
+        self.items = items
+        self.pinnedLinks = pinnedLinks
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        colorId = try container.decode(WorkspaceColorId.self, forKey: .colorId)
+        items = try container.decode([Node].self, forKey: .items)
+        pinnedLinks = try container.decodeIfPresent([Link].self, forKey: .pinnedLinks) ?? []
+    }
 }
 
 struct Link: Codable, Identifiable, Equatable, Sendable {

@@ -241,6 +241,8 @@ struct ThemeConstants {
 
         /// Standard row height (44pt) - For list and table rows
         static let rowHeight: CGFloat = 44
+
+        static let pinnedTileHeight: CGFloat = 50
     }
 
     // MARK: - Animation
