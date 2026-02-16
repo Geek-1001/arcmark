@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WindowAttachmentServiceDelegate {
+public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WindowAttachmentServiceDelegate, GlobalHotkeyServiceDelegate {
     public override init() {
         super.init()
     }
@@ -13,6 +13,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     // Attachment state
     private var isAttachmentMode: Bool = false
     private var lastManualFrame: NSRect?
+
+    // Shortcut toggle state
+    private var isUserHidden: Bool = false
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenus()
@@ -53,6 +56,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         self.window = window
         applyAlwaysOnTopFromDefaults()
         setupAttachmentService()
+        setupGlobalHotkey()
         observeBrowserChanges()
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -158,6 +162,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     @objc private func toggleAlwaysOnTop() {
         let enabled = !(UserDefaults.standard.bool(forKey: UserDefaultsKeys.alwaysOnTopEnabled))
 
+        // Reset user-hidden state when toggling always on top
+        if enabled {
+            isUserHidden = false
+        }
+
         // If enabling always on top, disable attachment first
         if enabled && isAttachmentMode {
             // Save current frame before disabling attachment
@@ -189,6 +198,44 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     @objc private func newFolder() {
         mainViewController?.createFolderAndBeginRename(parentId: nil)
+    }
+
+    // MARK: - Global Hotkey
+
+    private func setupGlobalHotkey() {
+        GlobalHotkeyService.shared.delegate = self
+
+        let shortcut: KeyboardShortcut
+        if let data = UserDefaults.standard.data(forKey: UserDefaultsKeys.toggleSidebarShortcut),
+           let saved = try? JSONDecoder().decode(KeyboardShortcut.self, from: data) {
+            shortcut = saved
+        } else {
+            shortcut = .defaultToggleSidebar
+        }
+
+        GlobalHotkeyService.shared.register(shortcut: shortcut)
+    }
+
+    func hotkeyServiceDidTrigger(_ service: GlobalHotkeyService) {
+        // Silently ignore when Always on Top is enabled
+        let alwaysOnTopEnabled = UserDefaults.standard.bool(forKey: UserDefaultsKeys.alwaysOnTopEnabled)
+        guard !alwaysOnTopEnabled else { return }
+
+        guard let window = window else { return }
+
+        if window.isVisible && !isUserHidden {
+            // Hide window
+            isUserHidden = true
+            window.orderOut(nil)
+        } else {
+            // Show window
+            isUserHidden = false
+            if isAttachmentMode {
+                WindowAttachmentService.shared.forceUpdate()
+            }
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 
     // MARK: - Window Attachment
@@ -277,6 +324,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             name: .sidebarPositionChanged,
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleToggleSidebarShortcutChanged),
+            name: .toggleSidebarShortcutChanged,
+            object: nil
+        )
     }
 
     @objc private func handleBrowserChanged(_ notification: Notification) {
@@ -297,6 +351,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
         alwaysOnTopMenuItem?.state = enabled ? .on : .off
         window?.level = enabled ? .floating : .normal
+
+        // Reset user-hidden state when Always on Top changes
+        if enabled {
+            isUserHidden = false
+        }
 
         // If enabling and attachment is active, disable attachment
         if enabled && isAttachmentMode {
@@ -333,6 +392,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             // Disable attachment
             WindowAttachmentService.shared.disable()
             isAttachmentMode = false
+            isUserHidden = false
             updateWindowConstraints()
 
             // Show window in case it was hidden
@@ -354,6 +414,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         WindowAttachmentService.shared.enable(browserBundleId: browserBundleId, position: position)
     }
 
+    @objc private func handleToggleSidebarShortcutChanged() {
+        if let data = UserDefaults.standard.data(forKey: UserDefaultsKeys.toggleSidebarShortcut),
+           let shortcut = try? JSONDecoder().decode(KeyboardShortcut.self, from: data) {
+            GlobalHotkeyService.shared.register(shortcut: shortcut)
+        } else {
+            GlobalHotkeyService.shared.unregister()
+        }
+    }
+
     // MARK: - WindowAttachmentServiceDelegate
 
     func attachmentService(_ service: WindowAttachmentService, shouldPositionWindow frame: NSRect, animated: Bool) {
@@ -361,6 +430,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
         // Always show window if hidden, even if frame hasn't changed
         if !window.isVisible {
+            // Don't auto-show if user explicitly hid via shortcut
+            guard !isUserHidden else { return }
             window.setFrame(frame, display: true, animate: false)
             window.orderFront(nil)
             return
@@ -386,6 +457,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     }
 
     func attachmentServiceShouldShowWindow(_ service: WindowAttachmentService) {
+        guard !isUserHidden else { return }
         window?.orderFront(nil)
     }
 }
