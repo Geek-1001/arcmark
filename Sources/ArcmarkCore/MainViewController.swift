@@ -244,6 +244,10 @@ final class MainViewController: NSViewController {
         nodeListViewController.onNewFolderRequested = { [weak self] parentId in
             self?.createFolderAndBeginRename(parentId: parentId)
         }
+
+        nodeListViewController.onLinkUrlEdited = { [weak self] nodeId, newUrl in
+            self?.model.updateLinkUrl(id: nodeId, newUrl: newUrl)
+        }
     }
 
     private func bindModel() {
