@@ -455,10 +455,15 @@ final class SettingsContentViewController: NSViewController {
         sidebarPositionSelector.selectedPosition = positionString
 
         // Load keyboard shortcut
-        if let data = UserDefaults.standard.data(forKey: UserDefaultsKeys.toggleSidebarShortcut),
-           let shortcut = try? JSONDecoder().decode(KeyboardShortcut.self, from: data) {
-            shortcutRecorder.configure(shortcut: shortcut)
+        if let data = UserDefaults.standard.data(forKey: UserDefaultsKeys.toggleSidebarShortcut) {
+            if let shortcut = try? JSONDecoder().decode(KeyboardShortcut.self, from: data) {
+                shortcutRecorder.configure(shortcut: shortcut)
+            } else {
+                // Empty data = explicitly cleared by user
+                shortcutRecorder.configure(shortcut: nil)
+            }
         } else {
+            // No data = first launch, use default
             shortcutRecorder.configure(shortcut: .defaultToggleSidebar)
         }
 
@@ -638,7 +643,8 @@ final class SettingsContentViewController: NSViewController {
                 UserDefaults.standard.set(data, forKey: UserDefaultsKeys.toggleSidebarShortcut)
             }
         } else {
-            UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.toggleSidebarShortcut)
+            // Store empty data to distinguish "explicitly cleared" from "never configured"
+            UserDefaults.standard.set(Data(), forKey: UserDefaultsKeys.toggleSidebarShortcut)
         }
         NotificationCenter.default.post(name: .toggleSidebarShortcutChanged, object: nil)
     }

@@ -206,15 +206,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private func setupGlobalHotkey() {
         GlobalHotkeyService.shared.delegate = self
 
-        let shortcut: KeyboardShortcut
-        if let data = UserDefaults.standard.data(forKey: UserDefaultsKeys.toggleSidebarShortcut),
-           let saved = try? JSONDecoder().decode(KeyboardShortcut.self, from: data) {
-            shortcut = saved
+        if let data = UserDefaults.standard.data(forKey: UserDefaultsKeys.toggleSidebarShortcut) {
+            // Key exists: decode saved shortcut, or treat as explicitly cleared
+            if let saved = try? JSONDecoder().decode(KeyboardShortcut.self, from: data) {
+                GlobalHotkeyService.shared.register(shortcut: saved)
+            }
         } else {
-            shortcut = .defaultToggleSidebar
+            // No data = first launch, use default
+            GlobalHotkeyService.shared.register(shortcut: .defaultToggleSidebar)
         }
-
-        GlobalHotkeyService.shared.register(shortcut: shortcut)
     }
 
     func hotkeyServiceDidTrigger(_ service: GlobalHotkeyService) {
