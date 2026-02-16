@@ -54,7 +54,7 @@ final class ShortcutRecorderView: NSView {
 
 // MARK: - Recorder Box View
 
-private final class RecorderBoxView: NSView {
+private final class RecorderBoxView: BaseView {
     var onShortcutRecorded: ((KeyboardShortcut?) -> Void)?
 
     private let shortcutLabel = NSTextField(labelWithString: "")
@@ -62,7 +62,6 @@ private final class RecorderBoxView: NSView {
 
     private var currentShortcut: KeyboardShortcut?
     private var isRecording = false
-    private var trackingArea: NSTrackingArea?
 
     override var acceptsFirstResponder: Bool { true }
 
@@ -82,7 +81,6 @@ private final class RecorderBoxView: NSView {
     }
 
     private func setupUI() {
-        wantsLayer = true
         layer?.backgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.08).cgColor
         layer?.cornerRadius = 8
 
@@ -205,25 +203,9 @@ private final class RecorderBoxView: NSView {
         onShortcutRecorded?(nil)
     }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let existingArea = trackingArea {
-            removeTrackingArea(existingArea)
-        }
-        let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeAlways]
-        trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(trackingArea!)
-    }
-
-    override func mouseEntered(with event: NSEvent) {
+    override func handleHoverStateChanged() {
         if !isRecording {
-            layer?.backgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.12).cgColor
-        }
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        if !isRecording {
-            layer?.backgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.08).cgColor
+            layer?.backgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: isHovered ? 0.12 : 0.08).cgColor
         }
     }
 }
