@@ -14,6 +14,7 @@ enum UserDefaultsKeys {
     static let sidebarPosition = "sidebarPosition"
     static let lastArcImportDate = "lastArcImportDate"
     static let arcImportCount = "arcImportCount"
+    static let toggleSidebarShortcut = "toggleSidebarShortcut"
 }
 
 let nodePasteboardType = NSPasteboard.PasteboardType("com.arcmark.node")
