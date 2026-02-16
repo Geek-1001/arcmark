@@ -210,6 +210,19 @@ final class AppModel {
         }
     }
 
+    func updateLinkUrl(id: UUID, newUrl: String) {
+        updateNode(id: id) { node in
+            switch node {
+            case .link(var link):
+                link.url = newUrl
+                link.faviconPath = nil
+                node = .link(link)
+            case .folder:
+                break
+            }
+        }
+    }
+
     func updateLinkTitleIfDefault(id: UUID, newTitle: String) -> Bool {
         let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }

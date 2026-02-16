@@ -46,6 +46,7 @@ final class NodeListViewController: NSViewController {
     var onBulkNodesCopied: (([UUID]) -> Void)?
     var onBulkNodesDeleted: (([UUID]) -> Void)?
     var onNewFolderRequested: ((UUID?) -> Void)?
+    var onLinkUrlEdited: ((UUID, String) -> Void)?
 
     // Data provider closure
     var nodeProvider: (() -> [Node])?
@@ -727,6 +728,11 @@ extension NodeListViewController: NSMenuDelegate {
             rename.target = self
             menu.addItem(rename)
 
+            let editUrl = NSMenuItem(title: "Edit URL…", action: #selector(contextEditUrl(_:)), keyEquivalent: "")
+            editUrl.target = self
+            editUrl.representedObject = node.id
+            menu.addItem(editUrl)
+
             let moveMenu = NSMenuItem(title: "Move to", action: nil, keyEquivalent: "")
             let submenu = NSMenu()
             if let workspaces = workspacesProvider?(), let currentWorkspace = workspaces.first {
@@ -760,6 +766,31 @@ extension NodeListViewController: NSMenuDelegate {
         guard let indexPath = contextIndexPath,
               let row = row(at: indexPath) else { return }
         beginInlineRename(nodeId: row.id, indexPath: indexPath)
+    }
+
+    @objc private func contextEditUrl(_ sender: NSMenuItem) {
+        guard let nodeId = sender.representedObject as? UUID,
+              let node = findNodeById?(nodeId),
+              case .link(let link) = node else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Edit URL"
+        alert.informativeText = "Enter the new URL for this link."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        textField.stringValue = link.url
+        textField.placeholderString = "https://example.com"
+        alert.accessoryView = textField
+        alert.window.initialFirstResponder = textField
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            let newUrl = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !newUrl.isEmpty, newUrl != link.url else { return }
+            onLinkUrlEdited?(nodeId, newUrl)
+        }
     }
 
     @objc private func contextDelete(_ sender: NSMenuItem) {
