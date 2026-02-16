@@ -155,6 +155,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     @objc private func showMainWindow() {
         guard let window else { return }
+        isUserHidden = false
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
