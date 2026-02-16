@@ -47,6 +47,8 @@ final class NodeListViewController: NSViewController {
     var onBulkNodesDeleted: (([UUID]) -> Void)?
     var onNewFolderRequested: ((UUID?) -> Void)?
     var onLinkUrlEdited: ((UUID, String) -> Void)?
+    var onPinLink: ((UUID) -> Void)?
+    var canPinLink: (() -> Bool)?
 
     // Data provider closure
     var nodeProvider: (() -> [Node])?
@@ -724,6 +726,16 @@ extension NodeListViewController: NSMenuDelegate {
             delete.representedObject = node.id
             menu.addItem(delete)
         case .link:
+            let pinItem = NSMenuItem(title: "Pin this link", action: #selector(contextPinLink(_:)), keyEquivalent: "")
+            pinItem.target = self
+            pinItem.representedObject = node.id
+            if let canPin = canPinLink, !canPin() {
+                pinItem.isEnabled = false
+                pinItem.title = "Maximum pinned tabs reached"
+            }
+            menu.addItem(pinItem)
+            menu.addItem(NSMenuItem.separator())
+
             let rename = NSMenuItem(title: "Rename…", action: #selector(contextRename), keyEquivalent: "")
             rename.target = self
             menu.addItem(rename)
@@ -803,6 +815,11 @@ extension NodeListViewController: NSMenuDelegate {
               let nodeId = dict["nodeId"],
               let workspaceId = dict["workspaceId"] else { return }
         onNodeMovedToWorkspace?(nodeId, workspaceId)
+    }
+
+    @objc private func contextPinLink(_ sender: NSMenuItem) {
+        guard let nodeId = sender.representedObject as? UUID else { return }
+        onPinLink?(nodeId)
     }
 
     private func populateBulkContextMenu(_ menu: NSMenu) {

@@ -12,6 +12,7 @@ final class MainViewController: NSViewController {
     // UI Components
     private let workspaceSwitcher = WorkspaceSwitcherView(style: .defaultStyle)
     private let searchField = SearchBarView(style: .defaultSearch)
+    private let pinnedTabsView = PinnedTabsView()
     private let pasteButton = IconTitleButton(
         title: "Add links from clipboard",
         symbolName: "plus",
@@ -95,6 +96,15 @@ final class MainViewController: NSViewController {
             self?.searchCoordinator.updateQuery(text)
         }
 
+        // Pinned tabs
+        pinnedTabsView.onLinkClicked = { [weak self] linkId in
+            guard let self, let link = self.model.pinnedLinkById(linkId) else { return }
+            self.openLink(link)
+        }
+        pinnedTabsView.onLinkRightClicked = { [weak self] linkId, event in
+            self?.showPinnedTabContextMenu(for: linkId, at: event)
+        }
+
         // Paste button
         pasteButton.translatesAutoresizingMaskIntoConstraints = false
         pasteButton.target = self
@@ -117,7 +127,7 @@ final class MainViewController: NSViewController {
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
         bottomBar.addSubview(pasteButton)
 
-        let stack = NSStackView(views: [topBar, searchField, nodeListViewController.view, bottomBar])
+        let stack = NSStackView(views: [topBar, searchField, pinnedTabsView, nodeListViewController.view, bottomBar])
         stack.orientation = .vertical
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -151,7 +161,9 @@ final class MainViewController: NSViewController {
 
         NSLayoutConstraint.activate([
             searchField.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 2),
-            searchField.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -2)
+            searchField.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -2),
+            pinnedTabsView.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 2),
+            pinnedTabsView.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -2),
         ])
 
         // Settings view constraints
@@ -248,6 +260,14 @@ final class MainViewController: NSViewController {
         nodeListViewController.onLinkUrlEdited = { [weak self] nodeId, newUrl in
             self?.model.updateLinkUrl(id: nodeId, newUrl: newUrl)
         }
+
+        nodeListViewController.onPinLink = { [weak self] nodeId in
+            self?.model.pinLink(id: nodeId)
+        }
+
+        nodeListViewController.canPinLink = { [weak self] in
+            self?.model.canPinMore ?? false
+        }
     }
 
     private func bindModel() {
@@ -291,6 +311,7 @@ final class MainViewController: NSViewController {
         } else {
             showWorkspaceContent()
             applyWorkspaceStyling()
+            pinnedTabsView.update(pinnedLinks: model.currentWorkspace.pinnedLinks)
             let filteredNodes = searchCoordinator.filter(nodes: model.currentWorkspace.items)
             let forceExpand = searchCoordinator.isSearchActive
             nodeListViewController.isSearchActive = searchCoordinator.isSearchActive
@@ -332,6 +353,7 @@ final class MainViewController: NSViewController {
     private func showSettingsContent() {
         // Hide workspace content
         searchField.isHidden = true
+        pinnedTabsView.isHidden = true
         pasteButton.isHidden = true
         nodeListViewController.view.isHidden = true
 
@@ -347,6 +369,7 @@ final class MainViewController: NSViewController {
     private func showWorkspaceContent() {
         // Show workspace content
         searchField.isHidden = false
+        pinnedTabsView.isHidden = model.currentWorkspace.pinnedLinks.isEmpty
         pasteButton.isHidden = false
         nodeListViewController.view.isHidden = false
 
@@ -579,7 +602,27 @@ final class MainViewController: NSViewController {
     @objc private func handleFaviconUpdate(_ notification: Notification) {
         guard let linkId = notification.userInfo?["linkId"] as? UUID,
               let path = notification.userInfo?["path"] as? String else { return }
-        model.updateLinkFaviconPath(id: linkId, path: path)
+        if model.pinnedLinkById(linkId) != nil {
+            model.updatePinnedLinkFaviconPath(id: linkId, path: path)
+        } else {
+            model.updateLinkFaviconPath(id: linkId, path: path)
+        }
+    }
+
+    // MARK: - Pinned Tabs
+
+    private func showPinnedTabContextMenu(for linkId: UUID, at event: NSEvent) {
+        let menu = NSMenu()
+        let unpinItem = NSMenuItem(title: "Unpin", action: #selector(unpinTab(_:)), keyEquivalent: "")
+        unpinItem.target = self
+        unpinItem.representedObject = linkId
+        menu.addItem(unpinItem)
+        NSMenu.popUpContextMenu(menu, with: event, for: pinnedTabsView)
+    }
+
+    @objc private func unpinTab(_ sender: NSMenuItem) {
+        guard let linkId = sender.representedObject as? UUID else { return }
+        model.unpinLink(id: linkId)
     }
 
     // MARK: - Bulk Operations
