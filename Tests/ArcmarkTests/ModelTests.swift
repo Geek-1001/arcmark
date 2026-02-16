@@ -119,4 +119,146 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(model.workspaces[2].name, "Second")
         XCTAssertEqual(model.workspaces[3].name, "Third")
     }
+
+    // MARK: - Pinned Links Tests
+
+    func testPinLink() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let linkId = model.addLink(urlString: "https://a.com", title: "A", parentId: nil)
+        XCTAssertEqual(model.currentWorkspace.items.count, 1)
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, 0)
+
+        model.pinLink(id: linkId)
+        XCTAssertEqual(model.currentWorkspace.items.count, 0)
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, 1)
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks[0].id, linkId)
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks[0].title, "A")
+    }
+
+    func testUnpinLink() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let linkId = model.addLink(urlString: "https://a.com", title: "A", parentId: nil)
+        model.pinLink(id: linkId)
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, 1)
+        XCTAssertEqual(model.currentWorkspace.items.count, 0)
+
+        model.unpinLink(id: linkId)
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, 0)
+        XCTAssertEqual(model.currentWorkspace.items.count, 1)
+        if case .link(let link) = model.currentWorkspace.items.last {
+            XCTAssertEqual(link.id, linkId)
+            XCTAssertEqual(link.title, "A")
+        } else {
+            XCTFail("Expected link at root level after unpin")
+        }
+    }
+
+    func testPinLinkMaximum() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        var linkIds: [UUID] = []
+        for i in 0..<10 {
+            let id = model.addLink(urlString: "https://\(i).com", title: "Link \(i)", parentId: nil)
+            linkIds.append(id)
+        }
+
+        // Pin 9 links (the maximum)
+        for i in 0..<9 {
+            model.pinLink(id: linkIds[i])
+        }
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, 9)
+        XCTAssertEqual(model.currentWorkspace.items.count, 1)
+        XCTAssertFalse(model.canPinMore)
+
+        // Attempt to pin the 10th - should be rejected
+        model.pinLink(id: linkIds[9])
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, 9)
+        XCTAssertEqual(model.currentWorkspace.items.count, 1)
+    }
+
+    func testPinLinkFromNestedFolder() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let folderId = model.addFolder(name: "Folder", parentId: nil)
+        let linkId = model.addLink(urlString: "https://nested.com", title: "Nested", parentId: folderId)
+
+        if let folderNode = model.nodeById(folderId), case .folder(let folder) = folderNode {
+            XCTAssertEqual(folder.children.count, 1)
+        }
+
+        model.pinLink(id: linkId)
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, 1)
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks[0].title, "Nested")
+
+        // Verify link was removed from the folder
+        if let folderNode = model.nodeById(folderId), case .folder(let folder) = folderNode {
+            XCTAssertEqual(folder.children.count, 0)
+        } else {
+            XCTFail("Expected folder to still exist")
+        }
+    }
+
+    func testCannotPinFolder() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let folderId = model.addFolder(name: "Folder", parentId: nil)
+        model.pinLink(id: folderId)
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, 0)
+        XCTAssertEqual(model.currentWorkspace.items.count, 1)
+    }
+
+    func testJSONRoundTripWithPinnedLinks() throws {
+        let link = Link(id: UUID(), title: "Pinned", url: "https://pinned.com", faviconPath: nil)
+        let treeLink = Link(id: UUID(), title: "Tree", url: "https://tree.com", faviconPath: nil)
+        let workspace = Workspace(
+            id: UUID(),
+            name: "Test",
+            colorId: .ember,
+            items: [.link(treeLink)],
+            pinnedLinks: [link]
+        )
+        let state = AppState(schemaVersion: 1, workspaces: [workspace], selectedWorkspaceId: workspace.id, isSettingsSelected: false)
+
+        let data = try JSONEncoder().encode(state)
+        let decoded = try JSONDecoder().decode(AppState.self, from: data)
+
+        XCTAssertEqual(decoded.workspaces[0].pinnedLinks.count, 1)
+        XCTAssertEqual(decoded.workspaces[0].pinnedLinks[0].title, "Pinned")
+        XCTAssertEqual(decoded.workspaces[0].items.count, 1)
+        XCTAssertEqual(state, decoded)
+    }
+
+    func testBackwardCompatibilityNoPinnedLinks() throws {
+        // Simulate old JSON format without pinnedLinks field
+        let json = """
+        {
+            "schemaVersion": 1,
+            "workspaces": [{
+                "id": "00000000-0000-0000-0000-000000000001",
+                "name": "Old Workspace",
+                "colorId": "ember",
+                "items": []
+            }],
+            "selectedWorkspaceId": "00000000-0000-0000-0000-000000000001",
+            "isSettingsSelected": false
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(AppState.self, from: data)
+
+        XCTAssertEqual(decoded.workspaces[0].pinnedLinks.count, 0)
+        XCTAssertEqual(decoded.workspaces[0].name, "Old Workspace")
+    }
 }
