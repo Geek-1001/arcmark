@@ -25,8 +25,8 @@ final class ShortcutRecorderView: NSView {
     }
 
     private func setupUI() {
-        titleLabel.font = NSFont.systemFont(ofSize: 13)
-        titleLabel.textColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 1.0)
+        titleLabel.font = ThemeConstants.Fonts.systemFont(size: 13, weight: .regular)
+        titleLabel.textColor = ThemeConstants.Colors.darkGray
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         recorderBox.translatesAutoresizingMaskIntoConstraints = false
@@ -81,11 +81,11 @@ private final class RecorderBoxView: BaseView {
     }
 
     private func setupUI() {
-        layer?.backgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.08).cgColor
-        layer?.cornerRadius = 8
+        layer?.backgroundColor = ThemeConstants.Colors.darkGray.withAlphaComponent(0.08).cgColor
+        layer?.cornerRadius = ThemeConstants.CornerRadius.medium
 
-        shortcutLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        shortcutLabel.textColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.8)
+        shortcutLabel.font = ThemeConstants.Fonts.systemFont(size: 12, weight: .medium)
+        shortcutLabel.textColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.high)
         shortcutLabel.alignment = .center
         shortcutLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -96,16 +96,16 @@ private final class RecorderBoxView: BaseView {
         clearButton.action = #selector(clearShortcut)
         clearButton.translatesAutoresizingMaskIntoConstraints = false
         clearButton.isHidden = true
-        clearButton.contentTintColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.4)
+        clearButton.contentTintColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.low)
 
         addSubview(shortcutLabel)
         addSubview(clearButton)
 
         NSLayoutConstraint.activate([
-            shortcutLabel.centerXAnchor.constraint(equalTo: centerXAnchor, constant: -8),
+            shortcutLabel.centerXAnchor.constraint(equalTo: centerXAnchor, constant: -ThemeConstants.Spacing.medium),
             shortcutLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            clearButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            clearButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -ThemeConstants.Spacing.small),
             clearButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             clearButton.widthAnchor.constraint(equalToConstant: 16),
             clearButton.heightAnchor.constraint(equalToConstant: 16),
@@ -117,18 +117,18 @@ private final class RecorderBoxView: BaseView {
     private func updateDisplay() {
         if isRecording {
             shortcutLabel.stringValue = "Type shortcut..."
-            shortcutLabel.textColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.5)
+            shortcutLabel.textColor = ThemeConstants.Colors.darkGray.withAlphaComponent(0.5)
             clearButton.isHidden = true
             layer?.borderWidth = 1.5
             layer?.borderColor = NSColor.controlAccentColor.cgColor
         } else if let shortcut = currentShortcut {
             shortcutLabel.stringValue = shortcut.displayString
-            shortcutLabel.textColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.8)
+            shortcutLabel.textColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.high)
             clearButton.isHidden = false
             layer?.borderWidth = 0
         } else {
             shortcutLabel.stringValue = "Click to set"
-            shortcutLabel.textColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: 0.4)
+            shortcutLabel.textColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.low)
             clearButton.isHidden = true
             layer?.borderWidth = 0
         }
@@ -205,7 +205,7 @@ private final class RecorderBoxView: BaseView {
 
     override func handleHoverStateChanged() {
         if !isRecording {
-            layer?.backgroundColor = NSColor(calibratedRed: 0.078, green: 0.078, blue: 0.078, alpha: isHovered ? 0.12 : 0.08).cgColor
+            layer?.backgroundColor = ThemeConstants.Colors.darkGray.withAlphaComponent(isHovered ? 0.12 : 0.08).cgColor
         }
     }
 }
