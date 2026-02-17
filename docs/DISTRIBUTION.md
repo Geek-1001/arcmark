@@ -6,6 +6,7 @@ This document describes how to build and distribute Arcmark for beta testing and
 - [ASSETS.md](ASSETS.md) - App icon and DMG background specifications
 - [BUILD_AND_CODESIGN.md](BUILD_AND_CODESIGN.md) - Build system and code signing details
 - [PRODUCTION_SIGNING.md](PRODUCTION_SIGNING.md) - Production code signing and notarization setup
+- [appcast.xml](appcast.xml) - Sparkle update feed (hosted via GitHub Pages)
 
 ## Version Management
 
@@ -79,11 +80,13 @@ For distribution to beta testers and public release:
 
 **What happens with `--production --dmg`**:
 1. App is built and signed with your Developer ID certificate
-2. Hardened runtime is enabled for notarization
-3. DMG is created with the signed app
-4. DMG is submitted to Apple for notarization (~2-5 minutes)
-5. Notarization ticket is stapled to the DMG
-6. Result: DMG launches without security warnings ✨
+2. Sparkle.framework is embedded and Info.plist is patched with update feed URL
+3. Hardened runtime is enabled for notarization
+4. DMG is created with the signed app
+5. DMG is signed with Sparkle's EdDSA key and `docs/appcast.xml` is auto-updated
+6. DMG is submitted to Apple for notarization (~2-5 minutes)
+7. Notarization ticket is stapled to the DMG
+8. Result: DMG launches without security warnings and supports auto-updates
 
 ### Build Comparison
 
@@ -150,24 +153,33 @@ When mounted, users see:
 
 2. **Build Release DMG**:
    ```bash
-   ./scripts/build.sh --dmg
+   ./scripts/build.sh --production --dmg
    ```
+   The build script automatically:
+   - Embeds Sparkle.framework and patches Info.plist with the update feed URL
+   - Signs the DMG with EdDSA and adds a new entry to `docs/appcast.xml`
 
 3. **Test Installation**:
    - Mount the DMG
    - Drag to Applications
    - Verify app launches correctly
+   - Verify "Check for Updates" works (App Menu and Settings)
 
-4. **Create Git Tag**:
+4. **Publish the update feed**:
+   ```bash
+   git add docs/appcast.xml
+   git commit -m "Update appcast for v1.0.0"
+   git push origin main
+   ```
+   GitHub Pages serves the appcast at `https://geek-1001.github.io/arcmark/appcast.xml`.
+
+5. **Create Git Tag and GitHub Release**:
    ```bash
    git tag -a v1.0.0 -m "Release version 1.0.0"
    git push origin v1.0.0
    ```
-
-5. **Distribute**:
-   - Upload to GitHub Releases
-   - Update website download links
-   - Announce to users
+   Upload the DMG (`.build/dmg/Arcmark-1.0.0.dmg`) to the GitHub Release.
+   The appcast entry points to this DMG URL, so existing users will receive the update automatically.
 
 ## Installation Instructions for Users
 
@@ -189,8 +201,17 @@ Share these instructions with beta testers:
 
 ### Updating Arcmark
 
-To update to a new version:
+Arcmark includes automatic update support via Sparkle. When a new version is available:
 
+1. The app checks for updates automatically in the background
+2. A dialog appears when an update is available
+3. Click "Install Update" to download and install automatically
+
+You can also check manually via:
+- **App Menu** > "Check for Updates..."
+- **Settings** > scroll to "App Version" > click "Check for Updates"
+
+**Manual update** (if auto-update is unavailable):
 1. **Quit** Arcmark if it's running
 2. **Download** the new DMG file
 3. **Follow** the same installation steps above (this will replace the old version)
@@ -272,10 +293,61 @@ This removes the entire `.build/` directory.
 **Issue**: "resource fork, Finder information, or similar detritus not allowed"
 **Solution**: The build script handles this automatically with `--force --deep` flags
 
+## Auto-Update System (Sparkle)
+
+Arcmark uses [Sparkle 2](https://sparkle-project.org/) for automatic updates.
+
+### How It Works
+
+1. **Appcast feed**: `docs/appcast.xml` is hosted via GitHub Pages at `https://geek-1001.github.io/arcmark/appcast.xml`
+2. **Update checking**: Sparkle checks the appcast feed periodically for new versions
+3. **EdDSA signing**: Each DMG is signed with an EdDSA key for secure update verification
+4. **User experience**: Standard macOS update dialog with download, install, and relaunch
+
+### First-Time Setup (One-Time)
+
+1. **Generate EdDSA keys** using Sparkle's `generate_keys` tool:
+   ```bash
+   # Find the tool in build artifacts after running swift build
+   find .build -name "generate_keys" -type f
+   # Run it to generate a key pair
+   .build/.../generate_keys
+   ```
+2. **Set the public key** in `Bundler.toml` (`SUPublicEDKey` field)
+3. **Enable GitHub Pages** on the repo to serve from `docs/` folder on `main` branch
+
+### Release Workflow with Auto-Updates
+
+```bash
+# 1. Update version
+echo "0.2.0" > VERSION
+
+# 2. Build production DMG (auto-signs with EdDSA, auto-updates appcast.xml)
+./scripts/build.sh --production --dmg
+
+# 3. Commit the updated appcast
+git add docs/appcast.xml
+git commit -m "Update appcast for v0.2.0"
+
+# 4. Tag and push
+git tag -a v0.2.0 -m "Release version 0.2.0"
+git push origin main v0.2.0
+
+# 5. Create GitHub Release and upload the DMG
+gh release create v0.2.0 .build/dmg/Arcmark-0.2.0.dmg --title "v0.2.0"
+```
+
+Existing users will receive the update automatically via Sparkle.
+
+### Where Users Can Check for Updates
+
+- **App Menu**: Arcmark > "Check for Updates..."
+- **Settings**: Scroll to the "App Version" section > "Check for Updates" button
+
 ## Future Improvements
 
 - [ ] Automated notarization for production releases
 - [ ] Custom DMG background image
-- [ ] Sparkle framework integration for auto-updates
+- [x] Sparkle framework integration for auto-updates
 - [ ] CI/CD pipeline for automated builds
 - [ ] TestFlight-style beta distribution portal
