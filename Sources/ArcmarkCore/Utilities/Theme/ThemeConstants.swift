@@ -243,6 +243,12 @@ struct ThemeConstants {
         static let rowHeight: CGFloat = 44
 
         static let pinnedTileHeight: CGFloat = 50
+
+        /// Number of columns in the pinned tabs grid
+        static let pinnedTileColumns: Int = 4
+
+        /// Maximum number of rows in the pinned tabs grid
+        static let pinnedTileMaxRows: Int = 3
     }
 
     // MARK: - Animation
