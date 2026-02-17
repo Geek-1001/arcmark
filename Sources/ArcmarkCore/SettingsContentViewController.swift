@@ -71,6 +71,10 @@ final class SettingsContentViewController: NSViewController {
     // Dynamic constraints
     private var separator1ToSelectorConstraint: NSLayoutConstraint?
     private var separator1ToToggleConstraint: NSLayoutConstraint?
+    private var separator4ToOpenSettingsConstraint: NSLayoutConstraint?
+    private var separator4ToRefreshButtonConstraint: NSLayoutConstraint?
+    private var separator5ToImportButtonConstraint: NSLayoutConstraint?
+    private var separator5ToImportStatusConstraint: NSLayoutConstraint?
 
     override func loadView() {
         let view = NSView()
@@ -431,7 +435,6 @@ final class SettingsContentViewController: NSViewController {
             // Separator 4
             separator4.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
             separator4.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
-            separator4.topAnchor.constraint(equalTo: refreshStatusButton.bottomAnchor, constant: sectionSpacing),
             separator4.heightAnchor.constraint(equalToConstant: 1),
 
             // Import & Export Header
@@ -452,7 +455,6 @@ final class SettingsContentViewController: NSViewController {
             // Separator 5
             separator5.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
             separator5.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
-            separator5.topAnchor.constraint(equalTo: importStatusLabel.bottomAnchor, constant: sectionSpacing),
             separator5.heightAnchor.constraint(equalToConstant: 1),
 
             // App Version Header
@@ -479,6 +481,20 @@ final class SettingsContentViewController: NSViewController {
 
         // Activate the appropriate constraint based on initial state
         separator1ToSelectorConstraint?.isActive = true
+
+        // Setup dynamic constraints for separator4 (permissions section)
+        // openSettingsButton is shown/hidden based on accessibility permission status
+        separator4ToOpenSettingsConstraint = separator4.topAnchor.constraint(equalTo: openSettingsButton.bottomAnchor, constant: sectionSpacing)
+        separator4ToRefreshButtonConstraint = separator4.topAnchor.constraint(equalTo: refreshStatusButton.bottomAnchor, constant: sectionSpacing)
+        // Default: openSettingsButton is visible
+        separator4ToOpenSettingsConstraint?.isActive = true
+
+        // Setup dynamic constraints for separator5 (import section)
+        // importStatusLabel is hidden by default, shown temporarily after import
+        separator5ToImportButtonConstraint = separator5.topAnchor.constraint(equalTo: importButton.bottomAnchor, constant: sectionSpacing)
+        separator5ToImportStatusConstraint = separator5.topAnchor.constraint(equalTo: importStatusLabel.bottomAnchor, constant: sectionSpacing)
+        // Default: importStatusLabel is hidden
+        separator5ToImportButtonConstraint?.isActive = true
 
         // Setup workspace collection view height constraint (will be updated dynamically)
         workspaceCollectionViewHeightConstraint = workspaceCollectionView.heightAnchor.constraint(equalToConstant: 0)
@@ -563,11 +579,17 @@ final class SettingsContentViewController: NSViewController {
             // Use a darker green for better readability
             permissionStatusLabel.textColor = NSColor(calibratedRed: 0.13, green: 0.67, blue: 0.29, alpha: 1.0)
             openSettingsButton.isHidden = true
+            // Anchor separator4 to refreshStatusButton when openSettingsButton is hidden
+            separator4ToOpenSettingsConstraint?.isActive = false
+            separator4ToRefreshButtonConstraint?.isActive = true
         } else {
             permissionStatusLabel.stringValue = "Accessibility Access: ✗ Not Granted"
             // Use a darker red for better readability
             permissionStatusLabel.textColor = NSColor(calibratedRed: 0.85, green: 0.23, blue: 0.23, alpha: 1.0)
             openSettingsButton.isHidden = false
+            // Anchor separator4 to openSettingsButton when it's visible
+            separator4ToRefreshButtonConstraint?.isActive = false
+            separator4ToOpenSettingsConstraint?.isActive = true
         }
     }
 
@@ -822,10 +844,16 @@ final class SettingsContentViewController: NSViewController {
         importStatusLabel.stringValue = message
         importStatusLabel.textColor = isError ? NSColor.systemRed : regularTextColor
         importStatusLabel.isHidden = false
+        // Anchor separator5 to importStatusLabel when it's visible
+        separator5ToImportButtonConstraint?.isActive = false
+        separator5ToImportStatusConstraint?.isActive = true
     }
 
     private func hideImportStatus() {
         importStatusLabel.isHidden = true
+        // Anchor separator5 to importButton when importStatusLabel is hidden
+        separator5ToImportStatusConstraint?.isActive = false
+        separator5ToImportButtonConstraint?.isActive = true
     }
 
     // MARK: - Workspace Management
