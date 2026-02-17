@@ -14,9 +14,12 @@ let package = Package(
         // Executable for development/testing
         .executable(name: "Arcmark", targets: ["ArcmarkApp"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0")
+    ],
     targets: [
         // Core library with all app logic
-        .target(name: "ArcmarkCore"),
+        .target(name: "ArcmarkCore", dependencies: ["Sparkle"]),
         // Minimal executable entry point
         .executableTarget(
             name: "ArcmarkApp",
