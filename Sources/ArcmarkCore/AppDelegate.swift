@@ -1,4 +1,5 @@
 import AppKit
+@preconcurrency import Sparkle
 
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WindowAttachmentServiceDelegate, GlobalHotkeyServiceDelegate {
@@ -9,6 +10,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var mainViewController: MainViewController?
     private var preferencesWindowController: PreferencesWindowController?
     private var alwaysOnTopMenuItem: NSMenuItem?
+    private var updaterController: SPUStandardUpdaterController!
 
     // Attachment state
     private var isAttachmentMode: Bool = false
@@ -18,10 +20,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var isUserHidden: Bool = false
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
+        )
+
         setupMenus()
 
         let model = AppModel()
         let mainViewController = MainViewController(model: model)
+        mainViewController.updater = updaterController.updater
         self.mainViewController = mainViewController
 
         let window = NSWindow(
@@ -111,6 +118,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
         appMenu.addItem(withTitle: "Preferences…", action: #selector(openPreferences), keyEquivalent: ",")
+        let checkForUpdatesItem = NSMenuItem(title: "Check for Updates…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        checkForUpdatesItem.target = updaterController
+        appMenu.addItem(checkForUpdatesItem)
         appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Quit Arcmark", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 

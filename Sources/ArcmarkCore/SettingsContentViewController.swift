@@ -4,6 +4,7 @@
 //
 
 import AppKit
+@preconcurrency import Sparkle
 
 final class SettingsContentViewController: NSViewController {
     // Layout constants
@@ -45,6 +46,11 @@ final class SettingsContentViewController: NSViewController {
     // Import & Export section
     private let importButton = SettingsButton(title: "Import from Arc Browser")
     private let importStatusLabel = NSTextField(labelWithString: "")
+
+    // App Version section
+    private let versionLabel = NSTextField(labelWithString: "")
+    private let checkForUpdatesButton = SettingsButton(title: "Check for Updates")
+    var updater: SPUUpdater?
 
     // Reference to AppModel (will be set from MainViewController)
     weak var appModel: AppModel? {
@@ -277,6 +283,17 @@ final class SettingsContentViewController: NSViewController {
         importStatusLabel.isHidden = true
         importStatusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+        // App Version Section
+        let versionString = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        versionLabel.stringValue = "Version \(versionString)"
+        versionLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        versionLabel.textColor = regularTextColor
+        versionLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        checkForUpdatesButton.target = self
+        checkForUpdatesButton.action = #selector(checkForUpdates)
+        checkForUpdatesButton.translatesAutoresizingMaskIntoConstraints = false
+
         // Add all subviews to contentView
         contentView.addSubview(windowSettingsHeader)
         contentView.addSubview(alwaysOnTopToggle)
@@ -301,6 +318,13 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(importHeader)
         contentView.addSubview(importButton)
         contentView.addSubview(importStatusLabel)
+
+        let separator5 = createSeparator()
+        let versionHeader = createSectionHeader("App Version")
+        contentView.addSubview(separator5)
+        contentView.addSubview(versionHeader)
+        contentView.addSubview(versionLabel)
+        contentView.addSubview(checkForUpdatesButton)
 
         // Layout constraints
         NSLayoutConstraint.activate([
@@ -425,8 +449,28 @@ final class SettingsContentViewController: NSViewController {
             importStatusLabel.topAnchor.constraint(equalTo: importButton.bottomAnchor, constant: itemSpacing),
             importStatusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
 
+            // Separator 5
+            separator5.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            separator5.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            separator5.topAnchor.constraint(equalTo: importStatusLabel.bottomAnchor, constant: sectionSpacing),
+            separator5.heightAnchor.constraint(equalToConstant: 1),
+
+            // App Version Header
+            versionHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            versionHeader.topAnchor.constraint(equalTo: separator5.bottomAnchor, constant: sectionSpacing),
+
+            // Version Label
+            versionLabel.leadingAnchor.constraint(equalTo: versionHeader.leadingAnchor),
+            versionLabel.topAnchor.constraint(equalTo: versionHeader.bottomAnchor, constant: sectionHeaderSpacing),
+
+            // Check for Updates Button
+            checkForUpdatesButton.leadingAnchor.constraint(equalTo: versionLabel.leadingAnchor),
+            checkForUpdatesButton.topAnchor.constraint(equalTo: versionLabel.bottomAnchor, constant: itemSpacing),
+            checkForUpdatesButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            checkForUpdatesButton.heightAnchor.constraint(equalToConstant: 36),
+
             // Bottom constraint to define content height - use greaterThanOrEqualTo to allow content to be anchored at top
-            contentView.bottomAnchor.constraint(greaterThanOrEqualTo: importStatusLabel.bottomAnchor, constant: 24),
+            contentView.bottomAnchor.constraint(greaterThanOrEqualTo: checkForUpdatesButton.bottomAnchor, constant: 24),
         ])
 
         // Setup dynamic constraints for separator1
@@ -678,6 +722,10 @@ final class SettingsContentViewController: NSViewController {
 
     @objc private func refreshPermissionStatus() {
         updatePermissionStatus()
+    }
+
+    @objc private func checkForUpdates() {
+        updater?.checkForUpdates()
     }
 
     @objc private func importFromArc() {
