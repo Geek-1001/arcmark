@@ -68,7 +68,7 @@ final class PinnedTabsView: NSView {
 
         while placed < count {
             let remaining = count - placed
-            let cols = min(remaining, 3)
+            let cols = min(remaining, ThemeConstants.Sizing.pinnedTileColumns)
             let tileWidth = (totalWidth - gap * CGFloat(cols - 1)) / CGFloat(cols)
 
             for col in 0..<cols {
@@ -87,7 +87,8 @@ final class PinnedTabsView: NSView {
 
         let tileHeight = ThemeConstants.Sizing.pinnedTileHeight
         let gap = ThemeConstants.Spacing.tiny
-        let rows = Int(ceil(Double(count) / 3.0))
+        let cols = ThemeConstants.Sizing.pinnedTileColumns
+        let rows = min(Int(ceil(Double(count) / Double(cols))), ThemeConstants.Sizing.pinnedTileMaxRows)
         let height = CGFloat(rows) * tileHeight + CGFloat(rows - 1) * gap
 
         return NSSize(width: NSView.noIntrinsicMetric, height: height)

@@ -29,7 +29,7 @@ struct Workspace: Codable, Identifiable, Equatable {
     var items: [Node]
     var pinnedLinks: [Link]
 
-    static let maxPinnedLinks = 9
+    static let maxPinnedLinks = ThemeConstants.Sizing.pinnedTileColumns * ThemeConstants.Sizing.pinnedTileMaxRows
 
     init(id: UUID, name: String, colorId: WorkspaceColorId, items: [Node], pinnedLinks: [Link] = []) {
         self.id = id

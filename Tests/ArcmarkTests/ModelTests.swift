@@ -164,23 +164,24 @@ final class ModelTests: XCTestCase {
         store.save(DataStore.defaultState())
         let model = AppModel(store: store)
 
+        let max = Workspace.maxPinnedLinks
         var linkIds: [UUID] = []
-        for i in 0..<10 {
+        for i in 0..<(max + 1) {
             let id = model.addLink(urlString: "https://\(i).com", title: "Link \(i)", parentId: nil)
             linkIds.append(id)
         }
 
-        // Pin 9 links (the maximum)
-        for i in 0..<9 {
+        // Pin up to the maximum
+        for i in 0..<max {
             model.pinLink(id: linkIds[i])
         }
-        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, 9)
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, max)
         XCTAssertEqual(model.currentWorkspace.items.count, 1)
         XCTAssertFalse(model.canPinMore)
 
-        // Attempt to pin the 10th - should be rejected
-        model.pinLink(id: linkIds[9])
-        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, 9)
+        // Attempt to pin one more - should be rejected
+        model.pinLink(id: linkIds[max])
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks.count, max)
         XCTAssertEqual(model.currentWorkspace.items.count, 1)
     }
 
