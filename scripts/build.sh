@@ -72,6 +72,56 @@ else
     fi
 fi
 
+# Post-build: Ensure Sparkle.framework is embedded
+echo "🔧 Checking Sparkle.framework embedding..."
+FRAMEWORKS_DIR=".build/bundler/Arcmark.app/Contents/Frameworks"
+if [ ! -d "$FRAMEWORKS_DIR/Sparkle.framework" ]; then
+    echo "  → Sparkle.framework not found in app bundle, copying..."
+    mkdir -p "$FRAMEWORKS_DIR"
+    # Find Sparkle.framework in the build artifacts
+    SPARKLE_FW=$(find .build -path "*/artifacts/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" -type d 2>/dev/null | head -1)
+    if [ -z "$SPARKLE_FW" ]; then
+        SPARKLE_FW=$(find .build -name "Sparkle.framework" -path "*/Sparkle.xcframework/*" -type d 2>/dev/null | head -1)
+    fi
+    if [ -n "$SPARKLE_FW" ]; then
+        cp -R "$SPARKLE_FW" "$FRAMEWORKS_DIR/"
+        echo "  ✓ Copied Sparkle.framework"
+    else
+        echo "  ⚠️  Warning: Could not find Sparkle.framework in build artifacts"
+    fi
+else
+    echo "  ✓ Sparkle.framework already embedded"
+fi
+
+# Patch Info.plist with Sparkle keys (SUFeedURL, SUPublicEDKey)
+echo "🔧 Patching Info.plist with Sparkle keys..."
+FEED_URL="https://geek-1001.github.io/arcmark/appcast.xml"
+
+if ! /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$INFO_PLIST" &>/dev/null; then
+    /usr/libexec/PlistBuddy -c "Add :SUFeedURL string '$FEED_URL'" "$INFO_PLIST"
+    echo "  ✓ Added SUFeedURL"
+else
+    /usr/libexec/PlistBuddy -c "Set :SUFeedURL '$FEED_URL'" "$INFO_PLIST"
+    echo "  ✓ Updated SUFeedURL"
+fi
+
+if ! /usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$INFO_PLIST" &>/dev/null; then
+    /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string ''" "$INFO_PLIST"
+    echo "  ✓ Added SUPublicEDKey (placeholder - run generate_keys to set)"
+else
+    echo "  ✓ SUPublicEDKey already present"
+fi
+
+# Add @executable_path/../Frameworks to rpath so dyld can find embedded frameworks
+echo "🔧 Fixing rpath for embedded frameworks..."
+EXECUTABLE=".build/bundler/Arcmark.app/Contents/MacOS/Arcmark"
+if ! otool -l "$EXECUTABLE" | grep -A2 LC_RPATH | grep -q '@executable_path/../Frameworks'; then
+    install_name_tool -add_rpath '@executable_path/../Frameworks' "$EXECUTABLE"
+    echo "  ✓ Added Frameworks rpath"
+else
+    echo "  ✓ Frameworks rpath already present"
+fi
+
 # Code sign the app
 echo "🔏 Code signing app..."
 

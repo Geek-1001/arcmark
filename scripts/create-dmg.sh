@@ -212,6 +212,67 @@ echo "✅ DMG created successfully!"
 echo "📦 Output: $DMG_PATH"
 echo "📏 Size: $(du -h "$DMG_PATH" | cut -f1)"
 
+# Sign DMG with Sparkle's EdDSA and update appcast.xml
+echo ""
+echo "🔐 Signing DMG for Sparkle updates..."
+
+SIGN_UPDATE=""
+# Look for sign_update in Sparkle build artifacts
+SIGN_UPDATE=$(find .build -name "sign_update" -type f 2>/dev/null | head -1)
+
+if [ -n "$SIGN_UPDATE" ] && [ -x "$SIGN_UPDATE" ]; then
+    SIGN_OUTPUT=$("$SIGN_UPDATE" "$DMG_PATH" 2>&1)
+    echo "  ✓ EdDSA signature generated"
+    echo "  $SIGN_OUTPUT"
+
+    # Extract signature and length from sign_update output
+    # Output format: sparkle:edSignature="..." length="..."
+    ED_SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -o 'sparkle:edSignature="[^"]*"' | sed 's/sparkle:edSignature="//;s/"//')
+    FILE_LENGTH=$(echo "$SIGN_OUTPUT" | grep -o 'length="[^"]*"' | sed 's/length="//;s/"//')
+
+    if [ -n "$ED_SIGNATURE" ] && [ -n "$FILE_LENGTH" ]; then
+        # Update appcast.xml with new entry
+        APPCAST_FILE="docs/appcast.xml"
+        if [ -f "$APPCAST_FILE" ]; then
+            echo "  → Updating appcast.xml with new release entry..."
+
+            DMG_URL="https://github.com/Geek-1001/arcmark/releases/download/v${VERSION}/Arcmark-${VERSION}.dmg"
+            PUB_DATE=$(date -u "+%a, %d %b %Y %H:%M:%S %z")
+
+            NEW_ITEM="            <item>\\
+                <title>Version ${VERSION}</title>\\
+                <pubDate>${PUB_DATE}</pubDate>\\
+                <enclosure\\
+                    url=\"${DMG_URL}\"\\
+                    sparkle:version=\"${VERSION}\"\\
+                    sparkle:shortVersionString=\"${VERSION}\"\\
+                    sparkle:edSignature=\"${ED_SIGNATURE}\"\\
+                    length=\"${FILE_LENGTH}\"\\
+                    type=\"application/octet-stream\"\\
+                />\\
+            </item>"
+
+            # Insert new item as the first <item> in the channel (after <link> line)
+            sed -i '' "/<link>.*<\/link>/a\\
+${NEW_ITEM}
+" "$APPCAST_FILE"
+
+            echo "  ✓ Added v${VERSION} entry to appcast.xml"
+            echo "  → Remember to commit docs/appcast.xml and push to update the feed"
+        else
+            echo "  ⚠️  docs/appcast.xml not found - skipping appcast update"
+            echo "  → Signature: sparkle:edSignature=\"${ED_SIGNATURE}\" length=\"${FILE_LENGTH}\""
+        fi
+    else
+        echo "  ⚠️  Could not parse EdDSA signature output"
+        echo "  → Raw output: $SIGN_OUTPUT"
+    fi
+else
+    echo "  ⚠️  Sparkle sign_update tool not found"
+    echo "  → To enable: run 'swift build' to download Sparkle, then re-run this script"
+    echo "  → The sign_update tool is included in Sparkle's build artifacts"
+fi
+
 # Notarize if requested
 if [ "$NOTARIZE" = true ]; then
     echo ""
