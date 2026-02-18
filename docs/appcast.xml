@@ -5,5 +5,23 @@
         <description>Arcmark update feed</description>
         <language>en</language>
         <link>https://github.com/Geek-1001/arcmark</link>
+            <item>
+                <title>Version 0.1.2</title>
+                <pubDate>Wed, 18 Feb 2026 10:17:31 +0000</pubDate>
+                <description><![CDATA[
+                    <h2>What's new?</h2>
+                    <ul>
+                        <li>Added the Sparkle auto-update feature.</li>
+                    </ul>
+                ]]></description>
+                <enclosure
+                    url="https://github.com/Geek-1001/arcmark/releases/download/v0.1.2/Arcmark-0.1.2.dmg"
+                    sparkle:version="0.1.2"
+                    sparkle:shortVersionString="0.1.2"
+                    sparkle:edSignature="Da6zFkLv0U4avaVTZXY0l/cguXdXTSsf4U4p1jUsqXuoCKbJs1rfVdQZDXxcg3FVjAO9dWl/g56Y3QNGgIu6AQ=="
+                    length="3068852"
+                    type="application/octet-stream"
+                />
+            </item>
     </channel>
 </rss>
