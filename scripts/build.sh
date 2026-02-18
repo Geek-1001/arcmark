@@ -110,22 +110,27 @@ else
 fi
 
 # Patch Info.plist with Sparkle keys (SUFeedURL, SUPublicEDKey)
+# Swift Bundler doesn't reliably merge [apps.*.plist] values, so we always set them explicitly
 echo "🔧 Patching Info.plist with Sparkle keys..."
 FEED_URL="https://geek-1001.github.io/arcmark/appcast.xml"
+PUBLIC_ED_KEY=$(grep "^SUPublicEDKey" Bundler.toml | sed "s/.*= *'\\(.*\\)'/\\1/" | tr -d '[:space:]')
 
 if ! /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$INFO_PLIST" &>/dev/null; then
     /usr/libexec/PlistBuddy -c "Add :SUFeedURL string '$FEED_URL'" "$INFO_PLIST"
-    echo "  ✓ Added SUFeedURL"
 else
     /usr/libexec/PlistBuddy -c "Set :SUFeedURL '$FEED_URL'" "$INFO_PLIST"
-    echo "  ✓ Updated SUFeedURL"
 fi
+echo "  ✓ SUFeedURL = $FEED_URL"
 
-if ! /usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$INFO_PLIST" &>/dev/null; then
-    /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string ''" "$INFO_PLIST"
-    echo "  ✓ Added SUPublicEDKey (placeholder - run generate_keys to set)"
+if [ -n "$PUBLIC_ED_KEY" ]; then
+    if ! /usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$INFO_PLIST" &>/dev/null; then
+        /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string '$PUBLIC_ED_KEY'" "$INFO_PLIST"
+    else
+        /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey '$PUBLIC_ED_KEY'" "$INFO_PLIST"
+    fi
+    echo "  ✓ SUPublicEDKey = ${PUBLIC_ED_KEY:0:20}..."
 else
-    echo "  ✓ SUPublicEDKey already present"
+    echo "  ⚠️  No SUPublicEDKey found in Bundler.toml - Sparkle update verification will rely on code signing only"
 fi
 
 # Add @executable_path/../Frameworks to rpath so dyld can find embedded frameworks
