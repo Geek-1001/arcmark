@@ -20,6 +20,10 @@ Arcmark is a macOS bookmark management application built with Swift and AppKit. 
 ./scripts/build.sh --production     # Build with Developer ID signing
 ./scripts/build.sh --production --dmg  # Build and create notarized DMG
 
+# Release (build + sign + tag + push + GitHub release)
+./scripts/release.sh 0.2.0         # Full release
+./scripts/release.sh 0.2.0 --dry-run  # Build only, skip git/GitHub
+
 # Other commands
 ./scripts/create-dmg.sh             # Create DMG from existing build
 ./scripts/run.sh                    # Build and run the app
