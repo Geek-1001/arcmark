@@ -52,7 +52,7 @@ fi
 # Build the app bundle using swift-bundler
 mint run swift-bundler bundle -c release
 
-# Post-build: Patch Info.plist with CFBundleIdentifier
+# Post-build: Patch Info.plist with CFBundleIdentifier and version strings
 # Swift Bundler v2.0.7 has an issue where [apps.*.plist] values don't always merge
 echo "🔧 Patching Info.plist..."
 INFO_PLIST=".build/bundler/Arcmark.app/Contents/Info.plist"
@@ -71,6 +71,22 @@ else
         echo "  ✓ CFBundleIdentifier already correct"
     fi
 fi
+
+# Patch version strings (required by Sparkle for update checks)
+echo "🔧 Patching Info.plist with version strings..."
+if ! /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST" &>/dev/null; then
+    /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string '$VERSION'" "$INFO_PLIST"
+else
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString '$VERSION'" "$INFO_PLIST"
+fi
+echo "  ✓ CFBundleShortVersionString = $VERSION"
+
+if ! /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST" &>/dev/null; then
+    /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string '$VERSION'" "$INFO_PLIST"
+else
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion '$VERSION'" "$INFO_PLIST"
+fi
+echo "  ✓ CFBundleVersion = $VERSION"
 
 # Post-build: Ensure Sparkle.framework is embedded
 echo "🔧 Checking Sparkle.framework embedding..."

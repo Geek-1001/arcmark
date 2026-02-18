@@ -11,7 +11,5 @@ icon = 'Resources/AppIcon.png'
 
 [apps.Arcmark.plist]
 CFBundleIdentifier = 'com.arcmark.app'
-CFBundleShortVersionString = '$(VERSION)'
-CFBundleVersion = '$(VERSION)'
 SUFeedURL = 'https://geek-1001.github.io/arcmark/appcast.xml'
 SUPublicEDKey = 'q6dyx5qi+I6jBIYOGjtrKxXWkBsoY6xW7cKsqiIQPto='

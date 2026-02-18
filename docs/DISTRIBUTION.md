@@ -43,7 +43,7 @@ The version is configured in three places (automatically synchronized):
 
 1. **VERSION file** - Source of truth
 2. **Bundler.toml** - Swift Bundler configuration
-3. **Info.plist** - Generated during build using `$(VERSION)` variable substitution
+3. **Info.plist** - Patched post-build by `build.sh` using PlistBuddy
 
 ## Building for Distribution
 
@@ -318,24 +318,17 @@ Arcmark uses [Sparkle 2](https://sparkle-project.org/) for automatic updates.
 
 ### Release Workflow with Auto-Updates
 
+Use the release script to handle the full workflow in one command:
+
 ```bash
-# 1. Update version
-echo "0.2.0" > VERSION
+# Full release: build, sign, commit, tag, push, create GitHub release
+./scripts/release.sh 0.2.0
 
-# 2. Build production DMG (auto-signs with EdDSA, auto-updates appcast.xml)
-./scripts/build.sh --production --dmg
-
-# 3. Commit the updated appcast
-git add docs/appcast.xml
-git commit -m "Update appcast for v0.2.0"
-
-# 4. Tag and push
-git tag -a v0.2.0 -m "Release version 0.2.0"
-git push origin main v0.2.0
-
-# 5. Create GitHub Release and upload the DMG
-gh release create v0.2.0 .build/dmg/Arcmark-0.2.0.dmg --title "v0.2.0"
+# Dry run: build and sign only, skip git/GitHub operations
+./scripts/release.sh 0.2.0 --dry-run
 ```
+
+The script handles all steps: updating VERSION, building a production DMG, signing with EdDSA, updating the appcast, committing, tagging, pushing, and creating the GitHub release.
 
 Existing users will receive the update automatically via Sparkle.
 

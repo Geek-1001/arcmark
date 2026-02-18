@@ -28,6 +28,27 @@ if [ ! -d "$FRAMEWORKS_DIR/Sparkle.framework" ]; then
     fi
 fi
 
+# Post-build: Patch Info.plist (Swift Bundler doesn't always merge plist values)
+INFO_PLIST=".build/bundler/Arcmark.app/Contents/Info.plist"
+VERSION=$(cat VERSION | tr -d '[:space:]')
+
+# Patch version strings (required by Sparkle)
+if ! /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST" &>/dev/null; then
+    /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string '$VERSION'" "$INFO_PLIST"
+else
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString '$VERSION'" "$INFO_PLIST"
+fi
+if ! /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST" &>/dev/null; then
+    /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string '$VERSION'" "$INFO_PLIST"
+else
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion '$VERSION'" "$INFO_PLIST"
+fi
+
+# Patch CFBundleIdentifier
+if ! /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO_PLIST" &>/dev/null; then
+    /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string 'com.arcmark.app'" "$INFO_PLIST"
+fi
+
 # Add @executable_path/../Frameworks to rpath so dyld can find embedded frameworks
 EXECUTABLE=".build/bundler/Arcmark.app/Contents/MacOS/Arcmark"
 if ! otool -l "$EXECUTABLE" | grep -A2 LC_RPATH | grep -q '@executable_path/../Frameworks'; then

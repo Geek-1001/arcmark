@@ -161,8 +161,6 @@ icon = 'Resources/AppIcon.icns'  # <-- Add this line
 
 [apps.Arcmark.plist]
 CFBundleIdentifier = 'com.arcmark.app'
-CFBundleShortVersionString = '$(VERSION)'
-CFBundleVersion = '$(VERSION)'
 ```
 
 ## Next Steps
