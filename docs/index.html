@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arcmark - Browser sidebar bookmark manager for macOS</title>
+  <meta name="description" content="A native macOS bookmark manager that attaches to any browser window as a sidebar. Workspace-based organization, drag-and-drop, and local-first storage.">
+  <meta property="og:title" content="Arcmark - Browser sidebar bookmark manager for macOS">
+  <meta property="og:description" content="A native macOS bookmark manager that attaches to any browser window as a sidebar. Workspace-based organization, drag-and-drop, and local-first storage.">
+  <meta property="og:image" content="https://geek-1001.github.io/arcmark/images/screenshot-app.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Arcmark - Browser sidebar bookmark manager for macOS">
+  <meta name="twitter:description" content="A native macOS bookmark manager that attaches to any browser window as a sidebar.">
+  <meta name="twitter:image" content="https://geek-1001.github.io/arcmark/images/screenshot-app.png">
+  <link rel="icon" href="images/app-icon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Upright:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #FAF4F2;
+      --text: #1C1412;
+      --text-muted: rgba(28, 20, 18, 0.4);
+      --text-subtle: rgba(28, 20, 18, 0.6);
+      --border: rgba(28, 20, 18, 0.1);
+      --border-hover: rgba(28, 20, 18, 0.2);
+      --accent: #FF5D26;
+      --accent-cta: #E54610;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
+      --font-headline: 'Cormorant Upright', Georgia, serif;
+    }
+
+    html {
+      background-color: var(--bg);
+    }
+
+    body {
+      font-family: var(--font-sans);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .animate-hero {
+      animation: fadeInUp 0.8s ease-out forwards;
+      opacity: 0;
+    }
+
+    .animate-screenshot {
+      animation: fadeInUp 0.8s ease-out 0.3s forwards;
+      opacity: 0;
+    }
+
+    .animate-features {
+      animation: fadeInUp 0.8s ease-out 0.3s forwards;
+      opacity: 0;
+    }
+
+    .animate-float {
+      animation: float 4s ease-in-out infinite;
+    }
+
+    /* Layout */
+    main {
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .hero-section {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6rem 2rem 2.25rem;
+    }
+
+    /* Hero content */
+    .hero-content {
+      max-width: 48rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .app-icon {
+      width: 96px;
+      height: 96px;
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 4rem;
+    }
+
+    .hero-headline {
+      font-family: var(--font-headline);
+      font-size: 2.6rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      line-height: 0.95;
+      margin-bottom: 1rem;
+    }
+
+    @media (min-width: 640px) {
+      .hero-headline {
+        font-size: 3.4rem;
+      }
+    }
+
+    @media (min-width: 960px) {
+      .hero-headline {
+        font-size: 3.75rem;
+      }
+    }
+
+    .hero-subtitle {
+      font-size: 1.125rem;
+      line-height: 1.5;
+      color: var(--text);
+      max-width: 32rem;
+      margin-bottom: 2rem;
+    }
+
+    /* CTA Buttons */
+    .cta-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.75rem;
+      width: 100%;
+    }
+
+    @media (min-width: 640px) {
+      .cta-buttons {
+        flex-direction: row;
+      }
+    }
+
+    .btn {
+      display: inline-flex;
+      width: 100%;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0 1.25rem;
+      height: 48px;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: opacity 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+
+    @media (min-width: 640px) {
+      .btn {
+        width: auto;
+      }
+    }
+
+    .btn:hover {
+      opacity: 0.7;
+    }
+
+    .btn-primary {
+      background-color: var(--accent-cta);
+      color: white;
+    }
+
+    .btn-secondary {
+      background-color: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+      box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-secondary:focus-visible {
+      outline: none;
+      box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 2px rgba(28, 20, 18, 0.2);
+    }
+
+    .github-stars {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.875rem;
+      color: var(--text-subtle);
+      margin-bottom: 4rem;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .github-stars.visible {
+      opacity: 1;
+    }
+
+    .github-stars svg {
+      width: 14px;
+      height: 14px;
+      fill: var(--text-muted);
+    }
+
+    .version-info {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 4rem;
+    }
+
+    .version-info a {
+      color: var(--text-muted);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--border-hover);
+      padding-bottom: 2px;
+      transition: opacity 0.2s;
+    }
+
+    .version-info a:hover {
+      opacity: 0.6;
+    }
+
+    /* Screenshot */
+    .screenshot-container {
+      width: calc(100% + 4rem);
+      margin-left: -2rem;
+      margin-right: -2rem;
+      overflow: hidden;
+      margin-bottom: 4rem;
+    }
+
+    .screenshot {
+      width: 700px;
+      height: auto;
+      border-radius: 12px 0 0 12px;
+      margin-left: 2rem;
+    }
+
+    @media (min-width: 640px) {
+      .screenshot-container {
+        width: 100%;
+        max-width: 960px;
+        margin-left: 0;
+        margin-right: 0;
+        margin-bottom: 6rem;
+        overflow: visible;
+      }
+
+      .screenshot {
+        width: 100%;
+        margin-left: 0;
+        border-radius: 12px;
+      }
+    }
+
+    @media (min-width: 1200px) {
+      .screenshot-container {
+        max-width: 1140px;
+      }
+    }
+
+    /* Features section */
+    .features-section {
+      max-width: 1140px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .features-heading {
+      font-family: var(--font-headline);
+      font-size: 2rem;
+      font-weight: 600;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+      margin-bottom: 2.5rem;
+      text-align: center;
+    }
+
+    @media (min-width: 640px) {
+      .features-heading {
+        font-size: 2.2rem;
+      }
+    }
+
+    @media (min-width: 960px) {
+      .features-heading {
+        font-size: 2.8rem;
+      }
+    }
+
+    .features-grid {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem 1rem;
+      margin-bottom: 4rem;
+    }
+
+    @media (min-width: 640px) {
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2rem 2rem;
+        margin-bottom: 6rem;
+      }
+    }
+
+    @media (min-width: 960px) {
+      .features-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: baseline;
+      gap: 0.9rem;
+      padding: 0.75rem 0;
+      font-size: 1.125rem;
+      line-height: 1.45;
+    }
+
+    .feature-icon {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+      color: var(--accent);
+      position: relative;
+      top: 0.2em;
+    }
+
+    .feature-text span {
+      font-weight: 600;
+    }
+
+    .feature-text a {
+      color: var(--text);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--border-hover);
+      padding-bottom: 1px;
+      transition: opacity 0.2s;
+    }
+
+    .feature-text a:hover {
+      opacity: 0.6;
+    }
+
+    /* Footer */
+    .footer {
+      font-size: 1rem;
+      padding-bottom: 4rem;
+      color: var(--text);
+    }
+
+    @media (min-width: 640px) {
+      .footer {
+        padding-bottom: 0;
+      }
+    }
+
+    .footer a {
+      color: var(--text);
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+
+    .footer a:hover {
+      opacity: 0.6;
+    }
+
+    /* macOS icon in headline */
+    .apple-icon {
+      display: inline-block;
+      vertical-align: baseline;
+      position: relative;
+      top: -0.05em;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="hero-section">
+      <!-- Hero -->
+      <div class="hero-content animate-hero">
+        <img
+          alt="Arcmark app icon"
+          width="128"
+          height="128"
+          class="app-icon animate-float"
+          src="images/app-icon.png"
+        >
+
+        <h1 class="hero-headline">
+          Your bookmarks, always within reach on <span class="apple-icon"></span>
+        </h1>
+
+        <p class="hero-subtitle">
+          A macOS bookmark manager that attaches to any browser window like a sidebar.
+        </p>
+
+        <div class="cta-buttons">
+          <a
+            class="btn btn-primary"
+            href="https://github.com/Geek-1001/arcmark/releases/latest/download/Arcmark-v0.1.3.dmg"
+          >
+            <svg width="18" height="18" viewBox="0 0 256 315" fill="currentColor" aria-hidden="true"><path d="M213.803 167.03c.442 47.58 41.74 63.413 42.197 63.615c-.35 1.116-6.599 22.563-21.757 44.716c-13.104 19.153-26.705 38.235-48.13 38.63c-21.05.388-27.82-12.483-51.888-12.483c-24.061 0-31.582 12.088-51.51 12.871c-20.68.783-36.428-20.71-49.64-39.793c-27-39.033-47.633-110.3-19.928-158.406c13.763-23.89 38.36-39.017 65.056-39.405c20.307-.388 39.475 13.662 51.889 13.662c12.406 0 35.699-16.895 60.186-14.414c10.25.427 39.026 4.14 57.503 31.186c-1.49.923-34.335 20.044-33.978 59.822M174.24 50.199c10.98-13.29 18.369-31.79 16.353-50.199c-15.826.636-34.962 10.546-46.314 23.828c-10.173 11.763-19.082 30.589-16.678 48.633c17.64 1.365 35.66-8.964 46.64-22.262"/></svg>
+            Download for Mac
+          </a>
+          <a
+            class="btn btn-secondary"
+            href="https://github.com/Geek-1001/arcmark"
+            target="_blank"
+          >
+            <svg width="18" height="18" viewBox="0 0 256 250" fill="currentColor" aria-hidden="true"><path d="M128.001 0C57.317 0 0 57.307 0 128.001c0 56.554 36.676 104.535 87.535 121.46c6.397 1.185 8.746-2.777 8.746-6.17c0-3.049-.115-13.145-.168-23.86c-35.61 7.742-43.124-15.103-43.124-15.103c-5.823-14.795-14.213-18.73-14.213-18.73c-11.613-7.944.876-7.78.876-7.78c12.853.902 19.621 13.19 19.621 13.19c11.417 19.568 29.945 13.911 37.249 10.64c1.149-8.272 4.466-13.92 8.127-17.116c-28.431-3.236-58.318-14.212-58.318-63.258c0-13.975 5-25.394 13.188-34.358c-1.329-3.224-5.71-16.242 1.24-33.874c0 0 10.749-3.44 35.21 13.121c10.21-2.836 21.16-4.258 32.038-4.307c10.878.049 21.837 1.47 32.066 4.307c24.431-16.56 35.165-13.12 35.165-13.12c6.967 17.63 2.584 30.65 1.255 33.873c8.207 8.964 13.173 20.383 13.173 34.358c0 49.163-29.944 59.988-58.447 63.157c4.591 3.972 8.682 11.762 8.682 23.704c0 17.126-.148 30.91-.148 35.126c0 3.407 2.304 7.398 8.792 6.14C219.37 232.5 256 184.537 256 128.002C256 57.307 198.691 0 128.001 0"/></svg>
+            View on GitHub
+          </a>
+        </div>
+
+        <div class="github-stars" id="github-stars">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/></svg>
+          <span id="star-count"></span> stars on GitHub
+        </div>
+      </div>
+
+      <!-- Screenshot -->
+      <div class="screenshot-container animate-screenshot">
+        <img
+          alt="Arcmark app - browser sidebar bookmark manager"
+          width="1080"
+          height="720"
+          class="screenshot"
+          src="images/screenshot-app.png"
+          loading="lazy"
+        >
+      </div>
+
+      <!-- Features -->
+      <div class="features-section animate-features">
+        <h2 class="features-heading">Everything you need to organize your web</h2>
+
+        <ul class="features-grid">
+          <li class="feature-item"><svg class="feature-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9.944 2.25c-1.838 0-3.294 0-4.433.153c-1.172.158-2.121.49-2.87 1.238c-.748.749-1.08 1.698-1.238 2.87c-.153 1.14-.153 2.595-.153 4.433v2.112c0 1.838 0 3.294.153 4.433c.158 1.172.49 2.121 1.238 2.87c.749.748 1.698 1.08 2.87 1.238c1.14.153 2.595.153 4.433.153h5.022l.072-.001c1.384-.004 2.523-.027 3.451-.152c1.172-.158 2.121-.49 2.87-1.238c.748-.749 1.08-1.698 1.238-2.87c.153-1.14.153-2.595.153-4.433v-2.112c0-1.838 0-3.294-.153-4.433c-.158-1.172-.49-2.121-1.238-2.87c-.749-.748-1.698-1.08-2.87-1.238c-.928-.125-2.067-.148-3.45-.152h-.073l-.91-.001zm4.306 1.5H10c-1.907 0-3.261.002-4.29.14c-1.005.135-1.585.389-2.008.812S3.025 5.705 2.89 6.71c-.138 1.029-.14 2.383-.14 4.29v2c0 1.907.002 3.262.14 4.29c.135 1.005.389 1.585.812 2.008s1.003.677 2.009.812c1.028.138 2.382.14 4.289.14h4.25zm1.5 16.494c1.034-.01 1.858-.042 2.54-.134c1.005-.135 1.585-.389 2.008-.812s.677-1.003.812-2.009c.138-1.027.14-2.382.14-4.289v-2c0-1.907-.002-3.261-.14-4.29c-.135-1.005-.389-1.585-.812-2.008s-1.003-.677-2.009-.812c-.68-.092-1.505-.123-2.539-.134z" clip-rule="evenodd"/></svg><span class="feature-text"><span>Browser sidebar</span>: Attaches to Chrome, Arc, Safari, Brave, or any browser window</span></li>
+          <li class="feature-item"><svg class="feature-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M1.25 6a4.75 4.75 0 0 1 9.5 0v.432l2.033-2.033a4.75 4.75 0 1 1 6.718 6.717l-2.134 2.134H18a4.75 4.75 0 1 1 0 9.5H6A4.75 4.75 0 0 1 1.25 18zm8.214 15.25H18a3.25 3.25 0 0 0 0-6.5h-2.133l-5.978 5.978a5 5 0 0 1-.425.522m1.286-3.504l7.69-7.69a3.25 3.25 0 1 0-4.596-4.597L10.75 8.553zM6 2.75A3.25 3.25 0 0 0 2.75 6v12a3.25 3.25 0 0 0 6.5 0V6A3.25 3.25 0 0 0 6 2.75m0 15a.25.25 0 1 0 0 .5a.25.25 0 0 0 0-.5M4.25 18a1.75 1.75 0 1 1 3.5 0a1.75 1.75 0 0 1-3.5 0" clip-rule="evenodd"/></svg><span class="feature-text"><span>Workspace organization</span>: Separate bookmark collections with custom-colored workspaces</span></li>
+          <li class="feature-item"><svg class="feature-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M6.86 1.25h.127c.351 0 .577 0 .798.02a4.75 4.75 0 0 1 2.474.98h6.299c.409 0 .687 0 .931.032a3.75 3.75 0 0 1 3.248 3.427a3 3 0 0 1 .77.503q.15.133.281.28c.529.588.754 1.303.86 2.144c.102.812.102 1.838.102 3.111v2.31c0 1.837 0 3.293-.153 4.432c-.158 1.172-.49 2.121-1.238 2.87c-.749.748-1.698 1.08-2.87 1.238c-1.14.153-2.595.153-4.433.153H9.944c-1.838 0-3.294 0-4.433-.153c-1.172-.158-2.121-.49-2.87-1.238c-.748-.749-1.08-1.698-1.238-2.87c-.153-1.14-.153-2.595-.153-4.433V6.86c0-.797 0-1.303.082-1.74A4.75 4.75 0 0 1 5.12 1.331c.438-.082.944-.082 1.74-.082m12.287 4.078a2.25 2.25 0 0 0-1.853-1.559c-.134-.017-.306-.019-.794-.019h-4.689c.643.64.935.906 1.266 1.09q.328.182.689.286c.413.117.866.124 2.062.124h.425c1.162 0 2.119 0 2.894.078M6.95 2.75c-.917 0-1.271.003-1.553.056a3.25 3.25 0 0 0-2.59 2.591c-.054.282-.057.636-.057 1.553V14c0 1.907.002 3.262.14 4.29c.135 1.005.389 1.585.812 2.008s1.003.677 2.009.812c1.028.138 2.382.14 4.289.14h4c1.907 0 3.262-.002 4.29-.14c1.005-.135 1.585-.389 2.008-.812s.677-1.003.812-2.009c.138-1.027.14-2.382.14-4.289v-2.202c0-1.336-.001-2.267-.09-2.975c-.087-.689-.246-1.06-.487-1.328a2 2 0 0 0-.168-.168c-.268-.241-.64-.4-1.328-.487c-.707-.089-1.639-.09-2.975-.09h-.484c-1.048 0-1.724 0-2.363-.182c-.35-.1-.689-.24-1.008-.417c-.58-.324-1.058-.801-1.8-1.543l-.077-.078l-.55-.55a8 8 0 0 0-.503-.482a3.25 3.25 0 0 0-1.771-.734a8 8 0 0 0-.696-.014m5.3 7.25a.75.75 0 0 1 .75-.75h5a.75.75 0 0 1 0 1.5h-5a.75.75 0 0 1-.75-.75" clip-rule="evenodd"/></svg><span class="feature-text"><span>Nested folders</span>: Create hierarchical folder structures with drag-and-drop</span></li>
+          <li class="feature-item"><svg class="feature-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><g fill-rule="evenodd" clip-rule="evenodd"><path d="M12 7.25A3.75 3.75 0 0 0 9.75 14v1c0 .966.784 1.75 1.75 1.75h1A1.75 1.75 0 0 0 14.25 15v-1A3.75 3.75 0 0 0 12 7.25M9.75 11a2.25 2.25 0 1 1 3.374 1.95a.75.75 0 0 0-.374.649V15a.25.25 0 0 1-.25.25h-1a.25.25 0 0 1-.25-.25v-1.401a.75.75 0 0 0-.374-.65A2.25 2.25 0 0 1 9.75 11"/><path d="M12 1.25c-.937 0-1.833.307-3.277.801l-.727.25c-1.481.506-2.625.898-3.443 1.23c-.412.167-.767.33-1.052.495c-.275.16-.55.359-.737.626c-.185.263-.281.587-.341.9c-.063.324-.1.713-.125 1.16c-.048.886-.048 2.102-.048 3.678v1.601c0 6.101 4.608 9.026 7.348 10.224l.027.011c.34.149.66.288 1.027.382c.387.1.799.142 1.348.142c.55 0 .96-.042 1.348-.142c.367-.094.687-.233 1.026-.382l.028-.011c2.74-1.198 7.348-4.123 7.348-10.224V10.39c0-1.576 0-2.792-.048-3.679a9 9 0 0 0-.125-1.16c-.06-.312-.156-.636-.34-.9c-.188-.266-.463-.465-.738-.625a9 9 0 0 0-1.052-.495c-.818-.332-1.962-.724-3.443-1.23l-.727-.25c-1.444-.494-2.34-.801-3.277-.801M9.08 3.514c1.615-.552 2.262-.764 2.92-.764s1.305.212 2.92.764l.572.196c1.513.518 2.616.896 3.39 1.21c.387.158.667.29.864.404q.144.084.208.139c.038.03.053.048.055.05a.4.4 0 0 1 .032.074q.03.082.063.248a7 7 0 0 1 .1.958c.046.841.046 2.015.046 3.624v1.574c0 5.176-3.87 7.723-6.449 8.849c-.371.162-.586.254-.825.315c-.228.059-.506.095-.976.095s-.748-.036-.976-.095c-.24-.06-.454-.153-.825-.315c-2.58-1.126-6.449-3.674-6.449-8.849v-1.574c0-1.609 0-2.783.046-3.624a7 7 0 0 1 .1-.958q.032-.166.063-.248c.018-.05.03-.07.032-.074a.4.4 0 0 1 .055-.05q.064-.055.208-.14c.197-.114.477-.245.864-.402c.774-.315 1.877-.693 3.39-1.21z"/></g></svg><span class="feature-text"><span>Local-first</span>: All data stored in a single JSON file on your Mac</span></li>
+          <li class="feature-item"><svg class="feature-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.943 1.25H13.5a.75.75 0 0 1 0 1.5H12c-2.378 0-4.086.002-5.386.176c-1.279.172-2.05.5-2.62 1.069c-.569.57-.896 1.34-1.068 2.619c-.174 1.3-.176 3.008-.176 5.386s.002 4.086.176 5.386c.172 1.279.5 2.05 1.069 2.62c.57.569 1.34.896 2.619 1.068c1.3.174 3.008.176 5.386.176s4.086-.002 5.386-.176c1.279-.172 2.05-.5 2.62-1.069c.569-.57.896-1.34 1.068-2.619c.174-1.3.176-3.008.176-5.386v-1.5a.75.75 0 0 1 1.5 0v1.557c0 2.309 0 4.118-.19 5.53c-.194 1.444-.6 2.584-1.494 3.479c-.895.895-2.035 1.3-3.48 1.494c-1.411.19-3.22.19-5.529.19h-.114c-2.309 0-4.118 0-5.53-.19c-1.444-.194-2.584-.6-3.479-1.494c-.895-.895-1.3-2.035-1.494-3.48c-.19-1.411-.19-3.22-.19-5.529v-.114c0-2.309 0-4.118.19-5.53c.194-1.444.6-2.584 1.494-3.479c.895-.895 2.035-1.3 3.48-1.494c1.411-.19 3.22-.19 5.529-.19m4.827 1.026a3.503 3.503 0 0 1 4.954 4.953l-6.648 6.649c-.371.37-.604.604-.863.806a5.3 5.3 0 0 1-.987.61c-.297.141-.61.245-1.107.411l-2.905.968a1.492 1.492 0 0 1-1.887-1.887l.968-2.905c.166-.498.27-.81.411-1.107q.252-.526.61-.987c.202-.26.435-.492.806-.863zm3.893 1.06a2.003 2.003 0 0 0-2.832 0l-.376.377q.032.145.098.338c.143.413.415.957.927 1.469a3.9 3.9 0 0 0 1.807 1.025l.376-.376a2.003 2.003 0 0 0 0-2.832m-1.558 4.391a5.4 5.4 0 0 1-1.686-1.146a5.4 5.4 0 0 1-1.146-1.686L11.218 9.95c-.417.417-.58.582-.72.76a4 4 0 0 0-.437.71c-.098.203-.172.423-.359.982l-.431 1.295l1.032 1.033l1.295-.432c.56-.187.779-.261.983-.358q.378-.18.71-.439c.177-.139.342-.302.759-.718z" clip-rule="evenodd"/></svg><span class="feature-text"><span>Inline editing</span>: Rename folders and links directly in the list</span></li>
+          <li class="feature-item"><svg class="feature-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.5 2.75a8.75 8.75 0 1 0 0 17.5a8.75 8.75 0 0 0 0-17.5M1.25 11.5c0-5.66 4.59-10.25 10.25-10.25S21.75 5.84 21.75 11.5S17.16 21.75 11.5 21.75S1.25 17.16 1.25 11.5m18.22 7.97a.75.75 0 0 1 1.06 0l2 2a.75.75 0 1 1-1.06 1.06l-2-2a.75.75 0 0 1 0-1.06" clip-rule="evenodd"/></svg><span class="feature-text"><span>Search &amp; filter</span>: Quickly find any bookmark across workspaces</span></li>
+          <li class="feature-item"><svg class="feature-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.635 2.124c.327-.832 1.503-.832 1.83 0l.428 1.09l1.084.429c.83.328.83 1.504 0 1.832l-1.084.43l-.428 1.089c-.327.832-1.503.832-1.83 0l-.428-1.09l-1.085-.429c-.83-.328-.83-1.504 0-1.832l1.085-.43zm.915.406l.415 1.055c.1.254.3.455.553.556l1.057.418l-1.057.419a.98.98 0 0 0-.553.555l-.415 1.055l-.415-1.055a.98.98 0 0 0-.554-.555l-1.057-.419l1.057-.418a.98.98 0 0 0 .554-.556zm-13.236.784a3.633 3.633 0 0 1 5.139 0l12.233 12.233a3.633 3.633 0 0 1-5.139 5.139L3.314 8.453a3.633 3.633 0 0 1 0-5.139m4.078 1.06a2.133 2.133 0 1 0-3.017 3.018L5.96 8.978l3.017-3.017zm9.216 15.251L7.022 10.04l3.017-3.017l9.586 9.586a2.133 2.133 0 1 1-3.017 3.017m4.724-10.679c-.327-.833-1.503-.833-1.83 0l-.155.393l-.391.155c-.83.328-.83 1.504 0 1.832l.391.155l.155.394c.327.832 1.503.832 1.83 0l.154-.394l.392-.155c.83-.328.83-1.504 0-1.832l-.392-.155zm-.915.405l-.141.36c-.1.253-.3.455-.554.555l-.364.144l.364.144c.254.1.454.302.554.555l.14.36l.142-.36c.1-.253.3-.454.554-.555l.364-.144l-.364-.144a.98.98 0 0 1-.554-.555zM4.668 15.124c.327-.832 1.503-.832 1.83 0l.155.394l.39.154c.83.329.83 1.505 0 1.833l-.39.155l-.155.393c-.327.833-1.503.833-1.83 0l-.155-.393l-.391-.155c-.83-.328-.83-1.504 0-1.832l.391-.155zm.774.765l.14-.36l.142.36c.1.254.3.455.554.556l.364.144l-.364.144a.98.98 0 0 0-.554.555l-.141.36l-.141-.36a.98.98 0 0 0-.554-.555l-.364-.144l.364-.144a.98.98 0 0 0 .554-.556" clip-rule="evenodd"/></svg><span class="feature-text"><span>Auto favicon &amp; title</span>: Automatically fetches website icons and page titles</span></li>
+          <li class="feature-item"><svg class="feature-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14.47 10.47a.75.75 0 1 1 1.06 1.06l-3 3a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l1.72 1.72V4a.75.75 0 0 1 1.5 0v8.19z"/><path d="M20.75 12a.75.75 0 0 0-1.5 0a7.25 7.25 0 1 1-14.5 0a.75.75 0 0 0-1.5 0a8.75 8.75 0 1 0 17.5 0"/></svg><span class="feature-text"><span>Arc import</span>: Import your pinned tabs and spaces from Arc browser</span></li>
+          <li class="feature-item"><svg class="feature-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="m16.475 4.375l3.172 3.176c1.008 1.008 1.824 1.825 2.35 2.535c.541.73.891 1.5.701 2.377c-.19.879-.826 1.434-1.62 1.875c-.773.429-1.854.835-3.187 1.336l-1.977.743c-.795.298-1.011.391-1.172.53q-.12.106-.216.237c-.124.173-.197.397-.422 1.216l-.013.045c-.228.831-.417 1.517-.624 2.032c-.21.523-.493 1.018-1.002 1.309a2.34 2.34 0 0 1-1.16.307c-.587 0-1.078-.292-1.519-.642c-.434-.346-.936-.85-1.545-1.46l-1.588-1.588l-4.122 4.127a.75.75 0 0 1-1.062-1.06l4.124-4.128l-1.535-1.537C3.453 15.2 2.954 14.7 2.61 14.268c-.349-.438-.638-.926-.642-1.508a2.34 2.34 0 0 1 .313-1.182c.29-.505.782-.786 1.302-.995c.512-.205 1.193-.393 2.018-.62l.045-.013c.82-.226 1.045-.3 1.217-.424q.135-.097.242-.222c.138-.163.23-.38.523-1.18l.716-1.956c.495-1.349.895-2.442 1.32-3.222c.437-.803.99-1.448 1.872-1.642c.882-.195 1.655.158 2.389.702c.712.53 1.535 1.353 2.55 2.369M13.03 3.21c-.602-.448-.921-.498-1.171-.443s-.519.235-.878.895c-.365.67-.729 1.658-1.25 3.081L9.036 8.64l-.04.108c-.233.64-.414 1.136-.75 1.529q-.224.264-.506.467c-.42.302-.927.441-1.585.622l-.11.03c-.882.243-1.48.41-1.903.58c-.425.17-.527.29-.562.35a.84.84 0 0 0-.112.424c0 .07.03.225.316.584c.284.357.722.797 1.368 1.444l4.117 4.12c.65.652 1.093 1.093 1.452 1.38c.36.286.516.315.585.315a.83.83 0 0 0 .416-.11c.06-.034.181-.136.353-.564s.338-1.03.582-1.917l.03-.11c.18-.657.32-1.164.62-1.583q.197-.274.453-.496c.39-.337.882-.522 1.519-.76l.107-.04l1.917-.72c1.408-.53 2.383-.898 3.046-1.266c.651-.361.829-.63.883-.88c.054-.251.003-.57-.44-1.168c-.452-.61-1.187-1.349-2.251-2.413L15.459 5.48c-1.071-1.072-1.816-1.814-2.429-2.27" clip-rule="evenodd"/></svg><span class="feature-text"><span>Always-on-top mode</span>: Pin the window to stay visible above all other apps</span></li>
+          <li class="feature-item"><svg class="feature-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14.18 4.276a.75.75 0 0 1 .531.918l-3.973 14.83a.75.75 0 0 1-1.45-.389l3.974-14.83a.75.75 0 0 1 .919-.53m2.262 3.053a.75.75 0 0 1 1.059-.056l1.737 1.564c.737.662 1.347 1.212 1.767 1.71c.44.525.754 1.088.754 1.784c0 .695-.313 1.258-.754 1.782c-.42.499-1.03 1.049-1.767 1.711l-1.737 1.564a.75.75 0 0 1-1.004-1.115l1.697-1.527c.788-.709 1.319-1.19 1.663-1.598c.33-.393.402-.622.402-.818s-.072-.424-.402-.817c-.344-.409-.875-.89-1.663-1.598l-1.697-1.527a.75.75 0 0 1-.056-1.06m-8.94 1.06a.75.75 0 1 0-1.004-1.115L4.761 8.836c-.737.662-1.347 1.212-1.767 1.71c-.44.525-.754 1.088-.754 1.784c0 .695.313 1.258.754 1.782c.42.499 1.03 1.049 1.767 1.711l1.737 1.564a.75.75 0 0 0 1.004-1.115l-1.697-1.527c-.788-.709-1.319-1.19-1.663-1.598c-.33-.393-.402-.622-.402-.818s.072-.424.402-.817c.344-.409.875-.89 1.663-1.598z"/></svg><span class="feature-text"><span>Open source</span>: MIT licensed, built with Swift and AppKit. <a href="https://github.com/Geek-1001/arcmark" target="_blank">View source</a></span></li>
+        </ul>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        Made with &#9829; by <a href="https://github.com/Geek-1001" target="_blank">Ahmed Sulaiman</a>
+      </div>
+    </div>
+  </main>
+  <script>
+    fetch('https://api.github.com/repos/Geek-1001/arcmark')
+      .then(r => r.json())
+      .then(data => {
+        if (data.stargazers_count != null) {
+          document.getElementById('star-count').textContent = data.stargazers_count;
+          document.getElementById('github-stars').classList.add('visible');
+        }
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>
