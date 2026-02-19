@@ -195,11 +195,11 @@ final class ChromeImportService: Sendable {
     /// Decode common HTML entities in a string
     private func decodeHTMLEntities(_ string: String) -> String {
         var result = string
-        result = result.replacingOccurrences(of: "&amp;", with: "&")
         result = result.replacingOccurrences(of: "&lt;", with: "<")
         result = result.replacingOccurrences(of: "&gt;", with: ">")
         result = result.replacingOccurrences(of: "&quot;", with: "\"")
         result = result.replacingOccurrences(of: "&#39;", with: "'")
+        result = result.replacingOccurrences(of: "&amp;", with: "&") // must be last to avoid double-decoding
         return result
     }
 

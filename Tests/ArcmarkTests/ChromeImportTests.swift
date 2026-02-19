@@ -430,6 +430,44 @@ struct ChromeImportTests {
         }
     }
 
+    // MARK: - HTML Entity Double-Decoding Prevention
+
+    @Test("HTML entities with escaped ampersands are not double-decoded")
+    func testHTMLEntitiesNotDoubleDeccoded() async throws {
+        let html = createBookmarksHTML(body: """
+            <DT><H3>Bookmarks bar</H3>
+            <DL><p>
+                <DT><A HREF="https://example.com">A &amp;lt; B</A>
+                <DT><A HREF="https://example2.com">Use &amp;amp; for ampersands</A>
+            </DL><p>
+        """)
+
+        let fileURL = try writeTempFile(html)
+        defer { cleanup(fileURL) }
+
+        let result = await ChromeImportService.shared.importFromChrome(fileURL: fileURL)
+
+        switch result {
+        case .success(let importResult):
+            let nodes = importResult.workspace.nodes
+            #expect(nodes.count == 2)
+
+            if case .link(let link1) = nodes[0] {
+                #expect(link1.title == "A &lt; B")
+            } else {
+                Issue.record("Expected a link node")
+            }
+
+            if case .link(let link2) = nodes[1] {
+                #expect(link2.title == "Use &amp; for ampersands")
+            } else {
+                Issue.record("Expected a link node")
+            }
+        case .failure(let error):
+            Issue.record("Import should succeed: \(error)")
+        }
+    }
+
     // MARK: - Mixed Content
 
     @Test("Mixed folders and links at same level")
