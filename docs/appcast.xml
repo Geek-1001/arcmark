@@ -6,6 +6,18 @@
         <language>en</language>
         <link>https://github.com/Geek-1001/arcmark</link>
             <item>
+                <title>Version 0.1.4</title>
+                <pubDate>Thu, 19 Feb 2026 15:53:47 +0000</pubDate>
+                <enclosure
+                    url="https://github.com/Geek-1001/arcmark/releases/download/v0.1.4/Arcmark-0.1.4.dmg"
+                    sparkle:version="0.1.4"
+                    sparkle:shortVersionString="0.1.4"
+                    sparkle:edSignature="BRFwkURnYwN7hjOM+zD1/IqdevOlBPZkXHTptAJZHv65nauFuGs1VobGxv8xoXzuw40T62zrSSTnjNSwjslkDQ=="
+                    length="3086770"
+                    type="application/octet-stream"
+                />
+            </item>
+            <item>
                 <title>Version 0.1.3</title>
                 <pubDate>Wed, 18 Feb 2026 13:28:01 +0000</pubDate>
                 <enclosure
