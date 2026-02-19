@@ -53,6 +53,7 @@ final class NodeListViewController: NSViewController {
     // Data provider closure
     var nodeProvider: (() -> [Node])?
     var workspacesProvider: (() -> [Workspace])?
+    var currentWorkspaceIdProvider: (() -> UUID?)?
     var findNodeById: ((UUID) -> Node?)?
     var findNodeLocation: ((UUID) -> NodeLocation?)?
     var findNodeInNodes: ((UUID, [Node]) -> Node?)?
@@ -723,8 +724,8 @@ extension NodeListViewController: NSMenuDelegate {
 
             let moveMenu = NSMenuItem(title: "Move to", action: nil, keyEquivalent: "")
             let submenu = NSMenu()
-            if let workspaces = workspacesProvider?(), let currentWorkspace = workspaces.first {
-                for workspace in workspaces where workspace.id != currentWorkspace.id {
+            if let workspaces = workspacesProvider?(), let currentId = currentWorkspaceIdProvider?() {
+                for workspace in workspaces where workspace.id != currentId {
                     let item = NSMenuItem(title: workspace.name, action: #selector(contextMoveToWorkspace), keyEquivalent: "")
                     item.target = self
                     item.representedObject = ["nodeId": node.id, "workspaceId": workspace.id]
@@ -760,8 +761,8 @@ extension NodeListViewController: NSMenuDelegate {
 
             let moveMenu = NSMenuItem(title: "Move to", action: nil, keyEquivalent: "")
             let submenu = NSMenu()
-            if let workspaces = workspacesProvider?(), let currentWorkspace = workspaces.first {
-                for workspace in workspaces where workspace.id != currentWorkspace.id {
+            if let workspaces = workspacesProvider?(), let currentId = currentWorkspaceIdProvider?() {
+                for workspace in workspaces where workspace.id != currentId {
                     let item = NSMenuItem(title: workspace.name, action: #selector(contextMoveToWorkspace), keyEquivalent: "")
                     item.target = self
                     item.representedObject = ["nodeId": node.id, "workspaceId": workspace.id]
@@ -841,8 +842,8 @@ extension NodeListViewController: NSMenuDelegate {
         // 1. Move to Workspace submenu
         let moveItem = NSMenuItem(title: "Move to…", action: nil, keyEquivalent: "")
         let moveSubmenu = NSMenu()
-        if let workspaces = workspacesProvider?(), let currentWorkspace = workspaces.first {
-            for workspace in workspaces where workspace.id != currentWorkspace.id {
+        if let workspaces = workspacesProvider?(), let currentId = currentWorkspaceIdProvider?() {
+            for workspace in workspaces where workspace.id != currentId {
                 let item = NSMenuItem(title: workspace.name, action: #selector(bulkMoveToWorkspace), keyEquivalent: "")
                 item.target = self
                 item.representedObject = workspace.id

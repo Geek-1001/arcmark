@@ -197,6 +197,10 @@ final class MainViewController: NSViewController {
             self?.model.workspaces ?? []
         }
 
+        nodeListViewController.currentWorkspaceIdProvider = { [weak self] in
+            self?.model.currentWorkspace.id
+        }
+
         nodeListViewController.findNodeById = { [weak self] id in
             self?.model.nodeById(id)
         }
