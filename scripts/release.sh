@@ -102,6 +102,12 @@ if ! grep -q "sparkle:version=\"${NEW_VERSION}\"" docs/appcast.xml; then
     echo "   Check docs/appcast.xml manually"
 fi
 
+# Update landing page download link to point to the new version's DMG
+echo "🔗 Updating landing page download link..."
+sed -i '' "s|href=\"https://github.com/Geek-1001/arcmark/releases/download/v[^\"]*\"|href=\"https://github.com/Geek-1001/arcmark/releases/download/v${NEW_VERSION}/Arcmark-${NEW_VERSION}.dmg\"|" docs/index.html
+echo "  ✓ Download link updated in docs/index.html"
+echo ""
+
 if [ "$DRY_RUN" = true ]; then
     echo ""
     echo "✅ Dry run complete!"
@@ -111,7 +117,7 @@ if [ "$DRY_RUN" = true ]; then
     echo "  📄 Appcast: docs/appcast.xml"
     echo ""
     echo "To finish the release manually:"
-    echo "  git add VERSION Bundler.toml docs/appcast.xml"
+    echo "  git add VERSION Bundler.toml docs/appcast.xml docs/index.html"
     echo "  git commit -m 'Release v${NEW_VERSION}'"
     echo "  git tag -a v${NEW_VERSION} -m 'Release version ${NEW_VERSION}'"
     echo "  git push origin main v${NEW_VERSION}"
@@ -122,7 +128,7 @@ fi
 # Step 3: Commit changes
 echo ""
 echo "📝 Step 3: Committing release changes..."
-git add VERSION Bundler.toml docs/appcast.xml
+git add VERSION Bundler.toml docs/appcast.xml docs/index.html
 git commit -m "Release v${NEW_VERSION}"
 echo "  ✓ Changes committed"
 
