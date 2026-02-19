@@ -46,7 +46,9 @@ final class SettingsContentViewController: NSViewController {
     // Import & Export section
     private let importButton = SettingsButton(title: "Import from Arc Browser")
     private let chromeImportButton = SettingsButton(title: "Import from Chrome")
+    private let chromeHelpContainer = NSView()
     private let chromeHelpButton = CustomTextButton(title: "How to export bookmarks from Chrome")
+    private let chromeHelpIcon = NSImageView()
     private let importStatusLabel = NSTextField(labelWithString: "")
 
     // App Version section
@@ -284,9 +286,34 @@ final class SettingsContentViewController: NSViewController {
         chromeImportButton.action = #selector(importFromChrome)
         chromeImportButton.translatesAutoresizingMaskIntoConstraints = false
 
+        // Chrome help container (centered, with icon + text)
+        chromeHelpContainer.translatesAutoresizingMaskIntoConstraints = false
+
+        chromeHelpIcon.translatesAutoresizingMaskIntoConstraints = false
+        if let infoImage = NSImage(systemSymbolName: "info.circle", accessibilityDescription: "Info") {
+            chromeHelpIcon.image = infoImage
+        }
+        chromeHelpIcon.contentTintColor = sectionHeaderColor
+        chromeHelpIcon.imageScaling = .scaleProportionallyDown
+
         chromeHelpButton.target = self
         chromeHelpButton.action = #selector(openChromeExportInstructions)
         chromeHelpButton.translatesAutoresizingMaskIntoConstraints = false
+
+        chromeHelpContainer.addSubview(chromeHelpIcon)
+        chromeHelpContainer.addSubview(chromeHelpButton)
+
+        NSLayoutConstraint.activate([
+            chromeHelpIcon.leadingAnchor.constraint(equalTo: chromeHelpContainer.leadingAnchor),
+            chromeHelpIcon.centerYAnchor.constraint(equalTo: chromeHelpContainer.centerYAnchor),
+            chromeHelpIcon.widthAnchor.constraint(equalToConstant: 14),
+            chromeHelpIcon.heightAnchor.constraint(equalToConstant: 14),
+
+            chromeHelpButton.leadingAnchor.constraint(equalTo: chromeHelpIcon.trailingAnchor, constant: 4),
+            chromeHelpButton.topAnchor.constraint(equalTo: chromeHelpContainer.topAnchor),
+            chromeHelpButton.bottomAnchor.constraint(equalTo: chromeHelpContainer.bottomAnchor),
+            chromeHelpButton.trailingAnchor.constraint(equalTo: chromeHelpContainer.trailingAnchor),
+        ])
 
         importStatusLabel.font = NSFont.systemFont(ofSize: 11)
         importStatusLabel.textColor = NSColor.secondaryLabelColor
@@ -332,7 +359,7 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(importHeader)
         contentView.addSubview(importButton)
         contentView.addSubview(chromeImportButton)
-        contentView.addSubview(chromeHelpButton)
+        contentView.addSubview(chromeHelpContainer)
         contentView.addSubview(importStatusLabel)
 
         let separator5 = createSeparator()
@@ -465,14 +492,13 @@ final class SettingsContentViewController: NSViewController {
             chromeImportButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             chromeImportButton.heightAnchor.constraint(equalToConstant: 36),
 
-            // Chrome Help Button (below Chrome import button)
-            chromeHelpButton.leadingAnchor.constraint(equalTo: chromeImportButton.leadingAnchor),
-            chromeHelpButton.topAnchor.constraint(equalTo: chromeImportButton.bottomAnchor, constant: controlLabelSpacing),
-            chromeHelpButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            // Chrome Help Container (centered below Chrome import button)
+            chromeHelpContainer.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            chromeHelpContainer.topAnchor.constraint(equalTo: chromeImportButton.bottomAnchor, constant: controlLabelSpacing),
 
-            // Import Status Label (below Chrome help button)
-            importStatusLabel.leadingAnchor.constraint(equalTo: chromeHelpButton.leadingAnchor),
-            importStatusLabel.topAnchor.constraint(equalTo: chromeHelpButton.bottomAnchor, constant: itemSpacing),
+            // Import Status Label (below Chrome help container)
+            importStatusLabel.leadingAnchor.constraint(equalTo: chromeImportButton.leadingAnchor),
+            importStatusLabel.topAnchor.constraint(equalTo: chromeHelpContainer.bottomAnchor, constant: itemSpacing),
             importStatusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
 
             // Separator 5
@@ -514,7 +540,7 @@ final class SettingsContentViewController: NSViewController {
 
         // Setup dynamic constraints for separator5 (import section)
         // importStatusLabel is hidden by default, shown temporarily after import
-        separator5ToChromeHelpButtonConstraint = separator5.topAnchor.constraint(equalTo: chromeHelpButton.bottomAnchor, constant: sectionSpacing)
+        separator5ToChromeHelpButtonConstraint = separator5.topAnchor.constraint(equalTo: chromeHelpContainer.bottomAnchor, constant: sectionSpacing)
         separator5ToImportStatusConstraint = separator5.topAnchor.constraint(equalTo: importStatusLabel.bottomAnchor, constant: sectionSpacing)
         // Default: importStatusLabel is hidden, anchor to chromeHelpButton
         separator5ToChromeHelpButtonConstraint?.isActive = true
@@ -852,21 +878,16 @@ final class SettingsContentViewController: NSViewController {
     private func applyChromeImport(_ result: ChromeImportResult) {
         guard let appModel = appModel else { return }
 
-        // Remember the currently selected workspace
-        let previousWorkspaceId = appModel.state.selectedWorkspaceId
-
-        // Create the workspace
+        // Create the workspace (this internally selects it for node insertion)
         _ = appModel.createWorkspace(name: result.workspace.name, colorId: result.workspace.colorId)
 
-        // The workspace is now selected, add all nodes to it
+        // Add all nodes to the new workspace
         for node in result.workspace.nodes {
             addNodeToWorkspace(node, parentId: nil, appModel: appModel)
         }
 
-        // Restore the previously selected workspace
-        if let previousWorkspaceId = previousWorkspaceId {
-            appModel.selectWorkspace(id: previousWorkspaceId)
-        }
+        // Don't call selectWorkspace — it sets isSettingsSelected=false and navigates away.
+        // The new workspace is already selected; when the user leaves settings they'll see it.
 
         // Reload the workspace list
         reloadWorkspaces()
