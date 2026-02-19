@@ -354,6 +354,7 @@ final class MainViewController: NSViewController {
     private func applyWorkspaceStyling() {
         view.layer?.backgroundColor = model.currentWorkspace.colorId.backgroundColor.cgColor
         view.window?.backgroundColor = model.currentWorkspace.colorId.backgroundColor
+        nodeListViewController.workspaceColor = model.currentWorkspace.colorId
     }
 
     private func showSettingsContent() {

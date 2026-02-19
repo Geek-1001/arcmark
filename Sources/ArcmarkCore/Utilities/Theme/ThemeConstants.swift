@@ -244,6 +244,12 @@ struct ThemeConstants {
 
         static let pinnedTileHeight: CGFloat = 50
 
+        /// Scroll shadow gradient height (32pt) - Used for vertical overscroll fade indicators
+        static let scrollShadowHeight: CGFloat = 32
+
+        /// Scroll shadow gradient width (32pt) - Used for horizontal overscroll fade indicators
+        static let scrollShadowWidth: CGFloat = 32
+
         /// Number of columns in the pinned tabs grid
         static let pinnedTileColumns: Int = 4
 
