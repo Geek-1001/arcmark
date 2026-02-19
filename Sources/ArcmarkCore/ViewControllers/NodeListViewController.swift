@@ -721,6 +721,19 @@ extension NodeListViewController: NSMenuDelegate {
             rename.target = self
             menu.addItem(rename)
 
+            let moveMenu = NSMenuItem(title: "Move to", action: nil, keyEquivalent: "")
+            let submenu = NSMenu()
+            if let workspaces = workspacesProvider?(), let currentWorkspace = workspaces.first {
+                for workspace in workspaces where workspace.id != currentWorkspace.id {
+                    let item = NSMenuItem(title: workspace.name, action: #selector(contextMoveToWorkspace), keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = ["nodeId": node.id, "workspaceId": workspace.id]
+                    submenu.addItem(item)
+                }
+            }
+            moveMenu.submenu = submenu
+            menu.addItem(moveMenu)
+
             let delete = NSMenuItem(title: "Delete", action: #selector(contextDelete), keyEquivalent: "")
             delete.target = self
             delete.representedObject = node.id
