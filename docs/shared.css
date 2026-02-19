@@ -1,0 +1,55 @@
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #FAF4F2;
+  --text: #1C1412;
+  --text-muted: rgba(28, 20, 18, 0.4);
+  --text-subtle: rgba(28, 20, 18, 0.6);
+  --border: rgba(28, 20, 18, 0.1);
+  --border-hover: rgba(28, 20, 18, 0.2);
+  --accent: #FF5D26;
+  --accent-cta: #E54610;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-headline: 'Cormorant Upright', Georgia, serif;
+}
+
+html {
+  background-color: var(--bg);
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Base typography for content pages */
+h1 {
+  font-family: var(--font-headline);
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 640px) {
+  h1 {
+    font-size: 2.8rem;
+  }
+}
+
+h2 {
+  font-family: var(--font-headline);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  margin-top: 2.5rem;
+}

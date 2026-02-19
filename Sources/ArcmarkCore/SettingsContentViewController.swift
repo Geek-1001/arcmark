@@ -45,6 +45,10 @@ final class SettingsContentViewController: NSViewController {
 
     // Import & Export section
     private let importButton = SettingsButton(title: "Import from Arc Browser")
+    private let chromeImportButton = SettingsButton(title: "Import from Chrome")
+    private let chromeHelpContainer = NSView()
+    private let chromeHelpButton = CustomTextButton(title: "How to export bookmarks from Chrome")
+    private let chromeHelpIcon = NSImageView()
     private let importStatusLabel = NSTextField(labelWithString: "")
 
     // App Version section
@@ -73,7 +77,7 @@ final class SettingsContentViewController: NSViewController {
     private var separator1ToToggleConstraint: NSLayoutConstraint?
     private var separator4ToOpenSettingsConstraint: NSLayoutConstraint?
     private var separator4ToRefreshButtonConstraint: NSLayoutConstraint?
-    private var separator5ToImportButtonConstraint: NSLayoutConstraint?
+    private var separator5ToChromeHelpButtonConstraint: NSLayoutConstraint?
     private var separator5ToImportStatusConstraint: NSLayoutConstraint?
 
     override func loadView() {
@@ -278,6 +282,39 @@ final class SettingsContentViewController: NSViewController {
         importButton.action = #selector(importFromArc)
         importButton.translatesAutoresizingMaskIntoConstraints = false
 
+        chromeImportButton.target = self
+        chromeImportButton.action = #selector(importFromChrome)
+        chromeImportButton.translatesAutoresizingMaskIntoConstraints = false
+
+        // Chrome help container (centered, with icon + text)
+        chromeHelpContainer.translatesAutoresizingMaskIntoConstraints = false
+
+        chromeHelpIcon.translatesAutoresizingMaskIntoConstraints = false
+        if let infoImage = NSImage(systemSymbolName: "info.circle", accessibilityDescription: "Info") {
+            chromeHelpIcon.image = infoImage
+        }
+        chromeHelpIcon.contentTintColor = sectionHeaderColor
+        chromeHelpIcon.imageScaling = .scaleProportionallyDown
+
+        chromeHelpButton.target = self
+        chromeHelpButton.action = #selector(openChromeExportInstructions)
+        chromeHelpButton.translatesAutoresizingMaskIntoConstraints = false
+
+        chromeHelpContainer.addSubview(chromeHelpIcon)
+        chromeHelpContainer.addSubview(chromeHelpButton)
+
+        NSLayoutConstraint.activate([
+            chromeHelpIcon.leadingAnchor.constraint(equalTo: chromeHelpContainer.leadingAnchor),
+            chromeHelpIcon.centerYAnchor.constraint(equalTo: chromeHelpContainer.centerYAnchor),
+            chromeHelpIcon.widthAnchor.constraint(equalToConstant: 14),
+            chromeHelpIcon.heightAnchor.constraint(equalToConstant: 14),
+
+            chromeHelpButton.leadingAnchor.constraint(equalTo: chromeHelpIcon.trailingAnchor, constant: 4),
+            chromeHelpButton.topAnchor.constraint(equalTo: chromeHelpContainer.topAnchor),
+            chromeHelpButton.bottomAnchor.constraint(equalTo: chromeHelpContainer.bottomAnchor),
+            chromeHelpButton.trailingAnchor.constraint(equalTo: chromeHelpContainer.trailingAnchor),
+        ])
+
         importStatusLabel.font = NSFont.systemFont(ofSize: 11)
         importStatusLabel.textColor = NSColor.secondaryLabelColor
         importStatusLabel.maximumNumberOfLines = 0
@@ -321,6 +358,8 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(separator4)
         contentView.addSubview(importHeader)
         contentView.addSubview(importButton)
+        contentView.addSubview(chromeImportButton)
+        contentView.addSubview(chromeHelpContainer)
         contentView.addSubview(importStatusLabel)
 
         let separator5 = createSeparator()
@@ -447,9 +486,19 @@ final class SettingsContentViewController: NSViewController {
             importButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             importButton.heightAnchor.constraint(equalToConstant: 36),
 
-            // Import Status Label (below import button)
-            importStatusLabel.leadingAnchor.constraint(equalTo: importButton.leadingAnchor),
-            importStatusLabel.topAnchor.constraint(equalTo: importButton.bottomAnchor, constant: itemSpacing),
+            // Chrome Import Button (below Arc import button)
+            chromeImportButton.leadingAnchor.constraint(equalTo: importButton.leadingAnchor),
+            chromeImportButton.topAnchor.constraint(equalTo: importButton.bottomAnchor, constant: itemSpacing),
+            chromeImportButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            chromeImportButton.heightAnchor.constraint(equalToConstant: 36),
+
+            // Chrome Help Container (centered below Chrome import button)
+            chromeHelpContainer.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            chromeHelpContainer.topAnchor.constraint(equalTo: chromeImportButton.bottomAnchor, constant: controlLabelSpacing),
+
+            // Import Status Label (below Chrome help container)
+            importStatusLabel.leadingAnchor.constraint(equalTo: chromeImportButton.leadingAnchor),
+            importStatusLabel.topAnchor.constraint(equalTo: chromeHelpContainer.bottomAnchor, constant: itemSpacing),
             importStatusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
 
             // Separator 5
@@ -491,10 +540,10 @@ final class SettingsContentViewController: NSViewController {
 
         // Setup dynamic constraints for separator5 (import section)
         // importStatusLabel is hidden by default, shown temporarily after import
-        separator5ToImportButtonConstraint = separator5.topAnchor.constraint(equalTo: importButton.bottomAnchor, constant: sectionSpacing)
+        separator5ToChromeHelpButtonConstraint = separator5.topAnchor.constraint(equalTo: chromeHelpContainer.bottomAnchor, constant: sectionSpacing)
         separator5ToImportStatusConstraint = separator5.topAnchor.constraint(equalTo: importStatusLabel.bottomAnchor, constant: sectionSpacing)
-        // Default: importStatusLabel is hidden
-        separator5ToImportButtonConstraint?.isActive = true
+        // Default: importStatusLabel is hidden, anchor to chromeHelpButton
+        separator5ToChromeHelpButtonConstraint?.isActive = true
 
         // Setup workspace collection view height constraint (will be updated dynamically)
         workspaceCollectionViewHeightConstraint = workspaceCollectionView.heightAnchor.constraint(equalToConstant: 0)
@@ -751,6 +800,11 @@ final class SettingsContentViewController: NSViewController {
     }
 
     @objc private func importFromArc() {
+        // Guard against concurrent imports
+        if importButton.getIsLoading() || chromeImportButton.getIsLoading() {
+            return
+        }
+
         // Construct default Arc path
         let arcPath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Arc/StorableSidebar.json")
@@ -764,6 +818,84 @@ final class SettingsContentViewController: NSViewController {
         // Import directly
         Task { @MainActor [weak self] in
             await self?.handleArcImport(fileURL: arcPath)
+        }
+    }
+
+    @objc private func importFromChrome() {
+        // Guard against concurrent imports
+        if importButton.getIsLoading() || chromeImportButton.getIsLoading() {
+            return
+        }
+
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.html]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Select your exported Chrome bookmarks HTML file"
+
+        panel.begin { [weak self] response in
+            guard response == .OK, let fileURL = panel.url else { return }
+            Task { @MainActor [weak self] in
+                await self?.handleChromeImport(fileURL: fileURL)
+            }
+        }
+    }
+
+    private func handleChromeImport(fileURL: URL) async {
+        // Show loading state
+        chromeImportButton.setLoading(true)
+        showImportStatus("Importing from Chrome...", isError: false)
+
+        // Perform import
+        let result = await ChromeImportService.shared.importFromChrome(fileURL: fileURL)
+
+        // Hide loading state
+        chromeImportButton.setLoading(false)
+
+        switch result {
+        case .success(let importResult):
+            // Apply to AppModel
+            applyChromeImport(importResult)
+
+            // Show success message
+            let message = """
+            Successfully imported:
+            • \(importResult.linksImported) links
+            • \(importResult.foldersImported) folders
+            """
+            showImportStatus(message, isError: false)
+
+            // Hide message after 5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                self?.hideImportStatus()
+            }
+
+        case .failure(let error):
+            showImportStatus(error.localizedDescription, isError: true)
+        }
+    }
+
+    private func applyChromeImport(_ result: ChromeImportResult) {
+        guard let appModel = appModel else { return }
+
+        // Create the workspace (this internally selects it for node insertion)
+        _ = appModel.createWorkspace(name: result.workspace.name, colorId: result.workspace.colorId)
+
+        // Add all nodes to the new workspace
+        for node in result.workspace.nodes {
+            addNodeToWorkspace(node, parentId: nil, appModel: appModel)
+        }
+
+        // Don't call selectWorkspace — it sets isSettingsSelected=false and navigates away.
+        // The new workspace is already selected; when the user leaves settings they'll see it.
+
+        // Reload the workspace list
+        reloadWorkspaces()
+    }
+
+    @objc private func openChromeExportInstructions() {
+        if let url = URL(string: "https://geek-1001.github.io/arcmark/import-from-chrome") {
+            NSWorkspace.shared.open(url)
         }
     }
 
@@ -845,15 +977,15 @@ final class SettingsContentViewController: NSViewController {
         importStatusLabel.textColor = isError ? NSColor.systemRed : regularTextColor
         importStatusLabel.isHidden = false
         // Anchor separator5 to importStatusLabel when it's visible
-        separator5ToImportButtonConstraint?.isActive = false
+        separator5ToChromeHelpButtonConstraint?.isActive = false
         separator5ToImportStatusConstraint?.isActive = true
     }
 
     private func hideImportStatus() {
         importStatusLabel.isHidden = true
-        // Anchor separator5 to importButton when importStatusLabel is hidden
+        // Anchor separator5 to chromeHelpButton when importStatusLabel is hidden
         separator5ToImportStatusConstraint?.isActive = false
-        separator5ToImportButtonConstraint?.isActive = true
+        separator5ToChromeHelpButtonConstraint?.isActive = true
     }
 
     // MARK: - Workspace Management
@@ -1195,7 +1327,9 @@ private final class SettingsButton: NSButton {
     private var trackingArea: NSTrackingArea?
     private var spinner: NSProgressIndicator?
     private let originalTitle: String
-    private var isLoading: Bool = false
+    private(set) var isLoading: Bool = false
+
+    func getIsLoading() -> Bool { isLoading }
 
     init(title: String) {
         self.originalTitle = title
