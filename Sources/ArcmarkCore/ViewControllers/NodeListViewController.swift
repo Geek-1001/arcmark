@@ -13,6 +13,8 @@ final class NodeListViewController: NSViewController {
 
     fileprivate let collectionView = ContextMenuCollectionView()
     let scrollView = NSScrollView()
+    private let topShadowView = NSView()
+    private let bottomShadowView = NSView()
     private let dropIndicator = DropIndicatorView()
     private let listMetrics = ListMetrics()
     private let contextMenu = NSMenu()
@@ -60,6 +62,11 @@ final class NodeListViewController: NSViewController {
 
     // State
     var isSearchActive: Bool = false
+    var workspaceColor: WorkspaceColorId = .defaultColor() {
+        didSet {
+            updateShadows()
+        }
+    }
 
     // MARK: - Initialization
 
@@ -132,12 +139,33 @@ final class NodeListViewController: NSViewController {
 
         view.addSubview(scrollView)
 
+        // Setup shadow views
+        topShadowView.translatesAutoresizingMaskIntoConstraints = false
+        topShadowView.wantsLayer = true
+        bottomShadowView.translatesAutoresizingMaskIntoConstraints = false
+        bottomShadowView.wantsLayer = true
+
+        view.addSubview(topShadowView)
+        view.addSubview(bottomShadowView)
+
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            topShadowView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            topShadowView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            topShadowView.topAnchor.constraint(equalTo: view.topAnchor),
+            topShadowView.heightAnchor.constraint(equalToConstant: ThemeConstants.Sizing.scrollShadowHeight),
+
+            bottomShadowView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomShadowView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomShadowView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            bottomShadowView.heightAnchor.constraint(equalToConstant: ThemeConstants.Sizing.scrollShadowHeight)
         ])
+
+        updateShadows()
     }
 
     private func setupNotifications() {
@@ -188,9 +216,59 @@ final class NodeListViewController: NSViewController {
 
     // MARK: - Private Methods
 
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        updateShadows()
+    }
+
     @objc private func handleScrollBoundsChanged() {
+        updateShadows()
         for item in collectionView.visibleItems() {
             (item as? NodeCollectionViewItem)?.refreshHoverState()
+        }
+    }
+
+    private func updateShadows() {
+        let clipView = scrollView.contentView
+        let visibleRect = clipView.documentVisibleRect
+        let contentHeight = collectionView.bounds.height
+
+        let canScrollUp = visibleRect.origin.y > 0
+        let canScrollDown = visibleRect.origin.y + visibleRect.height < contentHeight
+
+        let baseColor = workspaceColor.backgroundColor
+        let shadowOpacity = ThemeConstants.Opacity.high
+
+        if canScrollUp {
+            let topGradient = CAGradientLayer()
+            topGradient.frame = topShadowView.bounds
+            topGradient.colors = [
+                baseColor.withAlphaComponent(0.0).cgColor,
+                baseColor.withAlphaComponent(shadowOpacity).cgColor
+            ]
+            topGradient.startPoint = CGPoint(x: 0.5, y: 0)
+            topGradient.endPoint = CGPoint(x: 0.5, y: 1)
+            topShadowView.layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
+            topShadowView.layer?.addSublayer(topGradient)
+            topShadowView.isHidden = false
+        } else {
+            topShadowView.isHidden = true
+        }
+
+        if canScrollDown {
+            let bottomGradient = CAGradientLayer()
+            bottomGradient.frame = bottomShadowView.bounds
+            bottomGradient.colors = [
+                baseColor.withAlphaComponent(shadowOpacity).cgColor,
+                baseColor.withAlphaComponent(0.0).cgColor
+            ]
+            bottomGradient.startPoint = CGPoint(x: 0.5, y: 0)
+            bottomGradient.endPoint = CGPoint(x: 0.5, y: 1)
+            bottomShadowView.layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
+            bottomShadowView.layer?.addSublayer(bottomGradient)
+            bottomShadowView.isHidden = false
+        } else {
+            bottomShadowView.isHidden = true
         }
     }
 

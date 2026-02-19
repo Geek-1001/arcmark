@@ -158,12 +158,12 @@ final class WorkspaceSwitcherView: NSView {
             leftShadowView.leadingAnchor.constraint(equalTo: leadingAnchor),
             leftShadowView.topAnchor.constraint(equalTo: topAnchor),
             leftShadowView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            leftShadowView.widthAnchor.constraint(equalToConstant: 32),
+            leftShadowView.widthAnchor.constraint(equalToConstant: ThemeConstants.Sizing.scrollShadowWidth),
 
             rightShadowView.trailingAnchor.constraint(equalTo: trailingAnchor),
             rightShadowView.topAnchor.constraint(equalTo: topAnchor),
             rightShadowView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            rightShadowView.widthAnchor.constraint(equalToConstant: 32)
+            rightShadowView.widthAnchor.constraint(equalToConstant: ThemeConstants.Sizing.scrollShadowWidth)
         ])
 
         NotificationCenter.default.addObserver(
@@ -313,13 +313,13 @@ final class WorkspaceSwitcherView: NSView {
         // Create gradients based on workspace color
         let baseColor = workspaceColor.color
 
-        let shadowGradientOpacity = 0.80
+        let shadowOpacity = ThemeConstants.Opacity.high
 
         if canScrollLeft {
             let leftGradient = CAGradientLayer()
             leftGradient.frame = leftShadowView.bounds
             leftGradient.colors = [
-                baseColor.withAlphaComponent(shadowGradientOpacity).cgColor,
+                baseColor.withAlphaComponent(shadowOpacity).cgColor,
                 baseColor.withAlphaComponent(0.0).cgColor
             ]
             leftGradient.startPoint = CGPoint(x: 0, y: 0.5)
@@ -336,7 +336,7 @@ final class WorkspaceSwitcherView: NSView {
             rightGradient.frame = rightShadowView.bounds
             rightGradient.colors = [
                 baseColor.withAlphaComponent(0.0).cgColor,
-                baseColor.withAlphaComponent(shadowGradientOpacity).cgColor
+                baseColor.withAlphaComponent(shadowOpacity).cgColor
             ]
             rightGradient.startPoint = CGPoint(x: 0, y: 0.5)
             rightGradient.endPoint = CGPoint(x: 1, y: 0.5)
