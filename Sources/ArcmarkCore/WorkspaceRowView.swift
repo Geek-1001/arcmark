@@ -110,6 +110,7 @@ final class WorkspaceRowView: BaseView {
         editableTitle.translatesAutoresizingMaskIntoConstraints = false
         editableTitle.font = style.titleFont
         editableTitle.textColor = style.titleColor
+        editableTitle.commitsOnFocusLoss = true
 
         // Delete button
         deleteButton.translatesAutoresizingMaskIntoConstraints = false

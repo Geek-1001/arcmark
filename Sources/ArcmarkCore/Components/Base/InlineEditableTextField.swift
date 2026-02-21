@@ -82,6 +82,9 @@ final class InlineEditableTextField: NSView {
         set { textField.stringValue = newValue }
     }
 
+    /// Commits edits when focus leaves the field (except explicit cancel movement).
+    var commitsOnFocusLoss = false
+
     /// Indicates whether the text field is currently in edit mode.
     var isEditing: Bool {
         isEditingTitle
@@ -215,7 +218,10 @@ extension InlineEditableTextField: NSTextFieldDelegate {
         let movement = obj.userInfo?["NSTextMovement"] as? Int ?? NSOtherTextMovement
         let trimmed = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if movement == NSReturnTextMovement, !trimmed.isEmpty {
+        let isEscapeOrCancel = movement == NSCancelTextMovement
+        let shouldCommit = !trimmed.isEmpty && (movement == NSReturnTextMovement || (commitsOnFocusLoss && !isEscapeOrCancel))
+
+        if shouldCommit {
             textField.stringValue = trimmed
             finishInlineRename(commit: true)
         } else {

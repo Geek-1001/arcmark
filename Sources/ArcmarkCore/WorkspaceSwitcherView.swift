@@ -670,8 +670,10 @@ extension WorkspaceButton: NSTextFieldDelegate {
         guard isEditingTitle else { return }
         let movement = obj.userInfo?["NSTextMovement"] as? Int ?? NSOtherTextMovement
         let trimmed = titleLabel.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isEscapeOrCancel = movement == NSCancelTextMovement
+        let shouldCommit = !trimmed.isEmpty && (movement == NSReturnTextMovement || !isEscapeOrCancel)
 
-        if movement == NSReturnTextMovement, !trimmed.isEmpty {
+        if shouldCommit {
             titleLabel.stringValue = trimmed
             finishInlineRename(commit: true)
         } else {
@@ -680,4 +682,3 @@ extension WorkspaceButton: NSTextFieldDelegate {
         }
     }
 }
-
