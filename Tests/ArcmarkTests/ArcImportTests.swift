@@ -326,6 +326,339 @@ final class ArcImportTests: XCTestCase {
         }
     }
 
+    // MARK: - childrenIds Traversal Tests
+
+    func testChildrenIdsTraversal_FolderChildrenFoundViaChildrenIds() async throws {
+        // Arc stores parent-child relationships in childrenIds. The parentID field
+        // on the child may NOT match the folder's id — it can point to the container.
+        let spaces = [
+            createSpace(id: "space1", title: "Test Space")
+        ]
+
+        let items: [[String: Any?]] = [
+            // Folder at root of pinned container — parentID points to container
+            [
+                "id": "folder1",
+                "title": "My Folder",
+                "parentID": "container1",
+                "childrenIds": ["link-inside-folder"],
+                "data": nil
+            ],
+            // Link that folder claims as child via childrenIds,
+            // BUT whose parentID points to the container (not the folder)
+            [
+                "id": "link-inside-folder",
+                "title": nil,
+                "parentID": "container1",  // Mismatched! Points to container, not folder
+                "childrenIds": [],
+                "data": [
+                    "tab": [
+                        "savedTitle": "Nested Link",
+                        "savedURL": "https://nested.example.com",
+                        "timeLastActiveAt": 1234567890.0
+                    ]
+                ]
+            ],
+            // A link directly under the container
+            [
+                "id": "root-link",
+                "title": nil,
+                "parentID": "container1",
+                "childrenIds": [],
+                "data": [
+                    "tab": [
+                        "savedTitle": "Root Link",
+                        "savedURL": "https://root.example.com",
+                        "timeLastActiveAt": 1234567890.0
+                    ]
+                ]
+            ]
+        ]
+
+        let jsonData = try createArcJSON(spaces: spaces, items: items)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("json")
+        try jsonData.write(to: tempURL)
+
+        let service = ArcImportService.shared
+        let result = await service.importFromArc(fileURL: tempURL)
+        try? FileManager.default.removeItem(at: tempURL)
+
+        switch result {
+        case .success(let importResult):
+            XCTAssertEqual(importResult.workspacesCreated, 1)
+            XCTAssertEqual(importResult.linksImported, 2, "Should find both links")
+            XCTAssertEqual(importResult.foldersImported, 1)
+
+            // The folder should contain the nested link (found via childrenIds)
+            let folderNode = importResult.workspaces[0].nodes.compactMap { node -> Folder? in
+                if case .folder(let f) = node { return f }
+                return nil
+            }.first
+
+            XCTAssertNotNil(folderNode, "Should have a folder")
+            XCTAssertEqual(folderNode?.children.count, 1, "Folder should have 1 child via childrenIds")
+
+            if case .link(let link) = folderNode?.children.first {
+                XCTAssertEqual(link.title, "Nested Link")
+                XCTAssertEqual(link.url, "https://nested.example.com")
+            } else {
+                XCTFail("Expected link inside folder")
+            }
+        case .failure(let error):
+            XCTFail("Import failed: \(error)")
+        }
+    }
+
+    func testChildrenIdsTraversal_DeepNesting() async throws {
+        // Verify childrenIds traversal works for deeply nested structures
+        let spaces = [
+            createSpace(id: "space1", title: "Deep Space")
+        ]
+
+        let items: [[String: Any?]] = [
+            // Top-level folder
+            [
+                "id": "folder-top",
+                "title": "Top",
+                "parentID": "container1",
+                "childrenIds": ["folder-mid"],
+                "data": nil
+            ],
+            // Mid-level folder (child of top, but parentID could differ)
+            [
+                "id": "folder-mid",
+                "title": "Middle",
+                "parentID": "container1",  // parentID mismatch
+                "childrenIds": ["link-deep"],
+                "data": nil
+            ],
+            // Deep link
+            [
+                "id": "link-deep",
+                "title": nil,
+                "parentID": "container1",  // parentID mismatch
+                "childrenIds": [],
+                "data": [
+                    "tab": [
+                        "savedTitle": "Deep Link",
+                        "savedURL": "https://deep.example.com",
+                        "timeLastActiveAt": 1234567890.0
+                    ]
+                ]
+            ]
+        ]
+
+        let jsonData = try createArcJSON(spaces: spaces, items: items)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("json")
+        try jsonData.write(to: tempURL)
+
+        let service = ArcImportService.shared
+        let result = await service.importFromArc(fileURL: tempURL)
+        try? FileManager.default.removeItem(at: tempURL)
+
+        switch result {
+        case .success(let importResult):
+            XCTAssertEqual(importResult.linksImported, 1)
+            XCTAssertEqual(importResult.foldersImported, 2)
+
+            // Verify the nesting: Top > Middle > Deep Link
+            guard let topFolder = importResult.workspaces[0].nodes.compactMap({ node -> Folder? in
+                if case .folder(let f) = node { return f }
+                return nil
+            }).first else {
+                XCTFail("Expected top folder"); return
+            }
+
+            XCTAssertEqual(topFolder.name, "Top")
+            XCTAssertEqual(topFolder.children.count, 1)
+
+            if case .folder(let midFolder) = topFolder.children.first {
+                XCTAssertEqual(midFolder.name, "Middle")
+                XCTAssertEqual(midFolder.children.count, 1)
+
+                if case .link(let link) = midFolder.children.first {
+                    XCTAssertEqual(link.title, "Deep Link")
+                } else {
+                    XCTFail("Expected link inside middle folder")
+                }
+            } else {
+                XCTFail("Expected middle folder inside top folder")
+            }
+        case .failure(let error):
+            XCTFail("Import failed: \(error)")
+        }
+    }
+
+    func testChildrenIdsTraversal_PreservesOrdering() async throws {
+        // childrenIds defines the canonical order — verify it's preserved
+        let spaces = [
+            createSpace(id: "space1", title: "Ordered Space")
+        ]
+
+        let items: [[String: Any?]] = [
+            // Container item that exists in the items map
+            [
+                "id": "container1",
+                "title": nil,
+                "parentID": nil as String?,
+                "childrenIds": ["link-c", "link-a", "link-b"],  // Specific order
+                "data": nil
+            ],
+            [
+                "id": "link-a",
+                "title": nil,
+                "parentID": "container1",
+                "childrenIds": [],
+                "data": ["tab": ["savedTitle": "Alpha", "savedURL": "https://a.com", "timeLastActiveAt": 1.0]]
+            ],
+            [
+                "id": "link-b",
+                "title": nil,
+                "parentID": "container1",
+                "childrenIds": [],
+                "data": ["tab": ["savedTitle": "Beta", "savedURL": "https://b.com", "timeLastActiveAt": 1.0]]
+            ],
+            [
+                "id": "link-c",
+                "title": nil,
+                "parentID": "container1",
+                "childrenIds": [],
+                "data": ["tab": ["savedTitle": "Charlie", "savedURL": "https://c.com", "timeLastActiveAt": 1.0]]
+            ]
+        ]
+
+        let jsonData = try createArcJSON(spaces: spaces, items: items)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("json")
+        try jsonData.write(to: tempURL)
+
+        let service = ArcImportService.shared
+        let result = await service.importFromArc(fileURL: tempURL)
+        try? FileManager.default.removeItem(at: tempURL)
+
+        switch result {
+        case .success(let importResult):
+            let nodes = importResult.workspaces[0].nodes
+            XCTAssertEqual(nodes.count, 3)
+
+            // Verify order matches childrenIds: C, A, B
+            if case .link(let first) = nodes[0] { XCTAssertEqual(first.title, "Charlie") }
+            else { XCTFail("Expected link at index 0") }
+
+            if case .link(let second) = nodes[1] { XCTAssertEqual(second.title, "Alpha") }
+            else { XCTFail("Expected link at index 1") }
+
+            if case .link(let third) = nodes[2] { XCTAssertEqual(third.title, "Beta") }
+            else { XCTFail("Expected link at index 2") }
+        case .failure(let error):
+            XCTFail("Import failed: \(error)")
+        }
+    }
+
+    func testParentIDFallback_WhenContainerNotInItems() async throws {
+        // When the pinned container ID doesn't exist as an item in the map,
+        // the importer should fall back to parentID-based filtering
+        let spaces = [
+            createSpace(id: "space1", title: "Fallback Space")
+        ]
+
+        // No item has id == "container1", so fallback to parentID matching
+        let items = [
+            createLinkItem(
+                id: "link1",
+                parentID: "container1",
+                savedTitle: "Link One",
+                savedURL: "https://one.com"
+            ),
+            createLinkItem(
+                id: "link2",
+                parentID: "container1",
+                savedTitle: "Link Two",
+                savedURL: "https://two.com"
+            )
+        ]
+
+        let jsonData = try createArcJSON(spaces: spaces, items: items)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("json")
+        try jsonData.write(to: tempURL)
+
+        let service = ArcImportService.shared
+        let result = await service.importFromArc(fileURL: tempURL)
+        try? FileManager.default.removeItem(at: tempURL)
+
+        switch result {
+        case .success(let importResult):
+            XCTAssertEqual(importResult.linksImported, 2, "Fallback should find both links via parentID")
+        case .failure(let error):
+            XCTFail("Import failed: \(error)")
+        }
+    }
+
+    func testContainerIDs_UnpinnedBeforePinned() async throws {
+        // Real Arc data puts "unpinned" BEFORE "pinned" in containerIDs
+        let spaces = [
+            createSpace(
+                id: "space1",
+                title: "Real Format",
+                containerIDs: ["unpinned", "unpinned-ctr", "pinned", "pinned-ctr"]
+            )
+        ]
+
+        let items: [[String: Any?]] = [
+            [
+                "id": "pinned-ctr",
+                "title": nil,
+                "parentID": nil as String?,
+                "childrenIds": ["pinned-link"],
+                "data": nil
+            ],
+            [
+                "id": "pinned-link",
+                "title": nil,
+                "parentID": "pinned-ctr",
+                "childrenIds": [],
+                "data": ["tab": ["savedTitle": "Pinned", "savedURL": "https://pinned.com", "timeLastActiveAt": 1.0]]
+            ],
+            // Unpinned item should NOT be imported
+            [
+                "id": "unpinned-link",
+                "title": nil,
+                "parentID": "unpinned-ctr",
+                "childrenIds": [],
+                "data": ["tab": ["savedTitle": "Unpinned", "savedURL": "https://unpinned.com", "timeLastActiveAt": 1.0]]
+            ]
+        ]
+
+        let jsonData = try createArcJSON(spaces: spaces, items: items)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("json")
+        try jsonData.write(to: tempURL)
+
+        let service = ArcImportService.shared
+        let result = await service.importFromArc(fileURL: tempURL)
+        try? FileManager.default.removeItem(at: tempURL)
+
+        switch result {
+        case .success(let importResult):
+            XCTAssertEqual(importResult.linksImported, 1, "Should only import pinned link")
+            if case .link(let link) = importResult.workspaces[0].nodes.first {
+                XCTAssertEqual(link.title, "Pinned")
+            } else {
+                XCTFail("Expected pinned link")
+            }
+        case .failure(let error):
+            XCTFail("Import failed: \(error)")
+        }
+    }
+
     // MARK: - Integration Test with Real File
 
     /// Test with the actual user file if it exists

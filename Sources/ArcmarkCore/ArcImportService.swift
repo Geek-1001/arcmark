@@ -365,53 +365,89 @@ final class ArcImportService: Sendable {
         return map
     }
 
-    /// Recursively build node hierarchy from Arc items
+    /// Recursively build node hierarchy from Arc items.
+    ///
+    /// Uses `childrenIds` traversal when the parent item exists in the map (preserves Arc's
+    /// canonical ordering and parent-child relationships). Falls back to `parentID` filtering
+    /// for the root level where the pinned container itself may not be in the items array.
     private func buildNodeHierarchy(parentId: String, items: [String: ArcItem]) -> [Node] {
+        // Determine child items: prefer childrenIds lookup, fall back to parentID filtering
+        let childItems: [ArcItem]
+        if let parentItem = items[parentId], let childIds = parentItem.childrenIds {
+            // Traverse using childrenIds (Arc's canonical ordering)
+            childItems = childIds.compactMap { items[$0] }
+        } else {
+            // Fallback: pinned container may not exist as an item in the map.
+            // Exclude items that are claimed by a folder's childrenIds to avoid duplication
+            // (an item referenced in a folder's childrenIds belongs inside that folder,
+            // even if its parentID points to the container).
+            let claimedIds = collectClaimedChildIds(items: items)
+            childItems = items.values.filter { $0.parentID == parentId && !claimedIds.contains($0.id) }
+        }
+
         var nodes: [Node] = []
 
-        // Find all items with this parentId
-        let children = items.values.filter { $0.parentID == parentId }
-
-        for item in children {
-            // Check if it's a folder
-            if let childrenIds = item.childrenIds, !childrenIds.isEmpty {
-                let childNodes = buildNodeHierarchy(parentId: item.id, items: items)
-                let folder = Folder(
-                    id: UUID(),
-                    name: item.title ?? "Untitled Folder",
-                    children: childNodes,
-                    isExpanded: false
-                )
-                nodes.append(.folder(folder))
-            }
-            // Check if it's a link
-            else if let tabData = item.data?.tab {
-                // Validate URL - skip if nil or invalid
-                guard let urlString = tabData.savedURL,
-                      !urlString.isEmpty,
-                      URL(string: urlString) != nil else {
-                    continue
-                }
-
-                // Use savedTitle if available, otherwise use "Untitled"
-                let linkTitle: String
-                if let savedTitle = tabData.savedTitle, !savedTitle.isEmpty {
-                    linkTitle = savedTitle
-                } else {
-                    linkTitle = "Untitled"
-                }
-
-                let link = Link(
-                    id: UUID(),
-                    title: linkTitle,
-                    url: urlString,
-                    faviconPath: nil
-                )
-                nodes.append(.link(link))
+        for item in childItems {
+            if let node = convertItemToNode(item, items: items) {
+                nodes.append(node)
             }
         }
 
         return nodes
+    }
+
+    /// Collect all item IDs that are referenced in any item's childrenIds.
+    /// These items belong inside their parent folder and should not appear at the root.
+    private func collectClaimedChildIds(items: [String: ArcItem]) -> Set<String> {
+        var claimed = Set<String>()
+        for item in items.values {
+            if let childIds = item.childrenIds {
+                for id in childIds {
+                    claimed.insert(id)
+                }
+            }
+        }
+        return claimed
+    }
+
+    /// Convert a single Arc item into an Arcmark Node, recursing into folders.
+    private func convertItemToNode(_ item: ArcItem, items: [String: ArcItem]) -> Node? {
+        // Check if it's a folder (has non-empty childrenIds)
+        if let childrenIds = item.childrenIds, !childrenIds.isEmpty {
+            let childNodes = buildNodeHierarchy(parentId: item.id, items: items)
+            let folder = Folder(
+                id: UUID(),
+                name: item.title ?? "Untitled Folder",
+                children: childNodes,
+                isExpanded: false
+            )
+            return .folder(folder)
+        }
+        // Check if it's a link (has tab data with a valid URL)
+        else if let tabData = item.data?.tab {
+            guard let urlString = tabData.savedURL,
+                  !urlString.isEmpty,
+                  URL(string: urlString) != nil else {
+                return nil
+            }
+
+            let linkTitle: String
+            if let savedTitle = tabData.savedTitle, !savedTitle.isEmpty {
+                linkTitle = savedTitle
+            } else {
+                linkTitle = "Untitled"
+            }
+
+            let link = Link(
+                id: UUID(),
+                title: linkTitle,
+                url: urlString,
+                faviconPath: nil
+            )
+            return .link(link)
+        }
+
+        return nil
     }
 
     /// Assign a color to a workspace based on its index
