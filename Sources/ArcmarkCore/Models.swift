@@ -28,15 +28,17 @@ struct Workspace: Codable, Identifiable, Equatable {
     var colorId: WorkspaceColorId
     var items: [Node]
     var pinnedLinks: [Link]
+    var browserProfile: String?
 
     static let maxPinnedLinks = ThemeConstants.Sizing.pinnedTileColumns * ThemeConstants.Sizing.pinnedTileMaxRows
 
-    init(id: UUID, name: String, colorId: WorkspaceColorId, items: [Node], pinnedLinks: [Link] = []) {
+    init(id: UUID, name: String, colorId: WorkspaceColorId, items: [Node], pinnedLinks: [Link] = [], browserProfile: String? = nil) {
         self.id = id
         self.name = name
         self.colorId = colorId
         self.items = items
         self.pinnedLinks = pinnedLinks
+        self.browserProfile = browserProfile
     }
 
     init(from decoder: Decoder) throws {
@@ -46,6 +48,7 @@ struct Workspace: Codable, Identifiable, Equatable {
         colorId = try container.decode(WorkspaceColorId.self, forKey: .colorId)
         items = try container.decode([Node].self, forKey: .items)
         pinnedLinks = try container.decodeIfPresent([Link].self, forKey: .pinnedLinks) ?? []
+        browserProfile = try container.decodeIfPresent(String.self, forKey: .browserProfile)
     }
 }
 
