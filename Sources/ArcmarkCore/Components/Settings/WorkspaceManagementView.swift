@@ -12,7 +12,7 @@ final class WorkspaceManagementView: NSView {
     // MARK: - Properties
 
     private let workspaceCollectionView = WorkspaceContextMenuCollectionView()
-    private let workspaceDropIndicator = WorkspaceDropIndicatorView()
+    private let workspaceDropIndicator = DropIndicatorView()
     private var workspaceCollectionViewHeightConstraint: NSLayoutConstraint?
     private var contextWorkspaceId: UUID?
     private var inlineRenameWorkspaceId: UUID?
@@ -51,7 +51,9 @@ final class WorkspaceManagementView: NSView {
         workspaceCollectionView.isSelectable = true
         workspaceCollectionView.allowsMultipleSelection = false
         workspaceCollectionView.backgroundColors = [.clear]
-        workspaceCollectionView.managementView = self
+        workspaceCollectionView.workspacesProvider = { [weak self] in
+            self?.workspacesProvider?() ?? []
+        }
 
         // Set up context menu handler
         workspaceCollectionView.onRightClick = { [weak self] workspaceId, event in
@@ -270,7 +272,8 @@ extension WorkspaceManagementView: NSCollectionViewDataSource {
             },
             onRenameCommit: { [weak self] id, newName in
                 self?.handleWorkspaceRename(id: id, newName: newName)
-            }
+            },
+            onProfile: { _ in }
         )
 
         return item
@@ -380,55 +383,4 @@ extension WorkspaceManagementView: NSCollectionViewDelegate, NSCollectionViewDel
 
 // MARK: - Supporting Types
 
-private final class WorkspaceContextMenuCollectionView: NSCollectionView {
-    var onRightClick: ((UUID, NSEvent) -> Void)?
 
-    weak var managementView: WorkspaceManagementView?
-
-    override func rightMouseDown(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        if let indexPath = indexPathForItem(at: point),
-           let workspaces = managementView?.workspacesProvider?() {
-            let workspace = workspaces[indexPath.item]
-            onRightClick?(workspace.id, event)
-        } else {
-            super.rightMouseDown(with: event)
-        }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        // Call super to allow drag operations
-        super.mouseDown(with: event)
-    }
-}
-
-private final class WorkspaceDropIndicatorView: NSView {
-    private let lineThickness: CGFloat = 2
-    private let accentColor = NSColor.controlAccentColor
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.masksToBounds = true
-        isHidden = true
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        wantsLayer = true
-        layer?.masksToBounds = true
-        isHidden = true
-    }
-
-    func showLine(in frame: NSRect) {
-        isHidden = false
-        self.frame = frame
-        layer?.cornerRadius = lineThickness / 2
-        layer?.backgroundColor = accentColor.cgColor
-        layer?.borderWidth = 0
-    }
-
-    func hide() {
-        isHidden = true
-    }
-}
