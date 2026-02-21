@@ -773,6 +773,9 @@ final class SettingsContentViewController: NSViewController {
             // Update appearance after change
             updateBrowserPopupAppearance()
 
+            // Refresh workspace list so profile icons reflect the new browser
+            reloadWorkspaces()
+
             // Notify about browser change
             NotificationCenter.default.post(
                 name: .defaultBrowserChanged,
