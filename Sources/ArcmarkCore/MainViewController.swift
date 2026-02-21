@@ -548,7 +548,11 @@ final class MainViewController: NSViewController {
 
     private func openLink(_ link: Link) {
         guard let url = URL(string: link.url) else { return }
-        BrowserManager.open(url: url, profile: model.currentWorkspace.browserProfile, profileBundleId: model.currentWorkspace.browserProfileBundleId)
+        let profile: String? = {
+            guard let bundleId = BrowserManager.resolveDefaultBrowserBundleId() else { return nil }
+            return model.currentWorkspace.browserProfiles[bundleId]
+        }()
+        BrowserManager.open(url: url, profile: profile)
     }
 
     // MARK: - URL Utilities

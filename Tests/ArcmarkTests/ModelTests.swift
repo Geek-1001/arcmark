@@ -265,28 +265,27 @@ final class ModelTests: XCTestCase {
 
     // MARK: - Browser Profile Tests
 
-    func testJSONRoundTripWithBrowserProfile() throws {
+    func testJSONRoundTripWithBrowserProfiles() throws {
         let workspace = Workspace(
             id: UUID(),
             name: "Work",
             colorId: .ocean,
             items: [],
             pinnedLinks: [],
-            browserProfile: "Profile 1",
-            browserProfileBundleId: "com.google.chrome"
+            browserProfiles: ["com.google.chrome": "Profile 1", "org.mozilla.firefox": "default"]
         )
         let state = AppState(schemaVersion: 1, workspaces: [workspace], selectedWorkspaceId: workspace.id, isSettingsSelected: false)
 
         let data = try JSONEncoder().encode(state)
         let decoded = try JSONDecoder().decode(AppState.self, from: data)
 
-        XCTAssertEqual(decoded.workspaces[0].browserProfile, "Profile 1")
-        XCTAssertEqual(decoded.workspaces[0].browserProfileBundleId, "com.google.chrome")
+        XCTAssertEqual(decoded.workspaces[0].browserProfiles["com.google.chrome"], "Profile 1")
+        XCTAssertEqual(decoded.workspaces[0].browserProfiles["org.mozilla.firefox"], "default")
         XCTAssertEqual(state, decoded)
     }
 
     func testBackwardCompatibilityNoBrowserProfile() throws {
-        // Simulate old JSON format without browserProfile field
+        // Simulate old JSON format without any browser profile fields
         let json = """
         {
             "schemaVersion": 1,
@@ -304,9 +303,33 @@ final class ModelTests: XCTestCase {
         let data = json.data(using: .utf8)!
         let decoded = try JSONDecoder().decode(AppState.self, from: data)
 
-        XCTAssertNil(decoded.workspaces[0].browserProfile)
-        XCTAssertNil(decoded.workspaces[0].browserProfileBundleId)
+        XCTAssertTrue(decoded.workspaces[0].browserProfiles.isEmpty)
         XCTAssertEqual(decoded.workspaces[0].name, "Legacy Workspace")
+    }
+
+    func testBackwardCompatibilityOldBrowserProfileFormat() throws {
+        // Simulate old JSON format with browserProfile + browserProfileBundleId
+        let json = """
+        {
+            "schemaVersion": 1,
+            "workspaces": [{
+                "id": "00000000-0000-0000-0000-000000000003",
+                "name": "Migrated Workspace",
+                "colorId": "ocean",
+                "items": [],
+                "pinnedLinks": [],
+                "browserProfile": "Profile 1",
+                "browserProfileBundleId": "com.google.chrome"
+            }],
+            "selectedWorkspaceId": "00000000-0000-0000-0000-000000000003",
+            "isSettingsSelected": false
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(AppState.self, from: data)
+
+        XCTAssertEqual(decoded.workspaces[0].browserProfiles["com.google.chrome"], "Profile 1")
+        XCTAssertEqual(decoded.workspaces[0].browserProfiles.count, 1)
     }
 
     func testUpdateWorkspaceBrowserProfile() {
@@ -315,12 +338,10 @@ final class ModelTests: XCTestCase {
         let model = AppModel(store: store)
 
         let workspaceId = model.currentWorkspace.id
-        XCTAssertNil(model.currentWorkspace.browserProfile)
-        XCTAssertNil(model.currentWorkspace.browserProfileBundleId)
+        XCTAssertTrue(model.currentWorkspace.browserProfiles.isEmpty)
 
-        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: "Profile 2", bundleId: "com.google.chrome")
-        XCTAssertEqual(model.currentWorkspace.browserProfile, "Profile 2")
-        XCTAssertEqual(model.currentWorkspace.browserProfileBundleId, "com.google.chrome")
+        model.updateWorkspaceBrowserProfile(id: workspaceId, bundleId: "com.google.chrome", profile: "Profile 2")
+        XCTAssertEqual(model.currentWorkspace.browserProfiles["com.google.chrome"], "Profile 2")
     }
 
     func testClearWorkspaceBrowserProfile() {
@@ -331,14 +352,12 @@ final class ModelTests: XCTestCase {
         let workspaceId = model.currentWorkspace.id
 
         // Set profile
-        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: "Profile 1", bundleId: "com.google.chrome")
-        XCTAssertEqual(model.currentWorkspace.browserProfile, "Profile 1")
-        XCTAssertEqual(model.currentWorkspace.browserProfileBundleId, "com.google.chrome")
+        model.updateWorkspaceBrowserProfile(id: workspaceId, bundleId: "com.google.chrome", profile: "Profile 1")
+        XCTAssertEqual(model.currentWorkspace.browserProfiles["com.google.chrome"], "Profile 1")
 
         // Clear profile
-        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: nil)
-        XCTAssertNil(model.currentWorkspace.browserProfile)
-        XCTAssertNil(model.currentWorkspace.browserProfileBundleId)
+        model.updateWorkspaceBrowserProfile(id: workspaceId, bundleId: "com.google.chrome", profile: nil)
+        XCTAssertNil(model.currentWorkspace.browserProfiles["com.google.chrome"])
     }
 
     func testUpdateWorkspaceBrowserProfileTrimsWhitespace() {
@@ -348,12 +367,35 @@ final class ModelTests: XCTestCase {
 
         let workspaceId = model.currentWorkspace.id
 
-        // Empty string should become nil
-        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: "   ")
-        XCTAssertNil(model.currentWorkspace.browserProfile)
+        // Empty string should result in no entry
+        model.updateWorkspaceBrowserProfile(id: workspaceId, bundleId: "com.google.chrome", profile: "   ")
+        XCTAssertNil(model.currentWorkspace.browserProfiles["com.google.chrome"])
 
         // Whitespace-padded string should be trimmed
-        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: " Profile 1 ")
-        XCTAssertEqual(model.currentWorkspace.browserProfile, "Profile 1")
+        model.updateWorkspaceBrowserProfile(id: workspaceId, bundleId: "com.google.chrome", profile: " Profile 1 ")
+        XCTAssertEqual(model.currentWorkspace.browserProfiles["com.google.chrome"], "Profile 1")
+    }
+
+    func testMultipleBrowserProfiles() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let workspaceId = model.currentWorkspace.id
+
+        // Set Chrome profile
+        model.updateWorkspaceBrowserProfile(id: workspaceId, bundleId: "com.google.chrome", profile: "Profile 1")
+        // Set Firefox profile
+        model.updateWorkspaceBrowserProfile(id: workspaceId, bundleId: "org.mozilla.firefox", profile: "default")
+
+        XCTAssertEqual(model.currentWorkspace.browserProfiles.count, 2)
+        XCTAssertEqual(model.currentWorkspace.browserProfiles["com.google.chrome"], "Profile 1")
+        XCTAssertEqual(model.currentWorkspace.browserProfiles["org.mozilla.firefox"], "default")
+
+        // Clear Chrome profile, Firefox should remain
+        model.updateWorkspaceBrowserProfile(id: workspaceId, bundleId: "com.google.chrome", profile: nil)
+        XCTAssertEqual(model.currentWorkspace.browserProfiles.count, 1)
+        XCTAssertNil(model.currentWorkspace.browserProfiles["com.google.chrome"])
+        XCTAssertEqual(model.currentWorkspace.browserProfiles["org.mozilla.firefox"], "default")
     }
 }

@@ -28,19 +28,17 @@ struct Workspace: Codable, Identifiable, Equatable {
     var colorId: WorkspaceColorId
     var items: [Node]
     var pinnedLinks: [Link]
-    var browserProfile: String?
-    var browserProfileBundleId: String?
+    var browserProfiles: [String: String]
 
     static let maxPinnedLinks = ThemeConstants.Sizing.pinnedTileColumns * ThemeConstants.Sizing.pinnedTileMaxRows
 
-    init(id: UUID, name: String, colorId: WorkspaceColorId, items: [Node], pinnedLinks: [Link] = [], browserProfile: String? = nil, browserProfileBundleId: String? = nil) {
+    init(id: UUID, name: String, colorId: WorkspaceColorId, items: [Node], pinnedLinks: [Link] = [], browserProfiles: [String: String] = [:]) {
         self.id = id
         self.name = name
         self.colorId = colorId
         self.items = items
         self.pinnedLinks = pinnedLinks
-        self.browserProfile = browserProfile
-        self.browserProfileBundleId = browserProfileBundleId
+        self.browserProfiles = browserProfiles
     }
 
     init(from decoder: Decoder) throws {
@@ -50,8 +48,32 @@ struct Workspace: Codable, Identifiable, Equatable {
         colorId = try container.decode(WorkspaceColorId.self, forKey: .colorId)
         items = try container.decode([Node].self, forKey: .items)
         pinnedLinks = try container.decodeIfPresent([Link].self, forKey: .pinnedLinks) ?? []
-        browserProfile = try container.decodeIfPresent(String.self, forKey: .browserProfile)
-        browserProfileBundleId = try container.decodeIfPresent(String.self, forKey: .browserProfileBundleId)
+
+        // Support new format (browserProfiles dictionary) and migrate old format
+        if let profiles = try container.decodeIfPresent([String: String].self, forKey: .browserProfiles) {
+            browserProfiles = profiles
+        } else if let profile = try container.decodeIfPresent(String.self, forKey: .browserProfile),
+                  let bundleId = try container.decodeIfPresent(String.self, forKey: .browserProfileBundleId) {
+            browserProfiles = [bundleId: profile]
+        } else {
+            browserProfiles = [:]
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, colorId, items, pinnedLinks, browserProfiles
+        // Legacy keys for backward compatibility decoding
+        case browserProfile, browserProfileBundleId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(colorId, forKey: .colorId)
+        try container.encode(items, forKey: .items)
+        try container.encode(pinnedLinks, forKey: .pinnedLinks)
+        try container.encode(browserProfiles, forKey: .browserProfiles)
     }
 }
 

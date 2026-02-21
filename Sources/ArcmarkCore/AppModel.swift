@@ -78,12 +78,15 @@ final class AppModel {
         }
     }
 
-    func updateWorkspaceBrowserProfile(id: UUID, profile: String?, bundleId: String? = nil) {
+    func updateWorkspaceBrowserProfile(id: UUID, bundleId: String, profile: String?) {
         let trimmed = profile?.trimmingCharacters(in: .whitespacesAndNewlines)
         let value = (trimmed?.isEmpty ?? true) ? nil : trimmed
         updateWorkspace(id: id) { workspace in
-            workspace.browserProfile = value
-            workspace.browserProfileBundleId = value != nil ? bundleId : nil
+            if let value {
+                workspace.browserProfiles[bundleId] = value
+            } else {
+                workspace.browserProfiles.removeValue(forKey: bundleId)
+            }
         }
     }
 

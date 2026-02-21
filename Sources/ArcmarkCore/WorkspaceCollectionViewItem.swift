@@ -31,7 +31,10 @@ final class WorkspaceCollectionViewItem: NSCollectionViewItem {
             workspaceColor: workspace.colorId.color,
             showDelete: true,
             canDelete: canDelete,
-            hasProfile: workspace.browserProfile != nil && !(workspace.browserProfile?.isEmpty ?? true),
+            hasProfile: {
+                guard let bundleId = BrowserManager.resolveDefaultBrowserBundleId() else { return false }
+                return workspace.browserProfiles[bundleId] != nil
+            }(),
             onDelete: { [weak self] in
                 guard let self, let workspace = self.workspace else { return }
                 self.onDelete?(workspace.id)

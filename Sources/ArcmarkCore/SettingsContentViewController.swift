@@ -1089,12 +1089,14 @@ final class SettingsContentViewController: NSViewController {
         menu.addItem(colorItem)
 
         // Browser profile options
-        let profileTitle = workspace.browserProfile != nil ? "Edit Browser Profile..." : "Set Browser Profile..."
+        let currentBundleId = BrowserManager.resolveDefaultBrowserBundleId() ?? ""
+        let hasProfileForCurrentBrowser = !currentBundleId.isEmpty && workspace.browserProfiles[currentBundleId] != nil
+        let profileTitle = hasProfileForCurrentBrowser ? "Edit Browser Profile..." : "Set Browser Profile..."
         let profileItem = NSMenuItem(title: profileTitle, action: #selector(setContextWorkspaceProfile), keyEquivalent: "")
         profileItem.target = self
         menu.addItem(profileItem)
 
-        if workspace.browserProfile != nil {
+        if hasProfileForCurrentBrowser {
             let clearProfileItem = NSMenuItem(title: "Clear Browser Profile", action: #selector(clearContextWorkspaceProfile), keyEquivalent: "")
             clearProfileItem.target = self
             menu.addItem(clearProfileItem)
@@ -1146,7 +1148,8 @@ final class SettingsContentViewController: NSViewController {
 
     @objc private func clearContextWorkspaceProfile() {
         guard let workspaceId = contextWorkspaceId else { return }
-        appModel?.updateWorkspaceBrowserProfile(id: workspaceId, profile: nil)
+        guard let bundleId = BrowserManager.resolveDefaultBrowserBundleId() else { return }
+        appModel?.updateWorkspaceBrowserProfile(id: workspaceId, bundleId: bundleId, profile: nil)
         reloadWorkspaces()
     }
 
@@ -1191,7 +1194,7 @@ final class SettingsContentViewController: NSViewController {
 
             let textField = NSTextField()
             textField.placeholderString = "e.g., Profile 1"
-            textField.stringValue = workspace.browserProfile ?? ""
+            textField.stringValue = workspace.browserProfiles[bundleId] ?? ""
             textField.font = NSFont.systemFont(ofSize: 13)
             textField.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(textField)
@@ -1213,7 +1216,7 @@ final class SettingsContentViewController: NSViewController {
                 if response == .alertFirstButtonReturn {
                     let value = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
                     let profile = value.isEmpty ? nil : value
-                    appModel.updateWorkspaceBrowserProfile(id: id, profile: profile, bundleId: bundleId)
+                    appModel.updateWorkspaceBrowserProfile(id: id, bundleId: bundleId, profile: profile)
                     self?.reloadWorkspaces()
                 }
             }
@@ -1234,8 +1237,8 @@ final class SettingsContentViewController: NSViewController {
                 popup.menu?.items.last?.representedObject = profile.id
             }
 
-            // Pre-select current profile
-            if let currentProfile = workspace.browserProfile {
+            // Pre-select current profile for this browser
+            if let currentProfile = workspace.browserProfiles[bundleId] {
                 for (index, profile) in detectedProfiles.enumerated() {
                     if profile.id == currentProfile {
                         popup.selectItem(at: index + 1) // +1 for "Default" item
@@ -1270,10 +1273,10 @@ final class SettingsContentViewController: NSViewController {
                     let selectedIndex = popup.indexOfSelectedItem
                     if selectedIndex == 0 {
                         // "Default (no profile)"
-                        appModel.updateWorkspaceBrowserProfile(id: id, profile: nil, bundleId: nil)
+                        appModel.updateWorkspaceBrowserProfile(id: id, bundleId: bundleId, profile: nil)
                     } else {
                         let profileId = detectedProfiles[selectedIndex - 1].id
-                        appModel.updateWorkspaceBrowserProfile(id: id, profile: profileId, bundleId: bundleId)
+                        appModel.updateWorkspaceBrowserProfile(id: id, bundleId: bundleId, profile: profileId)
                     }
                     self?.reloadWorkspaces()
                 }
