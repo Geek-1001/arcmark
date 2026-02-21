@@ -65,12 +65,11 @@
       background: rgba(28, 20, 18, 0.03);
       text-decoration: none;
       color: var(--text);
-      transition: background 0.2s, box-shadow 0.2s;
+      transition: background 0.2s;
     }
 
     .browser-card:hover {
       background: rgba(28, 20, 18, 0.06);
-      box-shadow: 0 1px 4px rgba(28, 20, 18, 0.06);
     }
 
     .browser-icon {
@@ -135,7 +134,7 @@
 
       <div class="browser-cards">
         <a href="../import-from-chrome/" class="browser-card">
-          <svg class="browser-icon" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="#fff"/><path d="M24 13.2a10.8 10.8 0 0 1 9.35 5.4H44a22 22 0 0 0-38.17-6.23L12.6 24l1.15-2A10.76 10.76 0 0 1 24 13.2Z" fill="#DB4437"/><path d="M33.35 18.6A10.8 10.8 0 0 1 24 34.8l-.15.01-6.77 11.73A22 22 0 0 0 44 18.6H33.35Z" fill="#4285F4"/><path d="M24 34.8A10.8 10.8 0 0 1 13.75 22l.01-.2-7.93-9.43A22 22 0 0 0 17.08 46.54L23.85 34.8Z" fill="#0F9D58"/><circle cx="24" cy="24" r="7.2" fill="#fff"/><circle cx="24" cy="24" r="5.7" fill="#4285F4"/></svg>
+          <img class="browser-icon" src="chrome.svg" alt="Chrome">
           <div class="browser-info">
             <div class="browser-name">Google Chrome</div>
             <div class="browser-desc">Also works with Brave, Edge, Vivaldi, and other Chromium browsers</div>
@@ -144,7 +143,7 @@
         </a>
 
         <a href="../import-from-safari/" class="browser-card">
-          <svg class="browser-icon" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="#006CFF"/><circle cx="24" cy="24" r="19" fill="none" stroke="#fff" stroke-width="0.5" opacity="0.3"/><polygon points="24,8 28,28 24,24 20,28" fill="#fff" opacity="0.9"/><polygon points="24,40 20,20 24,24 28,20" fill="#DE3B40" opacity="0.9"/><circle cx="24" cy="24" r="2" fill="#fff"/></svg>
+          <img class="browser-icon" src="safari.svg" alt="Safari">
           <div class="browser-info">
             <div class="browser-name">Safari</div>
             <div class="browser-desc">Export via File &gt; Export Browsing Data to File</div>
@@ -153,7 +152,7 @@
         </a>
 
         <a href="../import-from-firefox/" class="browser-card">
-          <svg class="browser-icon" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="#FF9500"/><path d="M24 6c-9.94 0-18 8.06-18 18s8.06 18 18 18 18-8.06 18-18S33.94 6 24 6Zm0 32c-7.73 0-14-6.27-14-14s6.27-14 14-14 14 6.27 14 14-6.27 14-14 14Z" fill="#E05A00" opacity="0.3"/><circle cx="24" cy="24" r="10" fill="#FFE0B2" opacity="0.3"/><path d="M33 15c-1.5-2-4-3.5-7-3.8 4 1 7 4.5 7.5 8.8.3-1.7 0-3.4-.5-5Z" fill="#fff" opacity="0.5"/></svg>
+          <img class="browser-icon" src="firefox.svg" alt="Firefox">
           <div class="browser-info">
             <div class="browser-name">Firefox</div>
             <div class="browser-desc">Export via Library &gt; Import and Backup &gt; Export Bookmarks to HTML</div>
