@@ -73,7 +73,7 @@ final class WorkspaceRowView: BaseView {
                 buttonGap: ThemeConstants.Spacing.small,
                 titleFont: ThemeConstants.Fonts.bodyRegular,
                 titleColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.high),
-                setProfileFont: NSFont.systemFont(ofSize: 11, weight: .medium),
+                setProfileFont: ThemeConstants.Fonts.systemFont(size: 11, weight: .medium),
                 handleTintColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.low),
                 colorSquareBorderColor: NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: ThemeConstants.Opacity.subtle),
                 deleteTintColor: NSColor.black.withAlphaComponent(0.5),
