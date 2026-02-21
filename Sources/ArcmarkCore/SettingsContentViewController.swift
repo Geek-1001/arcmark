@@ -846,7 +846,7 @@ final class SettingsContentViewController: NSViewController {
     private func handleChromeImport(fileURL: URL) async {
         // Show loading state
         chromeImportButton.setLoading(true)
-        showImportStatus("Importing from Chrome...", isError: false)
+        showImportStatus("Importing bookmarks...", isError: false)
 
         // Perform import
         let result = await ChromeImportService.shared.importFromChrome(fileURL: fileURL)
