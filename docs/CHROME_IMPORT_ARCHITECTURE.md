@@ -217,9 +217,9 @@ This ensures the user doesn't see Chrome's internal folder structure in Arcmark.
 
 ### Phase 5: Apply to Arcmark
 
-1. **Create workspace** named "Chrome Bookmarks" with `.ember` color:
+1. **Create workspace** named "Imported Bookmarks" with `.ember` color:
    ```swift
-   _ = appModel.createWorkspace(name: "Chrome Bookmarks", colorId: .ember)
+   _ = appModel.createWorkspace(name: "Imported Bookmarks", colorId: .ember)
    ```
 
 2. **Add nodes recursively** using the same `addNodeToWorkspace` helper used by Arc import:
@@ -309,7 +309,7 @@ The line-by-line regex approach is simple, fast, and robust for this specific fo
 
 ### Output: Arcmark Structure
 ```
-Workspace: "Chrome Bookmarks" (color: ember)
+Workspace: "Imported Bookmarks" (color: ember)
 ├── Link: "GitHub" (https://github.com)
 ├── Folder: "Development"
 │   └── Link: "Stack Overflow" (https://stackoverflow.com)
@@ -330,7 +330,7 @@ Workspace: "Chrome Bookmarks" (color: ember)
 | Source | Fixed path (`~/Library/.../StorableSidebar.json`) | User-selected HTML file |
 | Format | JSON | Netscape Bookmark HTML |
 | Parser | JSONDecoder + Codable models | Line-by-line regex scanner |
-| Workspaces | Multiple (one per Arc space) | Single ("Chrome Bookmarks") |
+| Workspaces | Multiple (one per Arc space) | Single ("Imported Bookmarks") |
 | Top-level folders | N/A (Arc spaces are workspaces) | Flattened into root |
 | File picker | No (reads from known path) | Yes (NSOpenPanel, .html filter) |
 | Post-import | Restores previous workspace | Selects new workspace, stays on Settings |
@@ -420,7 +420,7 @@ func createBookmarksHTML(body: String) -> String {
 | HTML entities decoded | `&amp;`, `&#39;`, etc. in titles |
 | Order preserved | Links appear in file order |
 | Empty title | Falls back to "Untitled" |
-| Workspace properties | Name is "Chrome Bookmarks", colorId is `.ember` |
+| Workspace properties | Name is "Imported Bookmarks", colorId is `.ember` |
 | File not found | Returns `.fileNotFound` |
 | Invalid URLs skipped | `javascript:`, `chrome://`, empty URLs |
 | HTML entities in folder names | Entity decoding applies to `<H3>` content too |

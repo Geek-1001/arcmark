@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Import Bookmarks - Arcmark</title>
+  <meta name="description" content="Import bookmarks from Chrome, Safari, Firefox, or any browser that exports HTML into Arcmark.">
+  <link rel="icon" href="../images/app-icon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Upright:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../shared.css">
+  <style>
+    main {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .container {
+      max-width: 38rem;
+      width: 100%;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.875rem;
+      color: var(--text-subtle);
+      text-decoration: none;
+      margin-bottom: 2.5rem;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover {
+      color: var(--text);
+    }
+
+    .back-link svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .subtitle {
+      font-size: 1.05rem;
+      line-height: 1.7;
+      color: var(--text-subtle);
+      margin-bottom: 2.5rem;
+    }
+
+    .browser-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .browser-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.25rem 1.5rem;
+      border-radius: 10px;
+      background: rgba(28, 20, 18, 0.03);
+      text-decoration: none;
+      color: var(--text);
+      transition: background 0.2s;
+    }
+
+    .browser-card:hover {
+      background: rgba(28, 20, 18, 0.06);
+    }
+
+    .browser-icon {
+      width: 36px;
+      height: 36px;
+      flex-shrink: 0;
+    }
+
+    .browser-info {
+      flex: 1;
+    }
+
+    .browser-name {
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .browser-desc {
+      font-size: 0.85rem;
+      color: var(--text-subtle);
+    }
+
+    .browser-arrow {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .footer {
+      margin-top: 4rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--border-hover);
+      padding-bottom: 1px;
+    }
+
+    .footer a:hover {
+      color: var(--text);
+      border-bottom-color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="container">
+      <a href="../" class="back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        Back to Arcmark
+      </a>
+
+      <h1>Import Bookmarks</h1>
+      <p class="subtitle">Arcmark can import bookmarks from any browser that exports the standard HTML bookmark format. Choose your browser below for step-by-step instructions.</p>
+
+      <div class="browser-cards">
+        <a href="../import-from-chrome/" class="browser-card">
+          <img class="browser-icon" src="chrome.svg" alt="Chrome">
+          <div class="browser-info">
+            <div class="browser-name">Google Chrome</div>
+            <div class="browser-desc">Also works with Brave, Edge, Vivaldi, and other Chromium browsers</div>
+          </div>
+          <svg class="browser-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+
+        <a href="../import-from-safari/" class="browser-card">
+          <img class="browser-icon" src="safari.svg" alt="Safari">
+          <div class="browser-info">
+            <div class="browser-name">Safari</div>
+            <div class="browser-desc">Export via File &gt; Export Browsing Data to File</div>
+          </div>
+          <svg class="browser-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+
+        <a href="../import-from-firefox/" class="browser-card">
+          <img class="browser-icon" src="firefox.svg" alt="Firefox">
+          <div class="browser-info">
+            <div class="browser-name">Firefox</div>
+            <div class="browser-desc">Export via Library &gt; Import and Backup &gt; Export Bookmarks to HTML</div>
+          </div>
+          <svg class="browser-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+      </div>
+
+      <div class="footer">
+        <a href="../">Arcmark</a> &mdash; Browser sidebar bookmark manager for macOS
+      </div>
+    </div>
+  </main>
+</body>
+</html>

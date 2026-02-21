@@ -69,7 +69,7 @@ final class ChromeImportService: Sendable {
                 let stats = self.countNodes(nodes)
 
                 let workspace = ImportWorkspace(
-                    name: "Chrome Bookmarks",
+                    name: "Imported Bookmarks",
                     colorId: .ember,
                     nodes: nodes
                 )

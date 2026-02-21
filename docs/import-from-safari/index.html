@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Import Chrome Bookmarks - Arcmark</title>
-  <meta name="description" content="How to export your bookmarks from Chrome and import them into Arcmark.">
+  <title>Import Safari Bookmarks - Arcmark</title>
+  <meta name="description" content="How to export your bookmarks from Safari and import them into Arcmark.">
   <link rel="icon" href="../images/app-icon.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -59,6 +59,19 @@
       font-weight: 600;
     }
 
+    .screenshot {
+      margin: 1.5rem 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .screenshot img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
     .note {
       background: rgba(28, 20, 18, 0.04);
       border-radius: 8px;
@@ -103,18 +116,17 @@
         Back to Import Bookmarks
       </a>
 
-      <h1>Import Chrome Bookmarks</h1>
+      <h1>Import Safari Bookmarks</h1>
 
-      <h2>Step 1: Export from Chrome</h2>
+      <h2>Step 1: Export from Safari</h2>
       <ol>
-        <li>Open <strong>Google Chrome</strong></li>
-        <li>Click the three-dot menu in the top-right corner</li>
-        <li>Go to <strong>Bookmarks and lists</strong></li>
-        <li>Click <strong>Bookmark manager</strong></li>
-        <li>In the Bookmark manager, click the three-dot menu in the top-right</li>
-        <li>Select <strong>Export bookmarks</strong></li>
-        <li>Choose a location and save the HTML file</li>
+        <li>Open <strong>Safari</strong></li>
+        <li>Go to <strong>File &gt; Export Browsing Data to File</strong></li>
+        <li>In the dialog, make sure <strong>Bookmarks</strong> is toggled on</li>
+        <li>Click <strong>Export</strong> and choose where to save the file</li>
       </ol>
+
+      <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-subtle); margin-top: 1rem;">The file downloads as a zip &mdash; unzip it to find <strong>Bookmarks.html</strong>.</p>
 
       <h2>Step 2: Import to Arcmark</h2>
       <ol>
@@ -122,7 +134,7 @@
         <li>Go to <strong>Settings</strong> (gear icon)</li>
         <li>Scroll to the <strong>Import &amp; Export</strong> section</li>
         <li>Click <strong>Import from Chrome, Safari, Firefox</strong></li>
-        <li>Select the HTML file you exported from Chrome</li>
+        <li>Select the <strong>Bookmarks.html</strong> file you exported from Safari</li>
       </ol>
 
       <div class="note">

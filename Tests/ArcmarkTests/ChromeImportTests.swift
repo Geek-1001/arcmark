@@ -346,7 +346,7 @@ struct ChromeImportTests {
 
         switch result {
         case .success(let importResult):
-            #expect(importResult.workspace.name == "Chrome Bookmarks")
+            #expect(importResult.workspace.name == "Imported Bookmarks")
             #expect(importResult.workspace.colorId == .ember)
         case .failure(let error):
             Issue.record("Import should succeed: \(error)")

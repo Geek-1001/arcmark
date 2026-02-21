@@ -45,9 +45,9 @@ final class SettingsContentViewController: NSViewController {
 
     // Import & Export section
     private let importButton = SettingsButton(title: "Import from Arc Browser")
-    private let chromeImportButton = SettingsButton(title: "Import from Chrome")
+    private let chromeImportButton = SettingsButton(title: "Import from Chrome, Safari, Firefox")
     private let chromeHelpContainer = NSView()
-    private let chromeHelpButton = CustomTextButton(title: "How to export bookmarks from Chrome")
+    private let chromeHelpButton = CustomTextButton(title: "How to export bookmarks from your browser")
     private let chromeHelpIcon = NSImageView()
     private let importStatusLabel = NSTextField(labelWithString: "")
 
@@ -492,9 +492,11 @@ final class SettingsContentViewController: NSViewController {
             chromeImportButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             chromeImportButton.heightAnchor.constraint(equalToConstant: 36),
 
-            // Chrome Help Container (centered below Chrome import button)
+            // Chrome Help Container (centered below Chrome import button, constrained to parent width)
             chromeHelpContainer.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             chromeHelpContainer.topAnchor.constraint(equalTo: chromeImportButton.bottomAnchor, constant: controlLabelSpacing),
+            chromeHelpContainer.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: horizontalPadding),
+            chromeHelpContainer.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -horizontalPadding),
 
             // Import Status Label (below Chrome help container)
             importStatusLabel.leadingAnchor.constraint(equalTo: chromeImportButton.leadingAnchor),
@@ -831,7 +833,7 @@ final class SettingsContentViewController: NSViewController {
         panel.allowedContentTypes = [.html]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.message = "Select your exported Chrome bookmarks HTML file"
+        panel.message = "Select your exported bookmarks HTML file"
 
         panel.begin { [weak self] response in
             guard response == .OK, let fileURL = panel.url else { return }
@@ -844,7 +846,7 @@ final class SettingsContentViewController: NSViewController {
     private func handleChromeImport(fileURL: URL) async {
         // Show loading state
         chromeImportButton.setLoading(true)
-        showImportStatus("Importing from Chrome...", isError: false)
+        showImportStatus("Importing bookmarks...", isError: false)
 
         // Perform import
         let result = await ChromeImportService.shared.importFromChrome(fileURL: fileURL)
@@ -894,7 +896,7 @@ final class SettingsContentViewController: NSViewController {
     }
 
     @objc private func openChromeExportInstructions() {
-        if let url = URL(string: "https://geek-1001.github.io/arcmark/import-from-chrome") {
+        if let url = URL(string: "https://geek-1001.github.io/arcmark/import-bookmarks") {
             NSWorkspace.shared.open(url)
         }
     }
