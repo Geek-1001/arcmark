@@ -262,4 +262,91 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(decoded.workspaces[0].pinnedLinks.count, 0)
         XCTAssertEqual(decoded.workspaces[0].name, "Old Workspace")
     }
+
+    // MARK: - Browser Profile Tests
+
+    func testJSONRoundTripWithBrowserProfile() throws {
+        let workspace = Workspace(
+            id: UUID(),
+            name: "Work",
+            colorId: .ocean,
+            items: [],
+            pinnedLinks: [],
+            browserProfile: "Profile 1"
+        )
+        let state = AppState(schemaVersion: 1, workspaces: [workspace], selectedWorkspaceId: workspace.id, isSettingsSelected: false)
+
+        let data = try JSONEncoder().encode(state)
+        let decoded = try JSONDecoder().decode(AppState.self, from: data)
+
+        XCTAssertEqual(decoded.workspaces[0].browserProfile, "Profile 1")
+        XCTAssertEqual(state, decoded)
+    }
+
+    func testBackwardCompatibilityNoBrowserProfile() throws {
+        // Simulate old JSON format without browserProfile field
+        let json = """
+        {
+            "schemaVersion": 1,
+            "workspaces": [{
+                "id": "00000000-0000-0000-0000-000000000002",
+                "name": "Legacy Workspace",
+                "colorId": "moss",
+                "items": [],
+                "pinnedLinks": []
+            }],
+            "selectedWorkspaceId": "00000000-0000-0000-0000-000000000002",
+            "isSettingsSelected": false
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(AppState.self, from: data)
+
+        XCTAssertNil(decoded.workspaces[0].browserProfile)
+        XCTAssertEqual(decoded.workspaces[0].name, "Legacy Workspace")
+    }
+
+    func testUpdateWorkspaceBrowserProfile() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let workspaceId = model.currentWorkspace.id
+        XCTAssertNil(model.currentWorkspace.browserProfile)
+
+        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: "Profile 2")
+        XCTAssertEqual(model.currentWorkspace.browserProfile, "Profile 2")
+    }
+
+    func testClearWorkspaceBrowserProfile() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let workspaceId = model.currentWorkspace.id
+
+        // Set profile
+        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: "Profile 1")
+        XCTAssertEqual(model.currentWorkspace.browserProfile, "Profile 1")
+
+        // Clear profile
+        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: nil)
+        XCTAssertNil(model.currentWorkspace.browserProfile)
+    }
+
+    func testUpdateWorkspaceBrowserProfileTrimsWhitespace() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let workspaceId = model.currentWorkspace.id
+
+        // Empty string should become nil
+        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: "   ")
+        XCTAssertNil(model.currentWorkspace.browserProfile)
+
+        // Whitespace-padded string should be trimmed
+        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: " Profile 1 ")
+        XCTAssertEqual(model.currentWorkspace.browserProfile, "Profile 1")
+    }
 }
