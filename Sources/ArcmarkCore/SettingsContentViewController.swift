@@ -492,9 +492,11 @@ final class SettingsContentViewController: NSViewController {
             chromeImportButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             chromeImportButton.heightAnchor.constraint(equalToConstant: 36),
 
-            // Chrome Help Container (centered below Chrome import button)
+            // Chrome Help Container (centered below Chrome import button, constrained to parent width)
             chromeHelpContainer.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             chromeHelpContainer.topAnchor.constraint(equalTo: chromeImportButton.bottomAnchor, constant: controlLabelSpacing),
+            chromeHelpContainer.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: horizontalPadding),
+            chromeHelpContainer.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -horizontalPadding),
 
             // Import Status Label (below Chrome help container)
             importStatusLabel.leadingAnchor.constraint(equalTo: chromeImportButton.leadingAnchor),

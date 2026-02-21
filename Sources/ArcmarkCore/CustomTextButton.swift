@@ -30,7 +30,11 @@ final class CustomTextButton: BaseControl {
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.font = ThemeConstants.Fonts.systemFont(size: 13, weight: .medium)
         titleLabel.textColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.high)
-        titleLabel.alignment = .left
+        titleLabel.alignment = .center
+        titleLabel.maximumNumberOfLines = 0
+        titleLabel.lineBreakMode = .byWordWrapping
+        titleLabel.cell?.wraps = true
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         addSubview(titleLabel)
 
