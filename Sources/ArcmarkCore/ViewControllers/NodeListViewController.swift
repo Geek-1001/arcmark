@@ -1012,50 +1012,6 @@ private struct NodeListRow {
     }
 }
 
-private final class DropIndicatorView: NSView {
-    private let lineThickness: CGFloat = 2
-    private let highlightCornerRadius: CGFloat = 8
-    private let accentColor = NSColor.controlAccentColor
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.masksToBounds = true
-        isHidden = true
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        wantsLayer = true
-        layer?.masksToBounds = true
-        isHidden = true
-    }
-
-    func showLine(in frame: NSRect) {
-        isHidden = false
-        self.frame = frame
-        layer?.cornerRadius = lineThickness / 2
-        layer?.backgroundColor = accentColor.cgColor
-        layer?.borderWidth = 0
-    }
-
-    func showHighlight(in frame: NSRect) {
-        isHidden = false
-        self.frame = frame
-        layer?.cornerRadius = highlightCornerRadius
-        layer?.backgroundColor = accentColor.withAlphaComponent(0.12).cgColor
-        layer?.borderColor = accentColor.cgColor
-        layer?.borderWidth = 2
-    }
-
-    func hide() {
-        isHidden = true
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
-    }
-}
 
 private final class ContextMenuCollectionView: NSCollectionView {
     var onContextRequest: ((IndexPath?) -> Void)?
