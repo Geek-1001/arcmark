@@ -9,26 +9,28 @@ final class WorkspaceRowView: BaseView {
         var colorSquareBorderWidth: CGFloat
         var colorSquareCornerRadius: CGFloat
         var deleteButtonSize: CGFloat
-        var profileButtonSize: CGFloat
+        var profileIconSize: CGFloat
 
         // Spacing
         var handleLeading: CGFloat
         var colorSquareLeading: CGFloat
         var titleLeading: CGFloat
         var titleTrailing: CGFloat
-        var deleteTrailing: CGFloat
-        var profileTrailing: CGFloat
+        var buttonsTrailing: CGFloat
+        var buttonGap: CGFloat
 
         // Typography
         var titleFont: NSFont
         var titleColor: NSColor
+        var setProfileFont: NSFont
 
         // Colors
         var handleTintColor: NSColor
         var colorSquareBorderColor: NSColor
         var deleteTintColor: NSColor
-        var profileTintColor: NSColor
-        var profileActiveTintColor: NSColor
+        var profileIconTintColor: NSColor
+        var setProfileTextColor: NSColor
+        var setProfileBorderColor: NSColor
         var hoverBackgroundColor: NSColor
 
         // Handle icon
@@ -41,48 +43,57 @@ final class WorkspaceRowView: BaseView {
         var deleteIconSize: CGFloat
         var deleteIconWeight: NSFont.Weight
 
-        // Profile icon
+        // Profile icon (non-hovered indicator)
         var profileIconName: String
-        var profileIconActiveName: String
-        var profileIconSize: CGFloat
+        var profileIconDisplaySize: CGFloat
         var profileIconWeight: NSFont.Weight
 
+        // Set profile button
+        var setProfileCornerRadius: CGFloat
+        var setProfileBorderWidth: CGFloat
+        var setProfilePaddingH: CGFloat
+        var setProfileHeight: CGFloat
+
         static var `default`: Style {
-            // Base color reference: #141414 = RGB(20, 20, 20)
             let baseColorValue: CGFloat = 20.0 / 255.0
 
             return Style(
-                rowCornerRadius: 12,
-                handleSize: 18,
-                colorSquareSize: 18,
+                rowCornerRadius: ThemeConstants.CornerRadius.large,
+                handleSize: ThemeConstants.Sizing.iconMedium,
+                colorSquareSize: ThemeConstants.Sizing.iconMedium,
                 colorSquareBorderWidth: 1.5,
-                colorSquareCornerRadius: 6,
+                colorSquareCornerRadius: ThemeConstants.CornerRadius.small,
                 deleteButtonSize: 20,
-                profileButtonSize: 20,
+                profileIconSize: 20,
                 handleLeading: 12,
-                colorSquareLeading: 6,
-                titleLeading: 8,
-                titleTrailing: 6,
-                deleteTrailing: 12,
-                profileTrailing: 4,
-                titleFont: NSFont.systemFont(ofSize: 14, weight: .regular),
-                titleColor: NSColor.black.withAlphaComponent(0.8),
-                handleTintColor: NSColor.black.withAlphaComponent(0.4),
-                colorSquareBorderColor: NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: 0.15),
+                colorSquareLeading: ThemeConstants.Spacing.small,
+                titleLeading: ThemeConstants.Spacing.medium,
+                titleTrailing: ThemeConstants.Spacing.small,
+                buttonsTrailing: 10,
+                buttonGap: ThemeConstants.Spacing.small,
+                titleFont: ThemeConstants.Fonts.bodyRegular,
+                titleColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.high),
+                setProfileFont: NSFont.systemFont(ofSize: 11, weight: .medium),
+                handleTintColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.low),
+                colorSquareBorderColor: NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: ThemeConstants.Opacity.subtle),
                 deleteTintColor: NSColor.black.withAlphaComponent(0.5),
-                profileTintColor: NSColor.black.withAlphaComponent(0.4),
-                profileActiveTintColor: NSColor.black.withAlphaComponent(0.6),
-                hoverBackgroundColor: NSColor.black.withAlphaComponent(0.1),
+                profileIconTintColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.low),
+                setProfileTextColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.medium),
+                setProfileBorderColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.subtle),
+                hoverBackgroundColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.extraSubtle),
                 handleIconName: "line.3.horizontal",
-                handleIconSize: 18,
+                handleIconSize: ThemeConstants.Sizing.iconMedium,
                 handleIconWeight: .medium,
                 deleteIconName: "xmark",
-                deleteIconSize: 14,
+                deleteIconSize: ThemeConstants.Sizing.iconSmall,
                 deleteIconWeight: .bold,
-                profileIconName: "person.crop.circle",
-                profileIconActiveName: "person.crop.circle.fill",
-                profileIconSize: 14,
-                profileIconWeight: .medium
+                profileIconName: "person.crop.circle.fill",
+                profileIconDisplaySize: ThemeConstants.Sizing.iconSmall,
+                profileIconWeight: .medium,
+                setProfileCornerRadius: ThemeConstants.CornerRadius.small,
+                setProfileBorderWidth: 1,
+                setProfilePaddingH: ThemeConstants.Spacing.small,
+                setProfileHeight: 22
             )
         }
     }
@@ -90,19 +101,29 @@ final class WorkspaceRowView: BaseView {
     private let handleView = NSImageView()
     private let colorSquare = NSView()
     private let editableTitle = InlineEditableTextField()
-    private let profileButton = NSButton()
+    private let profileIconView = NSImageView()
+    private let setProfileButton: PaddedTextButton
     private let deleteButton = NSButton()
     private var style: Style = .default
     private var onDelete: (() -> Void)?
     private var onProfile: (() -> Void)?
     private var hasProfile: Bool = false
 
+    // Dynamic title trailing constraints (mutually exclusive)
+    private var titleTrailingToEdge: NSLayoutConstraint!
+    private var titleTrailingToProfileIcon: NSLayoutConstraint!
+    private var titleTrailingToSetProfile: NSLayoutConstraint!
+
     override init(frame frameRect: NSRect) {
+        let s = Style.default
+        setProfileButton = PaddedTextButton(hPadding: s.setProfilePaddingH)
         super.init(frame: frameRect)
         setupViews()
     }
 
     required init?(coder: NSCoder) {
+        let s = Style.default
+        setProfileButton = PaddedTextButton(hPadding: s.setProfilePaddingH)
         super.init(coder: coder)
         setupViews()
     }
@@ -131,21 +152,35 @@ final class WorkspaceRowView: BaseView {
         editableTitle.translatesAutoresizingMaskIntoConstraints = false
         editableTitle.font = style.titleFont
         editableTitle.textColor = style.titleColor
+        editableTitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        // Profile button
-        profileButton.translatesAutoresizingMaskIntoConstraints = false
-        profileButton.bezelStyle = .texturedRounded
-        profileButton.isBordered = false
-        let profileIconConfig = NSImage.SymbolConfiguration(pointSize: style.profileIconSize, weight: style.profileIconWeight)
-        profileButton.image = NSImage(systemSymbolName: style.profileIconName, accessibilityDescription: "Browser profile")?
+        // Profile icon (visible when not hovered + has profile)
+        profileIconView.translatesAutoresizingMaskIntoConstraints = false
+        profileIconView.imageScaling = .scaleProportionallyDown
+        let profileIconConfig = NSImage.SymbolConfiguration(pointSize: style.profileIconDisplaySize, weight: style.profileIconWeight)
+        profileIconView.image = NSImage(systemSymbolName: style.profileIconName, accessibilityDescription: "Browser profile")?
             .withSymbolConfiguration(profileIconConfig)
-        profileButton.contentTintColor = style.profileTintColor
-        profileButton.target = self
-        profileButton.action = #selector(handleProfile)
-        profileButton.setButtonType(.momentaryChange)
-        profileButton.isHidden = true
+        profileIconView.contentTintColor = style.profileIconTintColor
+        profileIconView.isHidden = true
 
-        // Delete button
+        // "Set profile..." text button (visible on hover)
+        setProfileButton.translatesAutoresizingMaskIntoConstraints = false
+        setProfileButton.title = "Set Profile"
+        setProfileButton.bezelStyle = .texturedRounded
+        setProfileButton.isBordered = false
+        setProfileButton.font = style.setProfileFont
+        setProfileButton.contentTintColor = style.setProfileTextColor
+        setProfileButton.wantsLayer = true
+        setProfileButton.layer?.cornerRadius = style.setProfileCornerRadius
+        setProfileButton.layer?.borderWidth = style.setProfileBorderWidth
+        setProfileButton.layer?.borderColor = style.setProfileBorderColor.cgColor
+        setProfileButton.target = self
+        setProfileButton.action = #selector(handleProfileAction)
+        setProfileButton.setButtonType(.momentaryChange)
+        setProfileButton.isHidden = true
+        setProfileButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        // Delete button (visible on hover)
         deleteButton.translatesAutoresizingMaskIntoConstraints = false
         deleteButton.bezelStyle = .texturedRounded
         deleteButton.isBordered = false
@@ -154,15 +189,24 @@ final class WorkspaceRowView: BaseView {
             .withSymbolConfiguration(deleteIconConfig)
         deleteButton.contentTintColor = style.deleteTintColor
         deleteButton.target = self
-        deleteButton.action = #selector(handleDelete)
+        deleteButton.action = #selector(handleDeleteAction)
         deleteButton.setButtonType(.momentaryChange)
         deleteButton.isHidden = true
 
         addSubview(handleView)
         addSubview(colorSquare)
         addSubview(editableTitle)
-        addSubview(profileButton)
+        addSubview(profileIconView)
+        addSubview(setProfileButton)
         addSubview(deleteButton)
+
+        // Three mutually exclusive title trailing constraints
+        titleTrailingToEdge = editableTitle.trailingAnchor.constraint(
+            lessThanOrEqualTo: trailingAnchor, constant: -style.buttonsTrailing)
+        titleTrailingToProfileIcon = editableTitle.trailingAnchor.constraint(
+            lessThanOrEqualTo: profileIconView.leadingAnchor, constant: -style.titleTrailing)
+        titleTrailingToSetProfile = editableTitle.trailingAnchor.constraint(
+            lessThanOrEqualTo: setProfileButton.leadingAnchor, constant: -style.titleTrailing)
 
         NSLayoutConstraint.activate([
             // Handle icon
@@ -177,22 +221,26 @@ final class WorkspaceRowView: BaseView {
             colorSquare.widthAnchor.constraint(equalToConstant: style.colorSquareSize),
             colorSquare.heightAnchor.constraint(equalToConstant: style.colorSquareSize),
 
-            // Title
+            // Title (leading + center only, trailing is dynamic)
             editableTitle.leadingAnchor.constraint(equalTo: colorSquare.trailingAnchor, constant: style.titleLeading),
             editableTitle.centerYAnchor.constraint(equalTo: centerYAnchor),
-            editableTitle.trailingAnchor.constraint(lessThanOrEqualTo: profileButton.leadingAnchor, constant: -style.titleTrailing),
 
-            // Profile button
-            profileButton.trailingAnchor.constraint(equalTo: deleteButton.leadingAnchor, constant: -style.profileTrailing),
-            profileButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            profileButton.widthAnchor.constraint(equalToConstant: style.profileButtonSize),
-            profileButton.heightAnchor.constraint(equalToConstant: style.profileButtonSize),
+            // Profile icon (at trailing edge, shown when not hovered + has profile)
+            profileIconView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -style.buttonsTrailing),
+            profileIconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            profileIconView.widthAnchor.constraint(equalToConstant: style.profileIconSize),
+            profileIconView.heightAnchor.constraint(equalToConstant: style.profileIconSize),
 
-            // Delete button
-            deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -style.deleteTrailing),
+            // "Set profile..." button (to the left of delete, shown on hover)
+            setProfileButton.trailingAnchor.constraint(equalTo: deleteButton.leadingAnchor, constant: -style.buttonGap),
+            setProfileButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            setProfileButton.heightAnchor.constraint(equalToConstant: style.setProfileHeight),
+
+            // Delete button (at trailing edge, shown on hover)
+            deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -style.buttonsTrailing),
             deleteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             deleteButton.widthAnchor.constraint(equalToConstant: style.deleteButtonSize),
-            deleteButton.heightAnchor.constraint(equalToConstant: style.deleteButtonSize)
+            deleteButton.heightAnchor.constraint(equalToConstant: style.deleteButtonSize),
         ])
     }
 
@@ -219,8 +267,7 @@ final class WorkspaceRowView: BaseView {
         self.hasProfile = hasProfile
         self.onDelete = onDelete
         self.onProfile = onProfile
-        updateProfileIcon()
-        refreshHoverState()
+        updateVisualState()
     }
 
     var isInlineRenaming: Bool {
@@ -235,11 +282,11 @@ final class WorkspaceRowView: BaseView {
         editableTitle.cancelInlineRename()
     }
 
-    @objc private func handleDelete() {
+    @objc private func handleDeleteAction() {
         onDelete?()
     }
 
-    @objc private func handleProfile() {
+    @objc private func handleProfileAction() {
         onProfile?()
     }
 
@@ -247,41 +294,71 @@ final class WorkspaceRowView: BaseView {
         updateVisualState()
     }
 
-    private func updateProfileIcon() {
-        let iconName = hasProfile ? style.profileIconActiveName : style.profileIconName
-        let tint = hasProfile ? style.profileActiveTintColor : style.profileTintColor
-        let iconConfig = NSImage.SymbolConfiguration(pointSize: style.profileIconSize, weight: style.profileIconWeight)
-        profileButton.image = NSImage(systemSymbolName: iconName, accessibilityDescription: "Browser profile")?
-            .withSymbolConfiguration(iconConfig)
-        profileButton.contentTintColor = tint
-    }
-
     private func updateVisualState() {
+        // Deactivate all title trailing constraints first
+        titleTrailingToEdge.isActive = false
+        titleTrailingToProfileIcon.isActive = false
+        titleTrailingToSetProfile.isActive = false
+
+        if isHovered {
+            // Hovered: show "Set profile..." button + X, hide profile icon
+            profileIconView.isHidden = true
+            setProfileButton.isHidden = false
+            deleteButton.isHidden = false
+            titleTrailingToSetProfile.isActive = true
+        } else if hasProfile {
+            // Not hovered, has profile: show profile icon only
+            profileIconView.isHidden = false
+            setProfileButton.isHidden = true
+            deleteButton.isHidden = true
+            titleTrailingToProfileIcon.isActive = true
+        } else {
+            // Not hovered, no profile: nothing on right
+            profileIconView.isHidden = true
+            setProfileButton.isHidden = true
+            deleteButton.isHidden = true
+            titleTrailingToEdge.isActive = true
+        }
+
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = ThemeConstants.Animation.durationFast
             context.timingFunction = ThemeConstants.Animation.timingFunction
 
             if isHovered {
                 layer?.backgroundColor = style.hoverBackgroundColor.cgColor
-                profileButton.animator().alphaValue = 1.0
+                setProfileButton.animator().alphaValue = 1.0
                 deleteButton.animator().alphaValue = 1.0
             } else {
                 layer?.backgroundColor = NSColor.clear.cgColor
                 if hasProfile {
-                    profileButton.animator().alphaValue = 0.5
-                } else {
-                    profileButton.animator().alphaValue = 0.0
+                    profileIconView.animator().alphaValue = 0.5
                 }
+                setProfileButton.animator().alphaValue = 0.0
                 deleteButton.animator().alphaValue = 0.0
             }
         })
+    }
+}
 
-        if isHovered {
-            profileButton.isHidden = false
-            deleteButton.isHidden = false
-        } else {
-            profileButton.isHidden = !hasProfile
-            deleteButton.isHidden = true
-        }
+// MARK: - PaddedTextButton
+
+/// An NSButton that adds horizontal padding to its intrinsic content size,
+/// so layer-based borders have visible spacing around the title text.
+private final class PaddedTextButton: NSButton {
+    private let hPadding: CGFloat
+
+    init(hPadding: CGFloat) {
+        self.hPadding = hPadding
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var intrinsicContentSize: NSSize {
+        var size = super.intrinsicContentSize
+        size.width += hPadding * 2
+        return size
     }
 }
