@@ -36,16 +36,16 @@ final class SettingsContentViewController: NSViewController {
     private var workspaceCollectionViewHeightConstraint: NSLayoutConstraint?
     private var contextWorkspaceId: UUID?
     private var inlineRenameWorkspaceId: UUID?
-    private let workspaceDropIndicator = WorkspaceDropIndicatorView()
+    private let workspaceDropIndicator = DropIndicatorView()
 
     // Permissions section
     private let permissionStatusLabel = NSTextField(labelWithString: "")
-    private let openSettingsButton = SettingsButton(title: "Open System Settings")
-    private let refreshStatusButton = SettingsButton(title: "Refresh Status")
+    private let openSettingsButton = SettingsActionButton(title: "Open System Settings")
+    private let refreshStatusButton = SettingsActionButton(title: "Refresh Status")
 
     // Import & Export section
-    private let importButton = SettingsButton(title: "Import from Arc Browser")
-    private let chromeImportButton = SettingsButton(title: "Import from Chrome, Safari, Firefox")
+    private let importButton = SettingsActionButton(title: "Import from Arc Browser")
+    private let chromeImportButton = SettingsActionButton(title: "Import from Chrome, Safari, Firefox")
     private let chromeHelpContainer = NSView()
     private let chromeHelpButton = CustomTextButton(title: "How to export bookmarks from your browser")
     private let chromeHelpIcon = NSImageView()
@@ -53,7 +53,7 @@ final class SettingsContentViewController: NSViewController {
 
     // App Version section
     private let versionLabel = NSTextField(labelWithString: "")
-    private let checkForUpdatesButton = SettingsButton(title: "Check for Updates")
+    private let checkForUpdatesButton = SettingsActionButton(title: "Check for Updates")
     var updater: SPUUpdater?
 
     // Reference to AppModel (will be set from MainViewController)
@@ -179,7 +179,9 @@ final class SettingsContentViewController: NSViewController {
         workspaceCollectionView.isSelectable = true  // Changed to true to enable drag and drop
         workspaceCollectionView.allowsMultipleSelection = false
         workspaceCollectionView.backgroundColors = [.clear]
-        workspaceCollectionView.settingsController = self
+        workspaceCollectionView.workspacesProvider = { [weak self] in
+            self?.appModel?.workspaces ?? []
+        }
 
         // Set up context menu handler
         workspaceCollectionView.onRightClick = { [weak self] workspaceId, event in
@@ -1434,229 +1436,6 @@ extension SettingsContentViewController: NSCollectionViewDelegate, NSCollectionV
     }
 }
 
-// MARK: - Workspace Context Menu Collection View
 
-private final class WorkspaceContextMenuCollectionView: NSCollectionView {
-    var onRightClick: ((UUID, NSEvent) -> Void)?
 
-    weak var settingsController: SettingsContentViewController?
 
-    override func rightMouseDown(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        if let indexPath = indexPathForItem(at: point),
-           let appModel = settingsController?.appModel {
-            let workspace = appModel.workspaces[indexPath.item]
-            onRightClick?(workspace.id, event)
-        } else {
-            super.rightMouseDown(with: event)
-        }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        // Call super to allow drag operations
-        super.mouseDown(with: event)
-    }
-}
-
-// MARK: - Flipped Content View
-
-/// A custom NSView that uses flipped coordinates so content is anchored to the top
-private final class FlippedContentView: NSView {
-    override var isFlipped: Bool {
-        return true
-    }
-}
-
-// MARK: - Settings Button
-
-/// A custom button with background and hover effect, styled like the dropdown container
-private final class SettingsButton: NSButton {
-    // Style constants
-    private struct Style {
-        // Base color reference: #141414 = RGB(20, 20, 20) = (20/255, 20/255, 20/255)
-        private static let baseColorValue: CGFloat = 20.0 / 255.0  // 0.0784313725
-
-        // Enabled state
-        static let baseBackgroundColor = NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: 0.08)
-        static let hoverBackgroundColor = NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: 0.12)
-        static let textColor = NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: 1.0)
-
-        // Disabled state
-        static let disabledBackgroundColor = NSColor(calibratedRed: 191.0/255.0, green: 193.0/255.0, blue: 195.0/255.0, alpha: 1.0) // #BFC1C3
-        static let disabledTextColor = NSColor(calibratedRed: baseColorValue, green: baseColorValue, blue: baseColorValue, alpha: 1.0) // #141414 (same as enabled)
-
-        static let cornerRadius: CGFloat = 8
-        static let fontSize: CGFloat = 13
-    }
-
-    private var trackingArea: NSTrackingArea?
-    private var spinner: NSProgressIndicator?
-    private let originalTitle: String
-    private(set) var isLoading: Bool = false
-
-    func getIsLoading() -> Bool { isLoading }
-
-    init(title: String) {
-        self.originalTitle = title
-        super.init(frame: .zero)
-        self.title = title
-        setupButton()
-    }
-
-    required init?(coder: NSCoder) {
-        self.originalTitle = ""
-        super.init(coder: coder)
-        setupButton()
-    }
-
-    private func setupButton() {
-        wantsLayer = true
-        isBordered = false
-        bezelStyle = .regularSquare
-        font = NSFont.systemFont(ofSize: Style.fontSize)
-
-        // Setup layer
-        layer?.backgroundColor = Style.baseBackgroundColor.cgColor
-        layer?.cornerRadius = Style.cornerRadius
-
-        // Set text color
-        updateTextColor(Style.textColor)
-    }
-
-    private func updateTextColor(_ color: NSColor) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: color,
-            .font: NSFont.systemFont(ofSize: Style.fontSize)
-        ]
-        attributedTitle = NSAttributedString(string: originalTitle, attributes: attributes)
-    }
-
-    func setLoading(_ loading: Bool) {
-        self.isLoading = loading
-
-        if loading {
-            // Create and add spinner if it doesn't exist
-            if spinner == nil {
-                let progressIndicator = NSProgressIndicator()
-                progressIndicator.style = .spinning
-                progressIndicator.controlSize = .small
-                progressIndicator.translatesAutoresizingMaskIntoConstraints = false
-
-                // Force aqua appearance so the spinner renders as dark/black instead of white
-                // This is necessary because NSProgressIndicator doesn't have a direct color API
-                progressIndicator.appearance = NSAppearance(named: .aqua)
-
-                addSubview(progressIndicator)
-
-                // Position spinner to the right of the text
-                NSLayoutConstraint.activate([
-                    progressIndicator.centerYAnchor.constraint(equalTo: centerYAnchor),
-                    progressIndicator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-                    progressIndicator.widthAnchor.constraint(equalToConstant: 16),
-                    progressIndicator.heightAnchor.constraint(equalToConstant: 16)
-                ])
-
-                spinner = progressIndicator
-            }
-
-            // Apply disabled background styling (without actually disabling the button)
-            layer?.backgroundColor = Style.disabledBackgroundColor.cgColor
-
-            // Update text color to #141414 with full opacity
-            let attributes: [NSAttributedString.Key: Any] = [
-                .foregroundColor: Style.disabledTextColor,
-                .font: NSFont.systemFont(ofSize: Style.fontSize)
-            ]
-            attributedTitle = NSAttributedString(string: originalTitle, attributes: attributes)
-
-            // Show and start spinner
-            spinner?.startAnimation(nil)
-            spinner?.isHidden = false
-        } else {
-            // Hide and stop spinner
-            spinner?.stopAnimation(nil)
-            spinner?.isHidden = true
-
-            // Restore enabled background styling
-            layer?.backgroundColor = Style.baseBackgroundColor.cgColor
-
-            // Restore text color
-            updateTextColor(Style.textColor)
-        }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        // Prevent action if loading
-        if isLoading {
-            return
-        }
-        super.mouseDown(with: event)
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-
-        if let existingArea = trackingArea {
-            removeTrackingArea(existingArea)
-        }
-
-        let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeAlways]
-        trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(trackingArea!)
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        // Only show hover effect if not loading
-        if !isLoading {
-            layer?.backgroundColor = Style.hoverBackgroundColor.cgColor
-        }
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        // Restore appropriate background based on loading state
-        if isLoading {
-            layer?.backgroundColor = Style.disabledBackgroundColor.cgColor
-        } else {
-            layer?.backgroundColor = Style.baseBackgroundColor.cgColor
-        }
-    }
-
-    override var intrinsicContentSize: NSSize {
-        return NSSize(width: NSView.noIntrinsicMetric, height: 36)
-    }
-}
-
-// MARK: - Workspace Drop Indicator View
-
-private final class WorkspaceDropIndicatorView: NSView {
-    private let lineThickness: CGFloat = 2
-    private let accentColor = NSColor.controlAccentColor
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.masksToBounds = true
-        isHidden = true
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        wantsLayer = true
-        layer?.masksToBounds = true
-        isHidden = true
-    }
-
-    func showLine(in frame: NSRect) {
-        isHidden = false
-        self.frame = frame
-        layer?.cornerRadius = lineThickness / 2
-        layer?.backgroundColor = accentColor.cgColor
-        layer?.borderWidth = 0
-    }
-
-    func hide() {
-        isHidden = true
-    }
-}
