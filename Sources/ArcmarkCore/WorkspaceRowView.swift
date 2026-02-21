@@ -69,7 +69,7 @@ final class WorkspaceRowView: BaseView {
                 colorSquareLeading: ThemeConstants.Spacing.small,
                 titleLeading: ThemeConstants.Spacing.medium,
                 titleTrailing: ThemeConstants.Spacing.small,
-                buttonsTrailing: 10,
+                buttonsTrailing: ThemeConstants.Spacing.regular,
                 buttonGap: ThemeConstants.Spacing.small,
                 titleFont: ThemeConstants.Fonts.bodyRegular,
                 titleColor: NSColor.black.withAlphaComponent(ThemeConstants.Opacity.high),
