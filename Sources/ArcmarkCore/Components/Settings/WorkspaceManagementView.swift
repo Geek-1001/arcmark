@@ -270,7 +270,8 @@ extension WorkspaceManagementView: NSCollectionViewDataSource {
             },
             onRenameCommit: { [weak self] id, newName in
                 self?.handleWorkspaceRename(id: id, newName: newName)
-            }
+            },
+            onProfile: { _ in }
         )
 
         return item

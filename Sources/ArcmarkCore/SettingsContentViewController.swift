@@ -1088,6 +1088,18 @@ final class SettingsContentViewController: NSViewController {
         colorItem.submenu = colorSubmenu
         menu.addItem(colorItem)
 
+        // Browser profile options
+        let profileTitle = workspace.browserProfile != nil ? "Edit Browser Profile..." : "Set Browser Profile..."
+        let profileItem = NSMenuItem(title: profileTitle, action: #selector(setContextWorkspaceProfile), keyEquivalent: "")
+        profileItem.target = self
+        menu.addItem(profileItem)
+
+        if workspace.browserProfile != nil {
+            let clearProfileItem = NSMenuItem(title: "Clear Browser Profile", action: #selector(clearContextWorkspaceProfile), keyEquivalent: "")
+            clearProfileItem.target = self
+            menu.addItem(clearProfileItem)
+        }
+
         // Delete option
         menu.addItem(.separator())
         let deleteItem = NSMenuItem(title: "Delete Workspace...", action: #selector(deleteContextWorkspace), keyEquivalent: "")
@@ -1127,6 +1139,146 @@ final class SettingsContentViewController: NSViewController {
         handleWorkspaceDelete(id: workspaceId)
     }
 
+    @objc private func setContextWorkspaceProfile() {
+        guard let workspaceId = contextWorkspaceId else { return }
+        handleWorkspaceProfile(id: workspaceId)
+    }
+
+    @objc private func clearContextWorkspaceProfile() {
+        guard let workspaceId = contextWorkspaceId else { return }
+        appModel?.updateWorkspaceBrowserProfile(id: workspaceId, profile: nil)
+        reloadWorkspaces()
+    }
+
+    private func handleWorkspaceProfile(id: UUID) {
+        guard let appModel = appModel else { return }
+        guard let workspace = appModel.workspaces.first(where: { $0.id == id }) else { return }
+        guard let window = view.window else { return }
+
+        let bundleId = BrowserManager.resolveDefaultBrowserBundleId() ?? ""
+        let browserSupportsProfiles = BrowserManager.supportsProfiles(bundleId: bundleId)
+
+        let alert = NSAlert()
+        alert.messageText = "Browser Profile"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        if !browserSupportsProfiles {
+            alert.informativeText = "The current browser does not support profile switching. Profile settings are supported for Chrome and Firefox."
+            let warningLabel = NSTextField(labelWithString: "Links will open normally without a profile.")
+            warningLabel.font = NSFont.systemFont(ofSize: 11)
+            warningLabel.textColor = .secondaryLabelColor
+            alert.accessoryView = warningLabel
+            alert.beginSheetModal(for: window) { _ in }
+            return
+        }
+
+        let detectedProfiles = BrowserManager.detectProfiles()
+        let containerWidth: CGFloat = 260
+
+        if detectedProfiles.isEmpty {
+            // Fallback: manual text input
+            let container = NSView(frame: NSRect(x: 0, y: 0, width: containerWidth, height: 60))
+
+            let helpLabel = NSTextField(labelWithString: "Enter the browser profile identifier:")
+            helpLabel.font = NSFont.systemFont(ofSize: 11)
+            helpLabel.textColor = .secondaryLabelColor
+            helpLabel.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(helpLabel)
+
+            let textField = NSTextField()
+            textField.placeholderString = "e.g., Profile 1"
+            textField.stringValue = workspace.browserProfile ?? ""
+            textField.font = NSFont.systemFont(ofSize: 13)
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(textField)
+
+            NSLayoutConstraint.activate([
+                helpLabel.topAnchor.constraint(equalTo: container.topAnchor),
+                helpLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                helpLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+
+                textField.topAnchor.constraint(equalTo: helpLabel.bottomAnchor, constant: 6),
+                textField.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                textField.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            ])
+
+            alert.accessoryView = container
+            alert.informativeText = "No profiles were auto-detected. You can enter a profile identifier manually."
+
+            alert.beginSheetModal(for: window) { [weak self] response in
+                if response == .alertFirstButtonReturn {
+                    let value = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let profile = value.isEmpty ? nil : value
+                    appModel.updateWorkspaceBrowserProfile(id: id, profile: profile)
+                    self?.reloadWorkspaces()
+                }
+            }
+        } else {
+            // Detected profiles: show popup button
+            let container = NSView(frame: NSRect(x: 0, y: 0, width: containerWidth, height: 56))
+
+            let popup = NSPopUpButton()
+            popup.translatesAutoresizingMaskIntoConstraints = false
+            popup.font = NSFont.systemFont(ofSize: 13)
+
+            // Add "Default (no profile)" option
+            popup.addItem(withTitle: "Default (no profile)")
+            popup.menu?.items.first?.representedObject = nil as String?
+
+            for profile in detectedProfiles {
+                popup.addItem(withTitle: profile.displayName)
+                popup.menu?.items.last?.representedObject = profile.id
+            }
+
+            // Pre-select current profile
+            if let currentProfile = workspace.browserProfile {
+                for (index, profile) in detectedProfiles.enumerated() {
+                    if profile.id == currentProfile {
+                        popup.selectItem(at: index + 1) // +1 for "Default" item
+                        break
+                    }
+                }
+            }
+
+            container.addSubview(popup)
+
+            let helpLabel = NSTextField(labelWithString: "Select a browser profile for this workspace.")
+            helpLabel.font = NSFont.systemFont(ofSize: 11)
+            helpLabel.textColor = .secondaryLabelColor
+            helpLabel.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(helpLabel)
+
+            NSLayoutConstraint.activate([
+                popup.topAnchor.constraint(equalTo: container.topAnchor),
+                popup.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                popup.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+
+                helpLabel.topAnchor.constraint(equalTo: popup.bottomAnchor, constant: 6),
+                helpLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                helpLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            ])
+
+            alert.accessoryView = container
+            alert.informativeText = "Links opened from this workspace will use the selected profile."
+
+            alert.beginSheetModal(for: window) { [weak self] response in
+                if response == .alertFirstButtonReturn {
+                    let selectedIndex = popup.indexOfSelectedItem
+                    if selectedIndex == 0 {
+                        // "Default (no profile)"
+                        appModel.updateWorkspaceBrowserProfile(id: id, profile: nil)
+                    } else {
+                        let profileId = detectedProfiles[selectedIndex - 1].id
+                        appModel.updateWorkspaceBrowserProfile(id: id, profile: profileId)
+                    }
+                    self?.reloadWorkspaces()
+                }
+            }
+        }
+    }
+
     @objc private func handleWorkspaceScrollBoundsChanged() {
         for item in workspaceCollectionView.visibleItems() {
             (item as? WorkspaceCollectionViewItem)?.refreshHoverState()
@@ -1162,6 +1314,9 @@ extension SettingsContentViewController: NSCollectionViewDataSource {
             },
             onRenameCommit: { [weak self] id, newName in
                 self?.handleWorkspaceRename(id: id, newName: newName)
+            },
+            onProfile: { [weak self] id in
+                self?.handleWorkspaceProfile(id: id)
             }
         )
 
