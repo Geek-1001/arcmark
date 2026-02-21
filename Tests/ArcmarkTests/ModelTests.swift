@@ -272,7 +272,8 @@ final class ModelTests: XCTestCase {
             colorId: .ocean,
             items: [],
             pinnedLinks: [],
-            browserProfile: "Profile 1"
+            browserProfile: "Profile 1",
+            browserProfileBundleId: "com.google.chrome"
         )
         let state = AppState(schemaVersion: 1, workspaces: [workspace], selectedWorkspaceId: workspace.id, isSettingsSelected: false)
 
@@ -280,6 +281,7 @@ final class ModelTests: XCTestCase {
         let decoded = try JSONDecoder().decode(AppState.self, from: data)
 
         XCTAssertEqual(decoded.workspaces[0].browserProfile, "Profile 1")
+        XCTAssertEqual(decoded.workspaces[0].browserProfileBundleId, "com.google.chrome")
         XCTAssertEqual(state, decoded)
     }
 
@@ -303,6 +305,7 @@ final class ModelTests: XCTestCase {
         let decoded = try JSONDecoder().decode(AppState.self, from: data)
 
         XCTAssertNil(decoded.workspaces[0].browserProfile)
+        XCTAssertNil(decoded.workspaces[0].browserProfileBundleId)
         XCTAssertEqual(decoded.workspaces[0].name, "Legacy Workspace")
     }
 
@@ -313,9 +316,11 @@ final class ModelTests: XCTestCase {
 
         let workspaceId = model.currentWorkspace.id
         XCTAssertNil(model.currentWorkspace.browserProfile)
+        XCTAssertNil(model.currentWorkspace.browserProfileBundleId)
 
-        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: "Profile 2")
+        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: "Profile 2", bundleId: "com.google.chrome")
         XCTAssertEqual(model.currentWorkspace.browserProfile, "Profile 2")
+        XCTAssertEqual(model.currentWorkspace.browserProfileBundleId, "com.google.chrome")
     }
 
     func testClearWorkspaceBrowserProfile() {
@@ -326,12 +331,14 @@ final class ModelTests: XCTestCase {
         let workspaceId = model.currentWorkspace.id
 
         // Set profile
-        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: "Profile 1")
+        model.updateWorkspaceBrowserProfile(id: workspaceId, profile: "Profile 1", bundleId: "com.google.chrome")
         XCTAssertEqual(model.currentWorkspace.browserProfile, "Profile 1")
+        XCTAssertEqual(model.currentWorkspace.browserProfileBundleId, "com.google.chrome")
 
         // Clear profile
         model.updateWorkspaceBrowserProfile(id: workspaceId, profile: nil)
         XCTAssertNil(model.currentWorkspace.browserProfile)
+        XCTAssertNil(model.currentWorkspace.browserProfileBundleId)
     }
 
     func testUpdateWorkspaceBrowserProfileTrimsWhitespace() {

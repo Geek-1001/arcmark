@@ -41,15 +41,17 @@ enum BrowserManager {
         return defaultBrowserBundleId()
     }
 
-    static func open(url: URL, profile: String? = nil) {
+    static func open(url: URL, profile: String? = nil, profileBundleId: String? = nil) {
         guard let bundleId = resolveDefaultBrowserBundleId(),
               let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
             NSWorkspace.shared.open(url)
             return
         }
 
-        // No profile: use existing NSWorkspace approach
-        guard let profile = profile, !profile.isEmpty else {
+        // No profile, or profile was set for a different browser: use existing NSWorkspace approach
+        let profileApplies = profile != nil && !profile!.isEmpty
+            && (profileBundleId == nil || profileBundleId!.lowercased() == bundleId.lowercased())
+        guard profileApplies, let profile = profile else {
             let config = NSWorkspace.OpenConfiguration()
             NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: config, completionHandler: nil)
             return

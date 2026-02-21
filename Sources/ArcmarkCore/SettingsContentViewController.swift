@@ -1213,7 +1213,7 @@ final class SettingsContentViewController: NSViewController {
                 if response == .alertFirstButtonReturn {
                     let value = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
                     let profile = value.isEmpty ? nil : value
-                    appModel.updateWorkspaceBrowserProfile(id: id, profile: profile)
+                    appModel.updateWorkspaceBrowserProfile(id: id, profile: profile, bundleId: bundleId)
                     self?.reloadWorkspaces()
                 }
             }
@@ -1270,10 +1270,10 @@ final class SettingsContentViewController: NSViewController {
                     let selectedIndex = popup.indexOfSelectedItem
                     if selectedIndex == 0 {
                         // "Default (no profile)"
-                        appModel.updateWorkspaceBrowserProfile(id: id, profile: nil)
+                        appModel.updateWorkspaceBrowserProfile(id: id, profile: nil, bundleId: nil)
                     } else {
                         let profileId = detectedProfiles[selectedIndex - 1].id
-                        appModel.updateWorkspaceBrowserProfile(id: id, profile: profileId)
+                        appModel.updateWorkspaceBrowserProfile(id: id, profile: profileId, bundleId: bundleId)
                     }
                     self?.reloadWorkspaces()
                 }
