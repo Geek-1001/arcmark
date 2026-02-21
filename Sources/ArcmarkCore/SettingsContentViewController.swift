@@ -1161,10 +1161,9 @@ final class SettingsContentViewController: NSViewController {
         let alert = NSAlert()
         alert.messageText = "Browser Profile"
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
 
         if !browserSupportsProfiles {
+            alert.addButton(withTitle: "OK")
             alert.informativeText = "The current browser does not support profile switching. Profile settings are supported for Chrome and Firefox."
             let warningLabel = NSTextField(labelWithString: "Links will open normally without a profile.")
             warningLabel.font = NSFont.systemFont(ofSize: 11)
@@ -1173,6 +1172,9 @@ final class SettingsContentViewController: NSViewController {
             alert.beginSheetModal(for: window) { _ in }
             return
         }
+
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
 
         let detectedProfiles = BrowserManager.detectProfiles()
         let containerWidth: CGFloat = 260
