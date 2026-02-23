@@ -26,6 +26,7 @@ final class WindowAttachmentService {
     private var browserWindowElement: AXUIElement?
     private var observers: [AXObserver] = []
     private var appObserver: AXObserver?
+    private var appObserverPid: pid_t?
     private var isEnabled: Bool = false
     private var currentBrowserBundleId: String?
     private var sidebarPosition: SidebarPosition = .right
@@ -109,11 +110,19 @@ final class WindowAttachmentService {
 
     // MARK: - Browser Window Discovery
 
-    private func findFrontmostBrowserWindow() -> AXUIElement? {
+    private func findFrontmostBrowserWindow(activeApp: NSRunningApplication? = nil) -> AXUIElement? {
         guard let bundleId = currentBrowserBundleId else { return nil }
 
-        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleId }) else {
-            return nil
+        let app: NSRunningApplication
+        if let activeApp = activeApp {
+            app = activeApp
+        } else {
+            guard let active = NSWorkspace.shared.runningApplications.first(where: {
+                $0.bundleIdentifier == bundleId && $0.isActive
+            }) else {
+                return nil
+            }
+            app = active
         }
 
         guard app.isActive else { return nil }
@@ -328,7 +337,7 @@ final class WindowAttachmentService {
         observeAppWindowChanges(app: frontmost)
 
         // Find browser window
-        guard let windowElement = findFrontmostBrowserWindow() else {
+        guard let windowElement = findFrontmostBrowserWindow(activeApp: frontmost) else {
             print("WindowAttachmentService: No browser window found")
             delegate?.attachmentServiceShouldHideWindow(self)
             return
@@ -399,7 +408,13 @@ final class WindowAttachmentService {
     }
 
     private func observeAppWindowChanges(app: NSRunningApplication) {
-        // Only create the observer if one doesn't already exist
+        let newPid = app.processIdentifier
+
+        // If observer exists for a different PID, clean it up first
+        if appObserver != nil && appObserverPid != newPid {
+            cleanupAppObserver()
+        }
+
         guard appObserver == nil else { return }
 
         var observer: AXObserver?
@@ -422,12 +437,14 @@ final class WindowAttachmentService {
         CFRunLoopAddSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
 
         self.appObserver = observer
+        self.appObserverPid = newPid
     }
 
     private func cleanupAppObserver() {
         if let observer = appObserver {
             CFRunLoopRemoveSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
             appObserver = nil
+            appObserverPid = nil
         }
     }
 
