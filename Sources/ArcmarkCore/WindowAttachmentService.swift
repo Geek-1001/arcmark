@@ -25,6 +25,8 @@ final class WindowAttachmentService {
     private var browserApp: NSRunningApplication?
     private var browserWindowElement: AXUIElement?
     private var observers: [AXObserver] = []
+    private var appObserver: AXObserver?
+    private var appObserverPid: pid_t?
     private var isEnabled: Bool = false
     private var currentBrowserBundleId: String?
     private var sidebarPosition: SidebarPosition = .right
@@ -82,6 +84,7 @@ final class WindowAttachmentService {
 
         isEnabled = false
         cleanupObservers()
+        cleanupAppObserver()
         cleanupWorkspaceObservers()
         cleanupScreenChangeObserver()
 
@@ -107,18 +110,43 @@ final class WindowAttachmentService {
 
     // MARK: - Browser Window Discovery
 
-    private func findFrontmostBrowserWindow() -> AXUIElement? {
+    private func findFrontmostBrowserWindow(activeApp: NSRunningApplication? = nil) -> AXUIElement? {
         guard let bundleId = currentBrowserBundleId else { return nil }
 
-        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleId }) else {
-            return nil
+        let app: NSRunningApplication
+        if let activeApp = activeApp {
+            app = activeApp
+        } else {
+            guard let active = NSWorkspace.shared.runningApplications.first(where: {
+                $0.bundleIdentifier == bundleId && $0.isActive
+            }) else {
+                return nil
+            }
+            app = active
         }
 
         guard app.isActive else { return nil }
 
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        var windowList: CFTypeRef?
 
+        // Try kAXFocusedWindowAttribute first - directly gets the focused window
+        var focusedWindowRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindowRef) == .success,
+           let focusedWindow = focusedWindowRef {
+            let windowElement = focusedWindow as! AXUIElement
+
+            // Check if window is minimized
+            var minimized: CFTypeRef?
+            AXUIElementCopyAttributeValue(windowElement, kAXMinimizedAttribute as CFString, &minimized)
+            if let isMinimized = minimized as? Bool, isMinimized {
+                return nil
+            }
+
+            return windowElement
+        }
+
+        // Fall back to windows.first from kAXWindowsAttribute
+        var windowList: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowList)
         guard result == .success else { return nil }
 
@@ -305,8 +333,11 @@ final class WindowAttachmentService {
             return
         }
 
+        // Setup app-level observer to detect window focus changes within the browser
+        observeAppWindowChanges(app: frontmost)
+
         // Find browser window
-        guard let windowElement = findFrontmostBrowserWindow() else {
+        guard let windowElement = findFrontmostBrowserWindow(activeApp: frontmost) else {
             print("WindowAttachmentService: No browser window found")
             delegate?.attachmentServiceShouldHideWindow(self)
             return
@@ -315,16 +346,18 @@ final class WindowAttachmentService {
         // Check if we're already observing this exact window
         if let existingElement = browserWindowElement,
            CFEqual(existingElement, windowElement) {
-            // Same window, just update position without re-registering observers
-            // Force show in case window was hidden and we're switching to browser
-            print("WindowAttachmentService: Already observing this window, updating position and showing")
+            // Re-register window observers if they were cleaned up
+            if observers.isEmpty {
+                browserApp = frontmost
+                observeBrowserWindow()
+            }
             updateArcmarkPosition(forceShow: true)
             return
         }
 
         print("WindowAttachmentService: New window detected, setting up observers")
 
-        // Different window - cleanup old observers and setup new ones
+        // Different window - cleanup old window observers and setup new ones
         cleanupObservers()
         browserWindowElement = windowElement
         browserApp = frontmost
@@ -372,6 +405,47 @@ final class WindowAttachmentService {
         CFRunLoopAddSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
 
         observers.append(observer)
+    }
+
+    private func observeAppWindowChanges(app: NSRunningApplication) {
+        let newPid = app.processIdentifier
+
+        // If observer exists for a different PID, clean it up first
+        if appObserver != nil && appObserverPid != newPid {
+            cleanupAppObserver()
+        }
+
+        guard appObserver == nil else { return }
+
+        var observer: AXObserver?
+        let error = AXObserverCreate(app.processIdentifier, { (_, element, notification, refcon) in
+            guard let refcon = refcon else { return }
+            let service = Unmanaged<WindowAttachmentService>.fromOpaque(refcon).takeUnretainedValue()
+
+            Task { @MainActor in
+                // User switched to a different window within the same browser app
+                service.attachToBrowser()
+            }
+        }, &observer)
+
+        guard error == .success, let observer = observer else { return }
+
+        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+
+        AXObserverAddNotification(observer, appElement, kAXFocusedWindowChangedNotification as CFString, selfPtr)
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
+
+        self.appObserver = observer
+        self.appObserverPid = newPid
+    }
+
+    private func cleanupAppObserver() {
+        if let observer = appObserver {
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
+            appObserver = nil
+            appObserverPid = nil
+        }
     }
 
     private func cleanupObservers() {
@@ -445,9 +519,16 @@ final class WindowAttachmentService {
                 guard let self = self else { return }
 
                 if app.bundleIdentifier == self.currentBrowserBundleId {
+                    // Skip cleanup if the browser is still running — the terminated
+                    // process is likely a short-lived instance spawned by Process()
+                    // when opening a URL with a browser profile.
+                    guard !BrowserManager.isRunning(bundleId: self.currentBrowserBundleId ?? "") else {
+                        return
+                    }
                     // Browser quit - hide and cleanup
                     self.delegate?.attachmentServiceShouldHideWindow(self)
                     self.cleanupObservers()
+                    self.cleanupAppObserver()
                 }
             }
         }
