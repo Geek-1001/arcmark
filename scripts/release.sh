@@ -75,6 +75,24 @@ if [ "$DRY_RUN" = false ]; then
     fi
 fi
 
+# Collect release description for appcast and GitHub release
+echo "📝 Enter release description (Markdown format)."
+echo "   This will appear in the Sparkle update dialog and GitHub release."
+echo "   Type your description, then press Enter followed by Ctrl+D when done."
+echo "   Press Ctrl+D immediately to skip."
+echo "---"
+RELEASE_DESCRIPTION=$(cat)
+export RELEASE_DESCRIPTION
+
+if [ -n "$RELEASE_DESCRIPTION" ]; then
+    echo ""
+    echo "  ✓ Release description captured"
+else
+    echo ""
+    echo "  ℹ️  No description provided, continuing without"
+fi
+echo ""
+
 # Step 1: Update version
 echo "📌 Step 1: Updating version to ${NEW_VERSION}..."
 echo "$NEW_VERSION" > VERSION
@@ -142,9 +160,16 @@ echo "  ✓ Pushed to origin with tag v${NEW_VERSION}"
 # Step 5: Create GitHub Release
 echo ""
 echo "🐙 Step 5: Creating GitHub Release..."
+if [ -n "$RELEASE_DESCRIPTION" ]; then
+    GH_RELEASE_NOTES="## Arcmark v${NEW_VERSION}
+
+${RELEASE_DESCRIPTION}"
+else
+    GH_RELEASE_NOTES="## Arcmark v${NEW_VERSION}"
+fi
 gh release create "v${NEW_VERSION}" "$DMG_PATH" \
     --title "v${NEW_VERSION}" \
-    --notes "## Arcmark v${NEW_VERSION}"
+    --notes "$GH_RELEASE_NOTES"
 echo "  ✓ GitHub Release created"
 
 echo ""
