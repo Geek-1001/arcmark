@@ -46,13 +46,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         window.backgroundColor = model.currentWorkspace.colorId.backgroundColor
         window.minSize = NSSize(width: 280, height: 420)
         window.maxSize = NSSize(width: 520, height: 10000) // Unlimited height for attachment mode
-        let windowAutosaveName = "ArcmarkMainWindow"
-        window.setFrameAutosaveName(windowAutosaveName)
-        let restoredSize = applySavedWindowSize(to: window)
-        let restoredFrame = restoredSize ? false : window.setFrameUsingName(windowAutosaveName)
         window.collectionBehavior = [.moveToActiveSpace]
         window.contentViewController = mainViewController
-        if !restoredSize && !restoredFrame {
+
+        // Restore saved frame AFTER content view controller is set
+        let restoredFrame = applySavedWindowFrame(to: window)
+        if !restoredFrame {
             window.center()
         }
         ensureWindowVisible(window)
@@ -69,14 +68,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
-        if let window {
-            saveWindowSize(window)
+        if let window, !isAttachmentMode {
+            saveWindowFrame(window)
         }
     }
 
     public func windowDidResize(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow else { return }
-        saveWindowSize(window)
+        guard !isAttachmentMode,
+              let window = notification.object as? NSWindow else { return }
+        saveWindowFrame(window)
     }
 
     private func ensureWindowVisible(_ window: NSWindow) {
@@ -90,24 +90,25 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         window.setFrameOrigin(origin)
     }
 
-    private func applySavedWindowSize(to window: NSWindow) -> Bool {
-        guard let sizeString = UserDefaults.standard.string(forKey: UserDefaultsKeys.mainWindowSize) else {
+    private func applySavedWindowFrame(to window: NSWindow) -> Bool {
+        guard let frameString = UserDefaults.standard.string(forKey: UserDefaultsKeys.mainWindowSize) else {
             return false
         }
-        let savedSize = NSSizeFromString(sizeString)
-        guard savedSize.width > 0, savedSize.height > 0 else { return false }
+        let savedFrame = NSRectFromString(frameString)
+        guard savedFrame.width > 0, savedFrame.height > 0 else { return false }
 
-        let clampedWidth = min(max(savedSize.width, window.minSize.width), window.maxSize.width)
-        let clampedHeight = min(max(savedSize.height, window.minSize.height), window.maxSize.height)
-        var frame = window.frame
+        let clampedWidth = min(max(savedFrame.width, window.minSize.width), window.maxSize.width)
+        let clampedHeight = min(max(savedFrame.height, window.minSize.height), window.maxSize.height)
+        var frame = savedFrame
         frame.size = NSSize(width: clampedWidth, height: clampedHeight)
         window.setFrame(frame, display: false)
         return true
     }
 
-    private func saveWindowSize(_ window: NSWindow) {
-        let sizeString = NSStringFromSize(window.frame.size)
-        UserDefaults.standard.set(sizeString, forKey: UserDefaultsKeys.mainWindowSize)
+    private func saveWindowFrame(_ window: NSWindow) {
+        guard !isAttachmentMode else { return }
+        let frameString = NSStringFromRect(window.frame)
+        UserDefaults.standard.set(frameString, forKey: UserDefaultsKeys.mainWindowSize)
     }
 
     private func setupMenus() {
