@@ -76,19 +76,48 @@ if [ "$DRY_RUN" = false ]; then
 fi
 
 # Collect release description for appcast and GitHub release
-echo "📝 Enter release description (Markdown format)."
-echo "   This will appear in the Sparkle update dialog and GitHub release."
-echo "   Type your description, then press Enter followed by Ctrl+D when done."
-echo "   Press Ctrl+D immediately to skip."
-echo "---"
-RELEASE_DESCRIPTION=$(cat)
+echo "📝 Preparing release description..."
+
+# Get previous version from VERSION file to find merged PRs
+PREV_VERSION=$(cat VERSION | tr -d '[:space:]')
+
+# Build prefilled description from commits since last release
+DESC_FILE=$(mktemp "${TMPDIR:-/tmp}/arcmark-release-desc.XXXXXX")
+{
+    echo "### What's New"
+    echo ""
+    if git rev-parse "v${PREV_VERSION}" &>/dev/null; then
+        COMMITS=$(git log "v${PREV_VERSION}..HEAD" --format="- %s" | grep -v "^- Release v" 2>/dev/null || true)
+        if [ -n "$COMMITS" ]; then
+            echo "$COMMITS"
+        else
+            echo "- "
+        fi
+    else
+        echo "- "
+    fi
+    echo ""
+    echo "# ----------------------------------------"
+    echo "# Edit the release description above."
+    echo "# Lines starting with # will be removed."
+    echo "# Save and close the editor to continue."
+    echo "# Delete all content to skip the description."
+} > "$DESC_FILE"
+
+echo "   Opening editor to edit release description..."
+if git rev-parse "v${PREV_VERSION}" &>/dev/null; then
+    echo "   (prefilled with commits since v${PREV_VERSION})"
+fi
+${VISUAL:-${EDITOR:-vi}} "$DESC_FILE"
+
+# Strip comment lines; command substitution strips trailing newlines
+RELEASE_DESCRIPTION=$(grep -v '^#' "$DESC_FILE" | sed '/./,$!d')
+rm -f "$DESC_FILE"
 export RELEASE_DESCRIPTION
 
 if [ -n "$RELEASE_DESCRIPTION" ]; then
-    echo ""
     echo "  ✓ Release description captured"
 else
-    echo ""
     echo "  ℹ️  No description provided, continuing without"
 fi
 echo ""
