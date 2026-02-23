@@ -49,6 +49,7 @@ final class NodeListViewController: NSViewController {
     var onBulkNodesDeleted: (([UUID]) -> Void)?
     var onNewFolderRequested: ((UUID?) -> Void)?
     var onLinkUrlEdited: ((UUID, String) -> Void)?
+    var onOpenFolderLinks: ((UUID) -> Void)?
     var onPinLink: ((UUID) -> Void)?
     var canPinLink: (() -> Bool)?
 
@@ -790,11 +791,22 @@ extension NodeListViewController: NSMenuDelegate {
         let node = row.node
 
         switch node {
-        case .folder:
+        case .folder(let folder):
             let newNested = NSMenuItem(title: "New Nested Folder…", action: #selector(contextNewNestedFolder(_:)), keyEquivalent: "")
             newNested.target = self
             newNested.representedObject = node.id
             menu.addItem(newNested)
+
+            let hasLinks = folder.children.contains { if case .link = $0 { return true } else { return false } }
+            let openLinks = NSMenuItem(title: "Open All Links", action: hasLinks ? #selector(contextOpenFolderLinks(_:)) : nil, keyEquivalent: "")
+            openLinks.target = self
+            openLinks.representedObject = node.id
+            if !hasLinks {
+                openLinks.isEnabled = false
+            }
+            menu.addItem(openLinks)
+
+            menu.addItem(NSMenuItem.separator())
 
             let rename = NSMenuItem(title: "Rename…", action: #selector(contextRename), keyEquivalent: "")
             rename.target = self
@@ -907,6 +919,11 @@ extension NodeListViewController: NSMenuDelegate {
               let nodeId = dict["nodeId"],
               let workspaceId = dict["workspaceId"] else { return }
         onNodeMovedToWorkspace?(nodeId, workspaceId)
+    }
+
+    @objc private func contextOpenFolderLinks(_ sender: NSMenuItem) {
+        guard let nodeId = sender.representedObject as? UUID else { return }
+        onOpenFolderLinks?(nodeId)
     }
 
     @objc private func contextPinLink(_ sender: NSMenuItem) {
