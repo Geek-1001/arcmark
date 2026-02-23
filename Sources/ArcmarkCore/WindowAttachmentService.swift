@@ -337,9 +337,11 @@ final class WindowAttachmentService {
         // Check if we're already observing this exact window
         if let existingElement = browserWindowElement,
            CFEqual(existingElement, windowElement) {
-            // Same window, just update position without re-registering observers
-            // Force show in case window was hidden and we're switching to browser
-            print("WindowAttachmentService: Already observing this window, updating position and showing")
+            // Re-register window observers if they were cleaned up
+            if observers.isEmpty {
+                browserApp = frontmost
+                observeBrowserWindow()
+            }
             updateArcmarkPosition(forceShow: true)
             return
         }
@@ -500,6 +502,12 @@ final class WindowAttachmentService {
                 guard let self = self else { return }
 
                 if app.bundleIdentifier == self.currentBrowserBundleId {
+                    // Skip cleanup if the browser is still running — the terminated
+                    // process is likely a short-lived instance spawned by Process()
+                    // when opening a URL with a browser profile.
+                    guard !BrowserManager.isRunning(bundleId: self.currentBrowserBundleId ?? "") else {
+                        return
+                    }
                     // Browser quit - hide and cleanup
                     self.delegate?.attachmentServiceShouldHideWindow(self)
                     self.cleanupObservers()
