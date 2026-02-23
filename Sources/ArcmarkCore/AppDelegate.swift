@@ -460,6 +460,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             return
         }
 
+        // Bring window to front so it matches the browser window's z-order
+        // (e.g., when switching between multiple browser windows)
+        window.orderFront(nil)
+
         // Skip if frame hasn't changed and window is already visible
         if window.frame == frame { return }
 
