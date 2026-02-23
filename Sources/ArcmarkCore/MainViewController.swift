@@ -271,6 +271,16 @@ final class MainViewController: NSViewController {
             self?.model.updateLinkUrl(id: nodeId, newUrl: newUrl)
         }
 
+        nodeListViewController.onOpenFolderLinks = { [weak self] folderId in
+            guard let self, let node = self.model.nodeById(folderId),
+                  case .folder(let folder) = node else { return }
+            for child in folder.children {
+                if case .link(let link) = child {
+                    self.openLink(link)
+                }
+            }
+        }
+
         nodeListViewController.onPinLink = { [weak self] nodeId in
             self?.model.pinLink(id: nodeId)
         }

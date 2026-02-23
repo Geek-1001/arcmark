@@ -376,6 +376,95 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(model.currentWorkspace.browserProfiles["com.google.chrome"], "Profile 1")
     }
 
+    // MARK: - Open Folder Links Tests
+
+    func testFolderRootLinksWithOnlyLinks() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let folderId = model.addFolder(name: "Folder", parentId: nil)
+        model.addLink(urlString: "https://a.com", title: "A", parentId: folderId)
+        model.addLink(urlString: "https://b.com", title: "B", parentId: folderId)
+        model.addLink(urlString: "https://c.com", title: "C", parentId: folderId)
+
+        guard let node = model.nodeById(folderId), case .folder(let folder) = node else {
+            XCTFail("Expected folder"); return
+        }
+
+        let rootLinks = folder.children.compactMap { child -> Link? in
+            if case .link(let link) = child { return link }
+            return nil
+        }
+        XCTAssertEqual(rootLinks.count, 3)
+        XCTAssertEqual(rootLinks.map(\.title), ["A", "B", "C"])
+    }
+
+    func testFolderRootLinksWithMixedContent() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let folderId = model.addFolder(name: "Parent", parentId: nil)
+        model.addLink(urlString: "https://root1.com", title: "Root Link 1", parentId: folderId)
+        let nestedFolderId = model.addFolder(name: "Nested", parentId: folderId)
+        model.addLink(urlString: "https://nested.com", title: "Nested Link", parentId: nestedFolderId)
+        model.addLink(urlString: "https://root2.com", title: "Root Link 2", parentId: folderId)
+
+        guard let node = model.nodeById(folderId), case .folder(let folder) = node else {
+            XCTFail("Expected folder"); return
+        }
+
+        let rootLinks = folder.children.compactMap { child -> Link? in
+            if case .link(let link) = child { return link }
+            return nil
+        }
+        // Only root-level links, not the one inside the nested folder
+        XCTAssertEqual(rootLinks.count, 2)
+        XCTAssertEqual(rootLinks.map(\.title), ["Root Link 1", "Root Link 2"])
+    }
+
+    func testFolderRootLinksWithEmptyFolder() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let folderId = model.addFolder(name: "Empty", parentId: nil)
+
+        guard let node = model.nodeById(folderId), case .folder(let folder) = node else {
+            XCTFail("Expected folder"); return
+        }
+
+        let rootLinks = folder.children.compactMap { child -> Link? in
+            if case .link(let link) = child { return link }
+            return nil
+        }
+        XCTAssertEqual(rootLinks.count, 0)
+    }
+
+    func testFolderRootLinksWithOnlyNestedFolders() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let folderId = model.addFolder(name: "Parent", parentId: nil)
+        let childFolder1 = model.addFolder(name: "Child A", parentId: folderId)
+        let childFolder2 = model.addFolder(name: "Child B", parentId: folderId)
+        model.addLink(urlString: "https://deep1.com", title: "Deep 1", parentId: childFolder1)
+        model.addLink(urlString: "https://deep2.com", title: "Deep 2", parentId: childFolder2)
+
+        guard let node = model.nodeById(folderId), case .folder(let folder) = node else {
+            XCTFail("Expected folder"); return
+        }
+
+        let rootLinks = folder.children.compactMap { child -> Link? in
+            if case .link(let link) = child { return link }
+            return nil
+        }
+        // No root-level links, even though nested folders contain links
+        XCTAssertEqual(rootLinks.count, 0)
+    }
+
     func testMultipleBrowserProfiles() {
         let store = makeStore()
         store.save(DataStore.defaultState())
