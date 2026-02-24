@@ -81,6 +81,8 @@ final class NodeRowView: BaseView {
                    onDelete: (() -> Void)?,
                    isSelected: Bool,
                    tooltipURL: String? = nil) {
+        tooltipShowTask?.cancel()
+        tooltipShowTask = nil
         self.tooltipURL = tooltipURL
         self.metrics = metrics
         self.isSelected = isSelected

@@ -41,6 +41,8 @@ final class PinnedTabTileView: BaseControl {
     }
 
     func configure(link: Link, iconsDirectory: URL?) {
+        tooltipShowTask?.cancel()
+        tooltipShowTask = nil
         linkId = link.id
         linkURL = link.url
 
