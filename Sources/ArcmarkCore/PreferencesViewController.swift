@@ -438,4 +438,5 @@ extension Notification.Name {
     static let attachmentSettingChanged = Notification.Name("attachmentSettingChanged")
     static let sidebarPositionChanged = Notification.Name("sidebarPositionChanged")
     static let toggleSidebarShortcutChanged = Notification.Name("toggleSidebarShortcutChanged")
+    static let tooltipsSettingChanged = Notification.Name("tooltipsSettingChanged")
 }

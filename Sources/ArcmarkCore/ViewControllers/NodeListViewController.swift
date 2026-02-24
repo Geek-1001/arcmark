@@ -592,7 +592,8 @@ extension NodeListViewController: NSCollectionViewDataSource {
                     self?.onNodeDeleted?(link.id)
                     self?.clearSelections()
                 },
-                isSelected: isSelected
+                isSelected: isSelected,
+                tooltipURL: link.url
             )
 
             if shouldFetch, let url = URL(string: link.url) {

@@ -20,6 +20,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var isUserHidden: Bool = false
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        UserDefaults.standard.register(defaults: [UserDefaultsKeys.tooltipsEnabled: true])
+
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
         )
