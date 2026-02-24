@@ -304,23 +304,31 @@ if [ -n "$SIGN_UPDATE" ] && [ -x "$SIGN_UPDATE" ]; then
             DMG_URL="https://github.com/Geek-1001/arcmark/releases/download/v${VERSION}/Arcmark-${VERSION}.dmg"
             PUB_DATE=$(date -u "+%a, %d %b %Y %H:%M:%S %z")
 
-            NEW_ITEM="            <item>\\
-                <title>Version ${VERSION}</title>\\
-                <pubDate>${PUB_DATE}</pubDate>\\
-                <enclosure\\
-                    url=\"${DMG_URL}\"\\
-                    sparkle:version=\"${VERSION}\"\\
-                    sparkle:shortVersionString=\"${VERSION}\"\\
-                    sparkle:edSignature=\"${ED_SIGNATURE}\"\\
-                    length=\"${FILE_LENGTH}\"\\
-                    type=\"application/octet-stream\"\\
-                />\\
-            </item>"
+            # Build item XML in a temp file for clean multi-line insertion
+            ITEM_FILE=$(mktemp)
+            {
+                echo '            <item>'
+                echo "                <title>Version ${VERSION}</title>"
+                echo "                <pubDate>${PUB_DATE}</pubDate>"
+                if [ -n "$RELEASE_DESCRIPTION" ]; then
+                    echo '                <description sparkle:format="markdown">'
+                    echo "$RELEASE_DESCRIPTION"
+                    echo '                </description>'
+                fi
+                echo '                <enclosure'
+                echo "                    url=\"${DMG_URL}\""
+                echo "                    sparkle:version=\"${VERSION}\""
+                echo "                    sparkle:shortVersionString=\"${VERSION}\""
+                echo "                    sparkle:edSignature=\"${ED_SIGNATURE}\""
+                echo "                    length=\"${FILE_LENGTH}\""
+                echo '                    type="application/octet-stream"'
+                echo '                />'
+                echo '            </item>'
+            } > "$ITEM_FILE"
 
             # Insert new item as the first <item> in the channel (after <link> line)
-            sed -i '' "/<link>.*<\/link>/a\\
-${NEW_ITEM}
-" "$APPCAST_FILE"
+            sed -i '' "/<link>.*<\/link>/r $ITEM_FILE" "$APPCAST_FILE"
+            rm -f "$ITEM_FILE"
 
             echo "  ✓ Added v${VERSION} entry to appcast.xml"
             echo "  → Remember to commit docs/appcast.xml and push to update the feed"

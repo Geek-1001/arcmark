@@ -75,6 +75,53 @@ if [ "$DRY_RUN" = false ]; then
     fi
 fi
 
+# Collect release description for appcast and GitHub release
+echo "📝 Preparing release description..."
+
+# Get previous version from VERSION file to find merged PRs
+PREV_VERSION=$(cat VERSION | tr -d '[:space:]')
+
+# Build prefilled description from commits since last release
+DESC_FILE=$(mktemp "${TMPDIR:-/tmp}/arcmark-release-desc.XXXXXX")
+{
+    echo "### What's New"
+    echo ""
+    if git rev-parse "v${PREV_VERSION}" &>/dev/null; then
+        COMMITS=$(git log "v${PREV_VERSION}..HEAD" --format="- %s" | grep -v "^- Release v" 2>/dev/null || true)
+        if [ -n "$COMMITS" ]; then
+            echo "$COMMITS"
+        else
+            echo "- "
+        fi
+    else
+        echo "- "
+    fi
+    echo ""
+    echo "# ----------------------------------------"
+    echo "# Edit the release description above."
+    echo "# Lines starting with # will be removed."
+    echo "# Save and close the editor to continue."
+    echo "# Delete all content to skip the description."
+} > "$DESC_FILE"
+
+echo "   Opening editor to edit release description..."
+if git rev-parse "v${PREV_VERSION}" &>/dev/null; then
+    echo "   (prefilled with commits since v${PREV_VERSION})"
+fi
+${VISUAL:-${EDITOR:-vi}} "$DESC_FILE"
+
+# Strip comment lines; command substitution strips trailing newlines
+RELEASE_DESCRIPTION=$(grep -v '^#' "$DESC_FILE" | sed '/./,$!d')
+rm -f "$DESC_FILE"
+export RELEASE_DESCRIPTION
+
+if [ -n "$RELEASE_DESCRIPTION" ]; then
+    echo "  ✓ Release description captured"
+else
+    echo "  ℹ️  No description provided, continuing without"
+fi
+echo ""
+
 # Step 1: Update version
 echo "📌 Step 1: Updating version to ${NEW_VERSION}..."
 echo "$NEW_VERSION" > VERSION
@@ -142,9 +189,16 @@ echo "  ✓ Pushed to origin with tag v${NEW_VERSION}"
 # Step 5: Create GitHub Release
 echo ""
 echo "🐙 Step 5: Creating GitHub Release..."
+if [ -n "$RELEASE_DESCRIPTION" ]; then
+    GH_RELEASE_NOTES="## Arcmark v${NEW_VERSION}
+
+${RELEASE_DESCRIPTION}"
+else
+    GH_RELEASE_NOTES="## Arcmark v${NEW_VERSION}"
+fi
 gh release create "v${NEW_VERSION}" "$DMG_PATH" \
     --title "v${NEW_VERSION}" \
-    --notes "## Arcmark v${NEW_VERSION}"
+    --notes "$GH_RELEASE_NOTES"
 echo "  ✓ GitHub Release created"
 
 echo ""
