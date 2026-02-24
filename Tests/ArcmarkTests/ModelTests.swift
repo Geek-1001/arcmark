@@ -465,6 +465,165 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(rootLinks.count, 0)
     }
 
+    // MARK: - Bulk Open Links Tests
+
+    func testBulkOpenLinksWithOnlyLinks() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let linkId1 = model.addLink(urlString: "https://a.com", title: "A", parentId: nil)
+        let linkId2 = model.addLink(urlString: "https://b.com", title: "B", parentId: nil)
+        let linkId3 = model.addLink(urlString: "https://c.com", title: "C", parentId: nil)
+
+        let selectedIds: [UUID] = [linkId1, linkId2, linkId3]
+        var collectedLinks: [Link] = []
+
+        for nodeId in selectedIds {
+            guard let node = model.nodeById(nodeId) else { continue }
+            switch node {
+            case .link(let link):
+                collectedLinks.append(link)
+            case .folder(let folder):
+                for child in folder.children {
+                    if case .link(let link) = child {
+                        collectedLinks.append(link)
+                    }
+                }
+            }
+        }
+
+        XCTAssertEqual(collectedLinks.count, 3)
+        XCTAssertEqual(Set(collectedLinks.map(\.url)), Set(["https://a.com", "https://b.com", "https://c.com"]))
+    }
+
+    func testBulkOpenLinksWithFolders() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let folderId = model.addFolder(name: "Folder", parentId: nil)
+        model.addLink(urlString: "https://inside1.com", title: "Inside 1", parentId: folderId)
+        model.addLink(urlString: "https://inside2.com", title: "Inside 2", parentId: folderId)
+
+        let selectedIds: [UUID] = [folderId]
+        var collectedLinks: [Link] = []
+
+        for nodeId in selectedIds {
+            guard let node = model.nodeById(nodeId) else { continue }
+            switch node {
+            case .link(let link):
+                collectedLinks.append(link)
+            case .folder(let folder):
+                for child in folder.children {
+                    if case .link(let link) = child {
+                        collectedLinks.append(link)
+                    }
+                }
+            }
+        }
+
+        XCTAssertEqual(collectedLinks.count, 2)
+        XCTAssertEqual(Set(collectedLinks.map(\.url)), Set(["https://inside1.com", "https://inside2.com"]))
+    }
+
+    func testBulkOpenLinksWithMixedSelection() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let linkId = model.addLink(urlString: "https://direct.com", title: "Direct", parentId: nil)
+        let folderId = model.addFolder(name: "Folder", parentId: nil)
+        model.addLink(urlString: "https://inside.com", title: "Inside", parentId: folderId)
+        let nestedFolderId = model.addFolder(name: "Nested", parentId: folderId)
+        model.addLink(urlString: "https://deep.com", title: "Deep", parentId: nestedFolderId)
+
+        let selectedIds: [UUID] = [linkId, folderId]
+        var collectedLinks: [Link] = []
+
+        for nodeId in selectedIds {
+            guard let node = model.nodeById(nodeId) else { continue }
+            switch node {
+            case .link(let link):
+                collectedLinks.append(link)
+            case .folder(let folder):
+                for child in folder.children {
+                    if case .link(let link) = child {
+                        collectedLinks.append(link)
+                    }
+                }
+            }
+        }
+
+        // Direct link + root-level link from folder, NOT the deeply nested link
+        XCTAssertEqual(collectedLinks.count, 2)
+        XCTAssertEqual(Set(collectedLinks.map(\.url)), Set(["https://direct.com", "https://inside.com"]))
+    }
+
+    func testBulkOpenLinksIgnoresNestedFolderLinks() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let parentFolderId = model.addFolder(name: "Parent", parentId: nil)
+        let childFolderId = model.addFolder(name: "Child", parentId: parentFolderId)
+        model.addLink(urlString: "https://nested.com", title: "Nested", parentId: childFolderId)
+
+        // Only select the parent folder, not the child folder
+        let selectedIds: [UUID] = [parentFolderId]
+        var collectedLinks: [Link] = []
+
+        for nodeId in selectedIds {
+            guard let node = model.nodeById(nodeId) else { continue }
+            switch node {
+            case .link(let link):
+                collectedLinks.append(link)
+            case .folder(let folder):
+                for child in folder.children {
+                    if case .link(let link) = child {
+                        collectedLinks.append(link)
+                    }
+                }
+            }
+        }
+
+        // Parent folder has no root-level links, only a nested folder
+        XCTAssertEqual(collectedLinks.count, 0)
+    }
+
+    func testBulkOpenLinksWithExplicitlySelectedNestedFolder() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let parentFolderId = model.addFolder(name: "Parent", parentId: nil)
+        let childFolderId = model.addFolder(name: "Child", parentId: parentFolderId)
+        model.addLink(urlString: "https://nested.com", title: "Nested", parentId: childFolderId)
+        model.addLink(urlString: "https://root.com", title: "Root", parentId: parentFolderId)
+
+        // Explicitly select both parent and child folders
+        let selectedIds: [UUID] = [parentFolderId, childFolderId]
+        var collectedLinks: [Link] = []
+
+        for nodeId in selectedIds {
+            guard let node = model.nodeById(nodeId) else { continue }
+            switch node {
+            case .link(let link):
+                collectedLinks.append(link)
+            case .folder(let folder):
+                for child in folder.children {
+                    if case .link(let link) = child {
+                        collectedLinks.append(link)
+                    }
+                }
+            }
+        }
+
+        // Root link from parent + nested link from explicitly selected child folder
+        XCTAssertEqual(collectedLinks.count, 2)
+        XCTAssertEqual(Set(collectedLinks.map(\.url)), Set(["https://root.com", "https://nested.com"]))
+    }
+
     func testMultipleBrowserProfiles() {
         let store = makeStore()
         store.save(DataStore.defaultState())
