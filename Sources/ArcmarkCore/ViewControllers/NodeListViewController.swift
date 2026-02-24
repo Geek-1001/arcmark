@@ -50,6 +50,7 @@ final class NodeListViewController: NSViewController {
     var onNewFolderRequested: ((UUID?) -> Void)?
     var onLinkUrlEdited: ((UUID, String) -> Void)?
     var onOpenFolderLinks: ((UUID) -> Void)?
+    var onBulkOpenLinks: (([UUID]) -> Void)?
     var onPinLink: ((UUID) -> Void)?
     var canPinLink: (() -> Bool)?
 
@@ -934,6 +935,11 @@ extension NodeListViewController: NSMenuDelegate {
     private func populateBulkContextMenu(_ menu: NSMenu) {
         let count = selectedNodeIds.count
 
+        // Resolve selected nodes
+        let nodes = selectedNodeIds.compactMap { id in
+            findNodeInNodes?(id, nodeProvider?() ?? [])
+        }
+
         // 1. Move to Workspace submenu
         let moveItem = NSMenuItem(title: "Move to…", action: nil, keyEquivalent: "")
         let moveSubmenu = NSMenu()
@@ -953,10 +959,24 @@ extension NodeListViewController: NSMenuDelegate {
         groupItem.target = self
         menu.addItem(groupItem)
 
-        // 3. Copy Links (only if there are links)
-        let nodes = selectedNodeIds.compactMap { id in
-            findNodeInNodes?(id, nodeProvider?() ?? [])
+        // 3. Open Links (selected links + root-level links from selected folders)
+        var openableLinkCount = 0
+        for node in nodes {
+            switch node {
+            case .link:
+                openableLinkCount += 1
+            case .folder(let folder):
+                openableLinkCount += folder.children.filter { if case .link = $0 { return true } else { return false } }.count
+            }
         }
+
+        if openableLinkCount > 0 {
+            let openItem = NSMenuItem(title: "Open \(openableLinkCount) Link\(openableLinkCount > 1 ? "s" : "")", action: #selector(bulkOpenLinks), keyEquivalent: "")
+            openItem.target = self
+            menu.addItem(openItem)
+        }
+
+        // 4. Copy Links (only if there are direct links)
         let linkCount = nodes.filter { node in
             if case .link = node { return true }
             return false
@@ -970,7 +990,7 @@ extension NodeListViewController: NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        // 4. Delete All
+        // 5. Delete All
         let deleteItem = NSMenuItem(title: "Delete \(count) Item\(count > 1 ? "s" : "")…", action: #selector(bulkDelete), keyEquivalent: "")
         deleteItem.target = self
         menu.addItem(deleteItem)
@@ -997,6 +1017,11 @@ extension NodeListViewController: NSMenuDelegate {
 
     @objc private func bulkCopyLinks() {
         onBulkNodesCopied?(Array(selectedNodeIds))
+        clearSelections()
+    }
+
+    @objc private func bulkOpenLinks() {
+        onBulkOpenLinks?(Array(selectedNodeIds))
         clearSelections()
     }
 

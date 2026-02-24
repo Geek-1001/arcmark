@@ -281,6 +281,23 @@ final class MainViewController: NSViewController {
             }
         }
 
+        nodeListViewController.onBulkOpenLinks = { [weak self] nodeIds in
+            guard let self else { return }
+            for nodeId in nodeIds {
+                guard let node = self.model.nodeById(nodeId) else { continue }
+                switch node {
+                case .link(let link):
+                    self.openLink(link)
+                case .folder(let folder):
+                    for child in folder.children {
+                        if case .link(let link) = child {
+                            self.openLink(link)
+                        }
+                    }
+                }
+            }
+        }
+
         nodeListViewController.onPinLink = { [weak self] nodeId in
             self?.model.pinLink(id: nodeId)
         }
