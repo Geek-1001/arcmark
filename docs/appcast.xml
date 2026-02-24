@@ -6,6 +6,26 @@
         <language>en</language>
         <link>https://github.com/Geek-1001/arcmark</link>
             <item>
+                <title>Version 0.1.7</title>
+                <pubDate>Tue, 24 Feb 2026 09:25:06 +0000</pubDate>
+                <description sparkle:format="markdown">
+- Added **experimental support for separate profiles in Chrome and Firefox**. You can now set a custom profile from the Settings page when hovering over a workspace name. Once you do, all links in that workspace will be opened in the specific profile.  
+- Added 'Open All Links' context menu action for folders to open multiple links at once. It also works when you select multiple links while holding the CMD key.
+
+
+- Restore window size and position on relaunch.  
+-  Fix support for multi-window attachment for the same browsers. Now the app should correctly transition between all active windows of a selected browser.
+                </description>
+                <enclosure
+                    url="https://github.com/Geek-1001/arcmark/releases/download/v0.1.7/Arcmark-0.1.7.dmg"
+                    sparkle:version="0.1.7"
+                    sparkle:shortVersionString="0.1.7"
+                    sparkle:edSignature="Qei6/k3SXATvYnSp6yXxKW/VKd4V/TqgIDJtlRCIu97fp7rAcqWo93nXYL7vC7ei7EBfRTXN4R0/oXMvDuhHAw=="
+                    length="3109658"
+                    type="application/octet-stream"
+                />
+            </item>
+            <item>
                 <title>Version 0.1.6</title>
                 <pubDate>Sat, 21 Feb 2026 12:37:00 +0000</pubDate>
                 <enclosure

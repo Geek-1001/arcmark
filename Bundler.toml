@@ -3,7 +3,7 @@ format_version = 2
 [apps.Arcmark]
 identifier = 'com.arcmark.app'
 product = 'Arcmark'
-version = '0.1.6'
+version = '0.1.7'
 description = 'A workspace-based bookmark manager for macOS'
 license = 'MIT'
 category = 'public.app-category.productivity'
