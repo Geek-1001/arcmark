@@ -1,6 +1,7 @@
 import AppKit
 
 final class CustomTooltipView: NSPanel {
+    private static let maxWidth: CGFloat = 300
     private let label = NSTextField(labelWithString: "")
 
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
@@ -17,11 +18,11 @@ final class CustomTooltipView: NSPanel {
         container.layer?.cornerRadius = ThemeConstants.CornerRadius.medium
         container.translatesAutoresizingMaskIntoConstraints = false
 
-        label.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+        label.font = ThemeConstants.Fonts.systemFont(size: 12, weight: .regular)
         label.textColor = ThemeConstants.Colors.white
         label.maximumNumberOfLines = 0
         label.lineBreakMode = .byCharWrapping
-        label.preferredMaxLayoutWidth = 300 - ThemeConstants.Spacing.medium * 2
+        label.preferredMaxLayoutWidth = Self.maxWidth - ThemeConstants.Spacing.medium * 2
         label.translatesAutoresizingMaskIntoConstraints = false
 
         contentView = NSView()
@@ -33,7 +34,7 @@ final class CustomTooltipView: NSPanel {
             container.trailingAnchor.constraint(equalTo: contentView!.trailingAnchor),
             container.topAnchor.constraint(equalTo: contentView!.topAnchor),
             container.bottomAnchor.constraint(equalTo: contentView!.bottomAnchor),
-            container.widthAnchor.constraint(lessThanOrEqualToConstant: 300),
+            container.widthAnchor.constraint(lessThanOrEqualToConstant: Self.maxWidth),
 
             label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: ThemeConstants.Spacing.medium),
             label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -ThemeConstants.Spacing.medium),
@@ -48,11 +49,11 @@ final class CustomTooltipView: NSPanel {
 
     func show(text: String, cursorPosition: NSPoint, parentWindow: NSWindow) {
         label.stringValue = text
-        label.preferredMaxLayoutWidth = 300 - ThemeConstants.Spacing.medium * 2
+        label.preferredMaxLayoutWidth = Self.maxWidth - ThemeConstants.Spacing.medium * 2
         contentView?.layoutSubtreeIfNeeded()
 
         let fittingSize = contentView?.fittingSize ?? .zero
-        let cursorOffset: CGFloat = 16
+        let cursorOffset = ThemeConstants.Spacing.extraLarge
 
         var origin = NSPoint(x: cursorPosition.x, y: cursorPosition.y - fittingSize.height - cursorOffset)
 
