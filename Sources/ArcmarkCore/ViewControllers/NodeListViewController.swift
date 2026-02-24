@@ -773,6 +773,7 @@ extension NodeListViewController: NSCollectionViewDelegate {
 
 extension NodeListViewController: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
+        NodeRowView.hideSharedTooltip()
         menu.removeAllItems()
 
         // Check for bulk selection context menu

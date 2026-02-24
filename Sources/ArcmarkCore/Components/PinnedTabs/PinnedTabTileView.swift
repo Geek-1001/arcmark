@@ -108,6 +108,10 @@ final class PinnedTabTileView: BaseControl {
     }
 
     override func rightMouseDown(with event: NSEvent) {
+        tooltipShowTask?.cancel()
+        tooltipShowTask = nil
+        PinnedTabTileView.sharedTooltip.hide()
+
         guard let linkId else { return }
         onTileRightClicked?(linkId, event)
     }

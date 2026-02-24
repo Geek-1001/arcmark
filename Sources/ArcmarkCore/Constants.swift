@@ -22,7 +22,7 @@ let nodePasteboardType = NSPasteboard.PasteboardType("com.arcmark.node")
 let workspacePasteboardType = NSPasteboard.PasteboardType("com.arcmark.workspace")
 
 struct TooltipConstants {
-    static let showDelay: TimeInterval = 0.6
+    static let showDelay: TimeInterval = 1.2
 }
 
 struct LayoutConstants {

@@ -11,6 +11,7 @@ final class NodeRowView: BaseView {
     private var tooltipURL: String?
     private var tooltipShowTask: DispatchWorkItem?
     private static let sharedTooltip = CustomTooltipView()
+    private static weak var activeTooltipTask: DispatchWorkItem?
     private var iconLeadingConstraint: NSLayoutConstraint?
     private var iconWidthConstraint: NSLayoutConstraint?
     private var iconHeightConstraint: NSLayoutConstraint?
@@ -131,6 +132,12 @@ final class NodeRowView: BaseView {
         editableTitle.cancelInlineRename()
     }
 
+    static func hideSharedTooltip() {
+        activeTooltipTask?.cancel()
+        activeTooltipTask = nil
+        sharedTooltip.hide()
+    }
+
     @objc private func handleDelete() {
         onDelete?()
     }
@@ -149,6 +156,7 @@ final class NodeRowView: BaseView {
                 NodeRowView.sharedTooltip.show(text: url, cursorPosition: NSEvent.mouseLocation, parentWindow: parentWindow)
             }
             tooltipShowTask = task
+            NodeRowView.activeTooltipTask = task
             DispatchQueue.main.asyncAfter(deadline: .now() + TooltipConstants.showDelay, execute: task)
         } else {
             NodeRowView.sharedTooltip.hide()
