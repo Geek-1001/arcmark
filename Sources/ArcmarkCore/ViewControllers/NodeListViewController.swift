@@ -901,6 +901,10 @@ extension NodeListViewController: NSMenuDelegate {
         let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
         textField.stringValue = link.url
         textField.placeholderString = "https://example.com"
+        textField.usesSingleLineMode = true
+        textField.cell?.wraps = false
+        textField.cell?.isScrollable = true
+        textField.lineBreakMode = .byTruncatingTail
         alert.accessoryView = textField
         alert.window.initialFirstResponder = textField
 
