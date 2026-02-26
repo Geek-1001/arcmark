@@ -530,6 +530,40 @@ final class MainViewController: NSViewController {
         model.moveWorkspace(id: workspace.id, direction: .right)
     }
 
+    func navigateToPreviousWorkspace() {
+        let workspaces = model.workspaces
+        if model.state.isSettingsSelected {
+            return
+        }
+        let currentId = model.currentWorkspace.id
+        guard let currentIndex = workspaces.firstIndex(where: { $0.id == currentId }) else { return }
+        if currentIndex > 0 {
+            let prevId = workspaces[currentIndex - 1].id
+            model.selectWorkspace(id: prevId)
+            workspaceSwitcher.scrollToWorkspace(id: prevId)
+        } else {
+            model.selectSettings()
+            workspaceSwitcher.scrollToSettings()
+        }
+    }
+
+    func navigateToNextWorkspace() {
+        let workspaces = model.workspaces
+        if model.state.isSettingsSelected {
+            guard let firstWorkspace = workspaces.first else { return }
+            model.selectWorkspace(id: firstWorkspace.id)
+            workspaceSwitcher.scrollToWorkspace(id: firstWorkspace.id)
+            return
+        }
+        let currentId = model.currentWorkspace.id
+        guard let currentIndex = workspaces.firstIndex(where: { $0.id == currentId }) else { return }
+        if currentIndex < workspaces.count - 1 {
+            let nextId = workspaces[currentIndex + 1].id
+            model.selectWorkspace(id: nextId)
+            workspaceSwitcher.scrollToWorkspace(id: nextId)
+        }
+    }
+
     func promptCreateWorkspace() {
         let workspaceId = model.createWorkspace(name: "Untitled Workspace", colorId: .randomColor())
         scheduleWorkspaceInlineRename(for: workspaceId)

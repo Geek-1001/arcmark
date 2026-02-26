@@ -160,6 +160,25 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         alwaysOnTopItem.keyEquivalentModifierMask = [.command, .option]
         windowMenu.addItem(alwaysOnTopItem)
         alwaysOnTopMenuItem = alwaysOnTopItem
+
+        windowMenu.addItem(NSMenuItem.separator())
+
+        let prevWorkspaceItem = NSMenuItem(
+            title: "Previous Workspace",
+            action: #selector(navigateToPreviousWorkspace),
+            keyEquivalent: String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!))
+        )
+        prevWorkspaceItem.keyEquivalentModifierMask = [.command, .option]
+        windowMenu.addItem(prevWorkspaceItem)
+
+        let nextWorkspaceItem = NSMenuItem(
+            title: "Next Workspace",
+            action: #selector(navigateToNextWorkspace),
+            keyEquivalent: String(Character(UnicodeScalar(NSRightArrowFunctionKey)!))
+        )
+        nextWorkspaceItem.keyEquivalentModifierMask = [.command, .option]
+        windowMenu.addItem(nextWorkspaceItem)
+
         windowMenu.addItem(NSMenuItem.separator())
         windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
@@ -224,6 +243,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     @objc private func newFolder() {
         mainViewController?.createFolderAndBeginRename(parentId: nil)
+    }
+
+    @objc private func navigateToPreviousWorkspace() {
+        mainViewController?.navigateToPreviousWorkspace()
+    }
+
+    @objc private func navigateToNextWorkspace() {
+        mainViewController?.navigateToNextWorkspace()
     }
 
     // MARK: - Global Hotkey

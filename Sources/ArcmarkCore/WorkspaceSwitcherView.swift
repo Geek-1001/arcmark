@@ -400,6 +400,20 @@ final class WorkspaceSwitcherView: NSView {
         inlineRenameButton = nil
         inlineRenameWorkspaceId = nil
     }
+
+    // MARK: - Scroll to Visible
+
+    func scrollToWorkspace(id: UUID) {
+        guard let button = workspaceButtons[id] else { return }
+        let buttonFrame = button.convert(button.bounds, to: contentView)
+        contentView.scrollToVisible(buttonFrame)
+    }
+
+    func scrollToSettings() {
+        guard let settingsBtn = settingsButton else { return }
+        let buttonFrame = settingsBtn.convert(settingsBtn.bounds, to: contentView)
+        contentView.scrollToVisible(buttonFrame)
+    }
 }
 
 // MARK: - SettingsButton
