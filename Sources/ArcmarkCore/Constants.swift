@@ -15,10 +15,15 @@ enum UserDefaultsKeys {
     static let lastArcImportDate = "lastArcImportDate"
     static let arcImportCount = "arcImportCount"
     static let toggleSidebarShortcut = "toggleSidebarShortcut"
+    static let tooltipsEnabled = "tooltipsEnabled"
 }
 
 let nodePasteboardType = NSPasteboard.PasteboardType("com.arcmark.node")
 let workspacePasteboardType = NSPasteboard.PasteboardType("com.arcmark.workspace")
+
+struct TooltipConstants {
+    static let showDelay: TimeInterval = 1.2
+}
 
 struct LayoutConstants {
     static let windowPadding: CGFloat = 8

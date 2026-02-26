@@ -28,6 +28,9 @@ final class SettingsContentViewController: NSViewController {
     private let attachSidebarToggle = CustomToggle(title: "Attach to Window as Sidebar")
     private let sidebarPositionSelector = SidebarPositionSelector()
 
+    // Display section
+    private let tooltipsToggle = CustomToggle(title: "Show full URL tooltip on hover")
+
     // Keyboard Shortcuts section
     private let shortcutRecorder = ShortcutRecorderView()
 
@@ -233,6 +236,15 @@ final class SettingsContentViewController: NSViewController {
 
         let separatorKS = createSeparator()
 
+        // Display Section
+        let displayHeader = createSectionHeader("Display")
+
+        tooltipsToggle.target = self
+        tooltipsToggle.action = #selector(tooltipsChanged)
+        tooltipsToggle.translatesAutoresizingMaskIntoConstraints = false
+
+        let separatorDisplay = createSeparator()
+
         // Workspace Management Section
         let workspaceHeader = createSectionHeader("Manage Workspaces")
 
@@ -346,6 +358,9 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(shortcutsHeader)
         contentView.addSubview(shortcutRecorder)
         contentView.addSubview(separatorKS)
+        contentView.addSubview(displayHeader)
+        contentView.addSubview(tooltipsToggle)
+        contentView.addSubview(separatorDisplay)
         contentView.addSubview(workspaceHeader)
         contentView.addSubview(workspaceCollectionView)
         contentView.addSubview(separator2)
@@ -417,9 +432,25 @@ final class SettingsContentViewController: NSViewController {
             separatorKS.topAnchor.constraint(equalTo: shortcutRecorder.bottomAnchor, constant: sectionSpacing),
             separatorKS.heightAnchor.constraint(equalToConstant: 1),
 
+            // Display Header
+            displayHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            displayHeader.topAnchor.constraint(equalTo: separatorKS.bottomAnchor, constant: sectionSpacing),
+
+            // Tooltips Toggle
+            tooltipsToggle.leadingAnchor.constraint(equalTo: displayHeader.leadingAnchor),
+            tooltipsToggle.topAnchor.constraint(equalTo: displayHeader.bottomAnchor, constant: sectionHeaderSpacing),
+            tooltipsToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            tooltipsToggle.heightAnchor.constraint(equalToConstant: 28),
+
+            // Separator Display
+            separatorDisplay.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
+            separatorDisplay.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            separatorDisplay.topAnchor.constraint(equalTo: tooltipsToggle.bottomAnchor, constant: sectionSpacing),
+            separatorDisplay.heightAnchor.constraint(equalToConstant: 1),
+
             // Workspace Management Header
             workspaceHeader.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
-            workspaceHeader.topAnchor.constraint(equalTo: separatorKS.bottomAnchor, constant: sectionSpacing),
+            workspaceHeader.topAnchor.constraint(equalTo: separatorDisplay.bottomAnchor, constant: sectionSpacing),
 
                 // Workspace Collection View - full width without horizontal padding
             workspaceCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
@@ -579,6 +610,10 @@ final class SettingsContentViewController: NSViewController {
             // No data = first launch, use default
             shortcutRecorder.configure(shortcut: .defaultToggleSidebar)
         }
+
+        // Load tooltips state
+        let tooltipsEnabled = UserDefaults.standard.bool(forKey: UserDefaultsKeys.tooltipsEnabled)
+        tooltipsToggle.isOn = tooltipsEnabled
 
         // Apply mutual exclusion and enable states
         updateControlStates()
@@ -754,6 +789,12 @@ final class SettingsContentViewController: NSViewController {
                 userInfo: ["position": position]
             )
         }
+    }
+
+    @objc private func tooltipsChanged() {
+        let enabled = tooltipsToggle.isOn
+        UserDefaults.standard.set(enabled, forKey: UserDefaultsKeys.tooltipsEnabled)
+        NotificationCenter.default.post(name: .tooltipsSettingChanged, object: nil)
     }
 
     private func shortcutChanged(_ shortcut: KeyboardShortcut?) {

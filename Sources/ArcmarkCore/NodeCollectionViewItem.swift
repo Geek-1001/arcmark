@@ -15,7 +15,8 @@ final class NodeCollectionViewItem: NSCollectionViewItem {
                    metrics: ListMetrics,
                    showDelete: Bool,
                    onDelete: (() -> Void)?,
-                   isSelected: Bool) {
+                   isSelected: Bool,
+                   tooltipURL: String? = nil) {
         view.alphaValue = 1
         view.layer?.transform = CATransform3DIdentity
         rowView.setIndentation(depth: depth, metrics: metrics)
@@ -26,7 +27,8 @@ final class NodeCollectionViewItem: NSCollectionViewItem {
             showDelete: showDelete,
             metrics: metrics,
             onDelete: onDelete,
-            isSelected: isSelected
+            isSelected: isSelected,
+            tooltipURL: tooltipURL
         )
     }
 

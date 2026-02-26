@@ -5,6 +5,9 @@ final class PinnedTabTileView: BaseControl {
 
     private let faviconView = NSImageView()
     private(set) var linkId: UUID?
+    private var linkURL: String?
+    private var tooltipShowTask: DispatchWorkItem?
+    private static let sharedTooltip = CustomTooltipView()
 
     var onTileClicked: ((UUID) -> Void)?
     var onTileRightClicked: ((UUID, NSEvent) -> Void)?
@@ -38,7 +41,10 @@ final class PinnedTabTileView: BaseControl {
     }
 
     func configure(link: Link, iconsDirectory: URL?) {
+        tooltipShowTask?.cancel()
+        tooltipShowTask = nil
         linkId = link.id
+        linkURL = link.url
 
         if let path = link.faviconPath,
            FileManager.default.fileExists(atPath: path),
@@ -61,6 +67,22 @@ final class PinnedTabTileView: BaseControl {
 
     override func handleHoverStateChanged() {
         updateBackground()
+
+        tooltipShowTask?.cancel()
+        tooltipShowTask = nil
+
+        if isHovered,
+           let url = linkURL, !url.isEmpty,
+           UserDefaults.standard.bool(forKey: UserDefaultsKeys.tooltipsEnabled) {
+            let task = DispatchWorkItem { [weak self] in
+                guard let self, self.isHovered, let parentWindow = self.window else { return }
+                PinnedTabTileView.sharedTooltip.show(text: url, cursorPosition: NSEvent.mouseLocation, parentWindow: parentWindow)
+            }
+            tooltipShowTask = task
+            DispatchQueue.main.asyncAfter(deadline: .now() + TooltipConstants.showDelay, execute: task)
+        } else {
+            PinnedTabTileView.sharedTooltip.hide()
+        }
     }
 
     override func handlePressedStateChanged() {
@@ -86,6 +108,10 @@ final class PinnedTabTileView: BaseControl {
     }
 
     override func rightMouseDown(with event: NSEvent) {
+        tooltipShowTask?.cancel()
+        tooltipShowTask = nil
+        PinnedTabTileView.sharedTooltip.hide()
+
         guard let linkId else { return }
         onTileRightClicked?(linkId, event)
     }

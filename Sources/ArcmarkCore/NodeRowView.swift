@@ -8,6 +8,10 @@ final class NodeRowView: BaseView {
     private var showsDeleteButton = false
     private var metrics = ListMetrics()
     private var onDelete: (() -> Void)?
+    private var tooltipURL: String?
+    private var tooltipShowTask: DispatchWorkItem?
+    private static let sharedTooltip = CustomTooltipView()
+    private static weak var activeTooltipTask: DispatchWorkItem?
     private var iconLeadingConstraint: NSLayoutConstraint?
     private var iconWidthConstraint: NSLayoutConstraint?
     private var iconHeightConstraint: NSLayoutConstraint?
@@ -76,7 +80,11 @@ final class NodeRowView: BaseView {
                    showDelete: Bool,
                    metrics: ListMetrics,
                    onDelete: (() -> Void)?,
-                   isSelected: Bool) {
+                   isSelected: Bool,
+                   tooltipURL: String? = nil) {
+        tooltipShowTask?.cancel()
+        tooltipShowTask = nil
+        self.tooltipURL = tooltipURL
         self.metrics = metrics
         self.isSelected = isSelected
         updateVisualState()
@@ -124,12 +132,35 @@ final class NodeRowView: BaseView {
         editableTitle.cancelInlineRename()
     }
 
+    static func hideSharedTooltip() {
+        activeTooltipTask?.cancel()
+        activeTooltipTask = nil
+        sharedTooltip.hide()
+    }
+
     @objc private func handleDelete() {
         onDelete?()
     }
 
     override func handleHoverStateChanged() {
         updateVisualState()
+
+        tooltipShowTask?.cancel()
+        tooltipShowTask = nil
+
+        if isHovered,
+           let url = tooltipURL, !url.isEmpty,
+           UserDefaults.standard.bool(forKey: UserDefaultsKeys.tooltipsEnabled) {
+            let task = DispatchWorkItem { [weak self] in
+                guard let self, self.isHovered, let parentWindow = self.window else { return }
+                NodeRowView.sharedTooltip.show(text: url, cursorPosition: NSEvent.mouseLocation, parentWindow: parentWindow)
+            }
+            tooltipShowTask = task
+            NodeRowView.activeTooltipTask = task
+            DispatchQueue.main.asyncAfter(deadline: .now() + TooltipConstants.showDelay, execute: task)
+        } else {
+            NodeRowView.sharedTooltip.hide()
+        }
     }
 
     private func updateVisualState() {
