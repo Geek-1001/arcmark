@@ -205,24 +205,32 @@ final class WindowAttachmentService {
 
         let screenFrame = screen.visibleFrame
 
-        // Calculate Arcmark X position based on sidebar position
-        let arcmarkX: CGFloat
-        switch sidebarPosition {
-        case .left:
-            arcmarkX = browserFrame.minX - arcmarkWidth
-            // Check if there's enough space on the left
-            if arcmarkX < screenFrame.minX { return nil }
-        case .right:
-            arcmarkX = browserFrame.maxX
-            // Check if there's enough space on the right
-            if arcmarkX + arcmarkWidth > screenFrame.maxX { return nil }
+        // Try preferred side first, then fall back to opposite side
+        let preferredSide = sidebarPosition
+        let oppositeSide: SidebarPosition = preferredSide == .left ? .right : .left
+
+        if let x = arcmarkX(for: preferredSide, browserFrame: browserFrame, arcmarkWidth: arcmarkWidth, screenFrame: screenFrame) {
+            return NSRect(x: x, y: browserFrame.minY, width: arcmarkWidth, height: browserFrame.height)
         }
 
-        // Match browser height exactly
-        let arcmarkY = browserFrame.minY
-        let arcmarkHeight = browserFrame.height
+        if let x = arcmarkX(for: oppositeSide, browserFrame: browserFrame, arcmarkWidth: arcmarkWidth, screenFrame: screenFrame) {
+            return NSRect(x: x, y: browserFrame.minY, width: arcmarkWidth, height: browserFrame.height)
+        }
 
-        return NSRect(x: arcmarkX, y: arcmarkY, width: arcmarkWidth, height: arcmarkHeight)
+        // Neither side has space
+        return nil
+    }
+
+    /// Returns the X position for Arcmark on the given side, or nil if there isn't enough space.
+    private func arcmarkX(for side: SidebarPosition, browserFrame: NSRect, arcmarkWidth: CGFloat, screenFrame: NSRect) -> CGFloat? {
+        switch side {
+        case .left:
+            let x = browserFrame.minX - arcmarkWidth
+            return x >= screenFrame.minX ? x : nil
+        case .right:
+            let x = browserFrame.maxX
+            return x + arcmarkWidth <= screenFrame.maxX ? x : nil
+        }
     }
 
     private func detectScreen(for frame: NSRect) -> NSScreen? {
