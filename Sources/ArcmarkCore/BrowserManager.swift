@@ -94,6 +94,7 @@ enum BrowserManager {
         let supported = [
             "com.google.chrome",
             "com.google.chrome.canary",
+            "net.imput.helium",
             "org.mozilla.firefox",
             "org.mozilla.firefoxdeveloperedition"
         ]
@@ -109,6 +110,8 @@ enum BrowserManager {
             return detectChromeProfiles(supportDir: "Google/Chrome")
         case "com.google.chrome.canary":
             return detectChromeProfiles(supportDir: "Google/Chrome Canary")
+        case "net.imput.helium":
+            return detectChromeProfiles(supportDir: "net.imput.helium")
         case "org.mozilla.firefox", "org.mozilla.firefoxdeveloperedition":
             return detectFirefoxProfiles(supportDir: "Firefox")
         default:
@@ -119,7 +122,7 @@ enum BrowserManager {
     static func profileArguments(for bundleId: String, profile: String) -> [String] {
         let lowered = bundleId.lowercased()
         switch lowered {
-        case "com.google.chrome", "com.google.chrome.canary":
+        case "com.google.chrome", "com.google.chrome.canary", "net.imput.helium":
             return ["--profile-directory=\(profile)"]
         case "org.mozilla.firefox", "org.mozilla.firefoxdeveloperedition":
             // Selectable Profiles: profile is a relative path like "Profiles/xxxx.Name"
