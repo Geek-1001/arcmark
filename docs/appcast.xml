@@ -6,6 +6,25 @@
         <language>en</language>
         <link>https://github.com/Geek-1001/arcmark</link>
             <item>
+                <title>Version 0.1.8</title>
+                <pubDate>Sat, 28 Feb 2026 22:32:23 +0000</pubDate>
+                <description sparkle:format="markdown">
+- Added support for the experimental browser profile in Helium browser. You can now map the workspace in Arcmar to the Helium profile, and all links from this workspace will open in that profile.
+- Added keyboard shortcuts to navigate between workspace in ArcMark (⌥⌘← / ⌥⌘→)
+- Added an automatic fallback for the sidebar position. Now, if there isn't enough space for the attached sidebar on the selected side, it will temporarily move to the opposite side to remain accessible.
+- Added a custom URL tooltip on link hover. It can be disabled from the settings.
+- Fixed URL text field wrapping in edit alert dialog
+                </description>
+                <enclosure
+                    url="https://github.com/Geek-1001/arcmark/releases/download/v0.1.8/Arcmark-0.1.8.dmg"
+                    sparkle:version="0.1.8"
+                    sparkle:shortVersionString="0.1.8"
+                    sparkle:edSignature="J5WOdM9183O9T6qJPY2OxmqCwQnKXxfaSNyTCZmIRSFk0Btn6Pt6dGvZbIDHDCdYTtrSCiq/eITOn1xeLlewCQ=="
+                    length="3117877"
+                    type="application/octet-stream"
+                />
+            </item>
+            <item>
                 <title>Version 0.1.7</title>
                 <pubDate>Tue, 24 Feb 2026 09:25:06 +0000</pubDate>
                 <description sparkle:format="markdown">
