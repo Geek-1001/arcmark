@@ -1213,7 +1213,7 @@ final class SettingsContentViewController: NSViewController {
 
         if !browserSupportsProfiles {
             alert.addButton(withTitle: "OK")
-            alert.informativeText = "The current browser does not support profile switching. Profile settings are supported for Chrome and Firefox."
+            alert.informativeText = "The current browser does not support profile switching. Profile settings are supported for Chrome, Helium, and Firefox."
             let warningLabel = NSTextField(labelWithString: "Links will open normally without a profile.")
             warningLabel.font = NSFont.systemFont(ofSize: 11)
             warningLabel.textColor = .secondaryLabelColor
