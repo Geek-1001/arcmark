@@ -935,14 +935,25 @@ extension MainViewController: SwipeGestureServiceDelegate {
         guard let layer = workspaceContentStack.layer else { return }
         isSwipeAnimating = true
 
+        let spring = CASpringAnimation(keyPath: "transform.translation.x")
+        spring.fromValue = layer.transform.m41  // current X offset
+        spring.toValue = 0
+        spring.mass = 1.0
+        spring.stiffness = 400
+        spring.damping = 22
+        spring.initialVelocity = 0
+        spring.duration = spring.settlingDuration
+        spring.isRemovedOnCompletion = false
+        spring.fillMode = .forwards
+
         CATransaction.begin()
-        CATransaction.setAnimationDuration(0.25)
-        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
         CATransaction.setCompletionBlock { [weak self] in
+            layer.removeAnimation(forKey: "snapBack")
+            layer.transform = CATransform3DIdentity
             self?.isSwipeAnimating = false
             self?.removeSwipePreview()
         }
-        layer.transform = CATransform3DIdentity
+        layer.add(spring, forKey: "snapBack")
         CATransaction.commit()
     }
 
