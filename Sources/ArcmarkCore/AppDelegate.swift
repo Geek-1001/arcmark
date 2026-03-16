@@ -65,6 +65,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         applyAlwaysOnTopFromDefaults()
         setupAttachmentService()
         setupGlobalHotkey()
+        setupSwipeGesture()
         observeBrowserChanges()
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -251,6 +252,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     @objc private func navigateToNextWorkspace() {
         mainViewController?.navigateToNextWorkspace()
+    }
+
+    // MARK: - Swipe Gesture
+
+    private func setupSwipeGesture() {
+        SwipeGestureService.shared.delegate = mainViewController
+        SwipeGestureService.shared.enable(window: window!)
     }
 
     // MARK: - Global Hotkey

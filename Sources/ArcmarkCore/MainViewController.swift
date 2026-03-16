@@ -25,11 +25,20 @@ final class MainViewController: NSViewController {
         didSet { settingsViewController.updater = updater }
     }
 
+    // Swipe animation views
+    private var swipeClipContainer: NSView!         // Clips to bounds, contains content + preview
+    private var workspaceContentStack: NSStackView! // The animated workspace content
+    private var swipePreviewView: NSView?           // Container for preview snapshot + gradient
+    private var swipePreviewSnapshot: NSImage?      // Cached snapshot of adjacent workspace
+    private var swipePreviewDirection: SwipeDirection? // Direction the snapshot was captured for
+
     // State
     private var isReloadScheduled = false
     private var hasLoaded = false
     private var lastWorkspaceId: UUID?
     private var pendingWorkspaceRenameId: UUID?
+    private var isSwipeAnimating = false
+    private var swipeColorAnimationFromColor: NSColor?  // Set before workspace switch to trigger animated color transition
 
     init(model: AppModel) {
         self.model = model
@@ -133,7 +142,25 @@ final class MainViewController: NSViewController {
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
         bottomBar.addSubview(pasteButton)
 
-        let stack = NSStackView(views: [topBar, searchField, pinnedTabsView, nodeListViewController.view, bottomBar])
+        // Workspace content stack (animated during swipe)
+        let contentStack = NSStackView(views: [pinnedTabsView, nodeListViewController.view, bottomBar])
+        contentStack.orientation = .vertical
+        contentStack.spacing = 10
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.alignment = .centerX
+        contentStack.wantsLayer = true
+        workspaceContentStack = contentStack
+
+        // Clipping container for swipe animation
+        let clipContainer = NSView()
+        clipContainer.translatesAutoresizingMaskIntoConstraints = false
+        clipContainer.wantsLayer = true
+        clipContainer.layer?.masksToBounds = true
+        swipeClipContainer = clipContainer
+        clipContainer.addSubview(contentStack)
+
+        // Outer stack: topBar, searchField, then the swipe clip container
+        let stack = NSStackView(views: [topBar, searchField, clipContainer])
         stack.orientation = .vertical
         stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -153,8 +180,18 @@ final class MainViewController: NSViewController {
             pasteButton.topAnchor.constraint(equalTo: bottomBar.topAnchor),
             pasteButton.bottomAnchor.constraint(equalTo: bottomBar.bottomAnchor),
 
-            bottomBar.leadingAnchor.constraint(equalTo: stack.leadingAnchor),
-            bottomBar.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
+            bottomBar.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor),
+            bottomBar.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor),
+
+            // Content stack fills the clip container
+            contentStack.leadingAnchor.constraint(equalTo: clipContainer.leadingAnchor),
+            contentStack.trailingAnchor.constraint(equalTo: clipContainer.trailingAnchor),
+            contentStack.topAnchor.constraint(equalTo: clipContainer.topAnchor),
+            contentStack.bottomAnchor.constraint(equalTo: clipContainer.bottomAnchor),
+
+            // Clip container fills width of outer stack
+            clipContainer.leadingAnchor.constraint(equalTo: stack.leadingAnchor),
+            clipContainer.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
 
             stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: LayoutConstants.windowPadding),
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -LayoutConstants.windowPadding),
@@ -168,8 +205,8 @@ final class MainViewController: NSViewController {
         NSLayoutConstraint.activate([
             searchField.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 2),
             searchField.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -2),
-            pinnedTabsView.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 2),
-            pinnedTabsView.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -2),
+            pinnedTabsView.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: 2),
+            pinnedTabsView.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -2),
         ])
 
         // Settings view constraints
@@ -383,9 +420,26 @@ final class MainViewController: NSViewController {
     }
 
     private func applyWorkspaceStyling() {
-        view.layer?.backgroundColor = model.currentWorkspace.colorId.backgroundColor.cgColor
-        view.window?.backgroundColor = model.currentWorkspace.colorId.backgroundColor
+        let newColor = model.currentWorkspace.colorId.backgroundColor
         nodeListViewController.workspaceColor = model.currentWorkspace.colorId
+
+        if let fromColor = swipeColorAnimationFromColor {
+            // Animate background color transition during swipe
+            swipeColorAnimationFromColor = nil
+            view.layer?.backgroundColor = fromColor.cgColor
+            view.window?.backgroundColor = fromColor
+
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = ThemeConstants.Animation.durationSlow
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                context.allowsImplicitAnimation = true
+                self.view.layer?.backgroundColor = newColor.cgColor
+                self.view.window?.backgroundColor = newColor
+            })
+        } else {
+            view.layer?.backgroundColor = newColor.cgColor
+            view.window?.backgroundColor = newColor
+        }
     }
 
     private func showSettingsContent() {
@@ -400,8 +454,23 @@ final class MainViewController: NSViewController {
 
         // Apply settings background color
         let settingsColor = NSColor(calibratedRed: 0.898, green: 0.906, blue: 0.922, alpha: 1.0)
-        view.layer?.backgroundColor = settingsColor.cgColor
-        view.window?.backgroundColor = settingsColor
+
+        if let fromColor = swipeColorAnimationFromColor {
+            swipeColorAnimationFromColor = nil
+            view.layer?.backgroundColor = fromColor.cgColor
+            view.window?.backgroundColor = fromColor
+
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = ThemeConstants.Animation.durationSlow
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                context.allowsImplicitAnimation = true
+                self.view.layer?.backgroundColor = settingsColor.cgColor
+                self.view.window?.backgroundColor = settingsColor
+            })
+        } else {
+            view.layer?.backgroundColor = settingsColor.cgColor
+            view.window?.backgroundColor = settingsColor
+        }
     }
 
     private func showWorkspaceContent() {
@@ -719,5 +788,288 @@ final class MainViewController: NSViewController {
         let joined = urls.joined(separator: "\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(joined, forType: .string)
+    }
+}
+
+// MARK: - SwipeGestureServiceDelegate
+
+extension MainViewController: SwipeGestureServiceDelegate {
+
+    func swipeGestureDidBegin(_ service: SwipeGestureService) {
+        guard !isSwipeAnimating else { return }
+        workspaceContentStack.layer?.removeAllAnimations()
+        removeSwipePreview()
+    }
+
+    func swipeGestureDidUpdate(_ service: SwipeGestureService, translationX: CGFloat) {
+        guard !isSwipeAnimating else { return }
+        guard let layer = workspaceContentStack.layer else { return }
+
+        let canGoRight = canNavigatePrevious()  // finger right = previous
+        let canGoLeft = canNavigateNext()        // finger left = next
+
+        var clampedX = translationX
+        // Apply rubber-band dampening if no adjacent workspace in that direction
+        if translationX > 0 && !canGoRight {
+            clampedX = translationX * 0.7
+        } else if translationX < 0 && !canGoLeft {
+            clampedX = translationX * 0.7
+        }
+
+        // Capture preview snapshot on first significant movement
+        let direction: SwipeDirection = translationX > 0 ? .right : .left
+        if swipePreviewSnapshot == nil || swipePreviewDirection != direction {
+            capturePreviewSnapshot(for: direction)
+        }
+
+        // Show/update preview of adjacent workspace
+        updateSwipePreview(translationX: clampedX, direction: direction)
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.transform = CATransform3DMakeTranslation(clampedX, 0, 0)
+        CATransaction.commit()
+    }
+
+    func swipeGestureDidComplete(_ service: SwipeGestureService, direction: SwipeDirection) {
+        guard !isSwipeAnimating else { return }
+        guard let layer = workspaceContentStack.layer else { return }
+
+        let containerWidth = swipeClipContainer.bounds.width
+
+        // Determine if we can actually navigate
+        let canNavigate: Bool
+        switch direction {
+        case .right: canNavigate = canNavigatePrevious()
+        case .left: canNavigate = canNavigateNext()
+        }
+
+        guard canNavigate else {
+            animateSnapBack()
+            return
+        }
+
+        isSwipeAnimating = true
+        let slideOffX: CGFloat = direction == .right ? containerWidth : -containerWidth
+
+        // Save current color so applyWorkspaceStyling can animate the transition
+        let currentBgColor: NSColor
+        if model.state.isSettingsSelected {
+            currentBgColor = NSColor(calibratedRed: 0.898, green: 0.906, blue: 0.922, alpha: 1.0)
+        } else {
+            currentBgColor = model.currentWorkspace.colorId.backgroundColor
+        }
+
+        // Animate content sliding off-screen
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(ThemeConstants.Animation.durationNormal)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeIn))
+        CATransaction.setCompletionBlock { [weak self] in
+            guard let self else { return }
+
+            // Remove preview before switching
+            self.removeSwipePreview()
+
+            // Set the from-color so reloadData → applyWorkspaceStyling animates the color
+            self.swipeColorAnimationFromColor = currentBgColor
+
+            // Switch workspace
+            switch direction {
+            case .right: self.navigateToPreviousWorkspace()
+            case .left: self.navigateToNextWorkspace()
+            }
+
+            // Position on opposite side
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            layer.transform = CATransform3DMakeTranslation(-slideOffX, 0, 0)
+            CATransaction.commit()
+
+            // Animate sliding in
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(ThemeConstants.Animation.durationNormal)
+            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+            CATransaction.setCompletionBlock { [weak self] in
+                self?.isSwipeAnimating = false
+            }
+            layer.transform = CATransform3DIdentity
+            CATransaction.commit()
+        }
+        layer.transform = CATransform3DMakeTranslation(slideOffX, 0, 0)
+        CATransaction.commit()
+    }
+
+    func swipeGestureDidCancel(_ service: SwipeGestureService) {
+        animateSnapBack()
+    }
+
+    // MARK: - Swipe Helpers
+
+    private func canNavigatePrevious() -> Bool {
+        if model.state.isSettingsSelected { return false }
+        return true
+    }
+
+    private func canNavigateNext() -> Bool {
+        let workspaces = model.workspaces
+        if model.state.isSettingsSelected {
+            return !workspaces.isEmpty
+        }
+        guard let currentIndex = workspaces.firstIndex(where: { $0.id == model.currentWorkspace.id }) else { return false }
+        return currentIndex < workspaces.count - 1
+    }
+
+    private func animateSnapBack() {
+        guard let layer = workspaceContentStack.layer else { return }
+        isSwipeAnimating = true
+
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(0.25)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+        CATransaction.setCompletionBlock { [weak self] in
+            self?.isSwipeAnimating = false
+            self?.removeSwipePreview()
+        }
+        layer.transform = CATransform3DIdentity
+        CATransaction.commit()
+    }
+
+    // MARK: - Swipe Preview
+
+    private func adjacentWorkspace(for direction: SwipeDirection) -> Workspace? {
+        let workspaces = model.workspaces
+        if model.state.isSettingsSelected {
+            if direction == .left { return workspaces.first }
+            return nil
+        }
+        guard let currentIndex = workspaces.firstIndex(where: { $0.id == model.currentWorkspace.id }) else { return nil }
+        switch direction {
+        case .right:
+            return currentIndex > 0 ? workspaces[currentIndex - 1] : nil
+        case .left:
+            return currentIndex < workspaces.count - 1 ? workspaces[currentIndex + 1] : nil
+        }
+    }
+
+    /// Captures a bitmap snapshot of the adjacent workspace's content by temporarily
+    /// switching the model and rendering the content views.
+    private func capturePreviewSnapshot(for direction: SwipeDirection) {
+        swipePreviewSnapshot = nil
+        swipePreviewDirection = direction
+
+        let currentId = model.currentWorkspace.id
+        let wasSettings = model.state.isSettingsSelected
+
+        // Determine next workspace
+        let nextWorkspace: Workspace?
+        let nextIsSettings: Bool
+        if let ws = adjacentWorkspace(for: direction) {
+            nextWorkspace = ws
+            nextIsSettings = false
+        } else if direction == .right && !wasSettings {
+            // Going to settings
+            nextWorkspace = nil
+            nextIsSettings = true
+        } else {
+            return
+        }
+
+        // Suppress onChange to prevent external UI updates
+        let savedOnChange = model.onChange
+        model.onChange = nil
+
+        // Switch to the adjacent workspace
+        if nextIsSettings {
+            model.selectSettings()
+            // For settings, capture the settings view instead
+            settingsViewController.notifyWorkspacesChanged()
+        } else if let ws = nextWorkspace {
+            model.selectWorkspace(id: ws.id)
+            // Update content views with next workspace's data
+            pinnedTabsView.update(pinnedLinks: ws.pinnedLinks)
+            let filteredNodes = searchCoordinator.filter(nodes: ws.items)
+            nodeListViewController.reloadData(with: filteredNodes, forceExpand: false)
+        }
+
+        // Force layout so the views render with new data
+        workspaceContentStack.layoutSubtreeIfNeeded()
+
+        // Capture bitmap
+        let bounds = workspaceContentStack.bounds
+        if let bitmap = workspaceContentStack.bitmapImageRepForCachingDisplay(in: bounds) {
+            workspaceContentStack.cacheDisplay(in: bounds, to: bitmap)
+            let image = NSImage(size: bounds.size)
+            image.addRepresentation(bitmap)
+            swipePreviewSnapshot = image
+        }
+
+        // Restore original workspace
+        if wasSettings {
+            model.selectSettings()
+        } else {
+            model.selectWorkspace(id: currentId)
+        }
+
+        // Restore content views
+        let currentWorkspace = model.currentWorkspace
+        pinnedTabsView.update(pinnedLinks: currentWorkspace.pinnedLinks)
+        let currentNodes = searchCoordinator.filter(nodes: currentWorkspace.items)
+        nodeListViewController.reloadData(with: currentNodes, forceExpand: searchCoordinator.isSearchActive)
+        workspaceContentStack.layoutSubtreeIfNeeded()
+
+        // Restore onChange
+        model.onChange = savedOnChange
+    }
+
+    private func updateSwipePreview(translationX: CGFloat, direction: SwipeDirection) {
+        let containerWidth = swipeClipContainer.bounds.width
+        let containerHeight = swipeClipContainer.bounds.height
+
+        // Use the CURRENT workspace's background color so the preview blends seamlessly
+        let currentBgColor: NSColor
+        if model.state.isSettingsSelected {
+            currentBgColor = NSColor(calibratedRed: 0.898, green: 0.906, blue: 0.922, alpha: 1.0)
+        } else {
+            currentBgColor = model.currentWorkspace.colorId.backgroundColor
+        }
+
+        if swipePreviewView == nil {
+            let preview = NSView()
+            preview.wantsLayer = true
+            swipeClipContainer.addSubview(preview, positioned: .below, relativeTo: workspaceContentStack)
+            swipePreviewView = preview
+        }
+
+        guard let preview = swipePreviewView else { return }
+
+        // Same background as current workspace — color change happens via fade after switch
+        preview.layer?.backgroundColor = currentBgColor.cgColor
+
+        // Position preview adjacent to the sliding content
+        if translationX > 0 {
+            preview.frame = NSRect(x: translationX - containerWidth, y: 0, width: containerWidth, height: containerHeight)
+        } else {
+            preview.frame = NSRect(x: containerWidth + translationX, y: 0, width: containerWidth, height: containerHeight)
+        }
+
+        // Add or update the content snapshot image view
+        let imageView: NSImageView
+        if let existing = preview.subviews.first(where: { $0 is NSImageView }) as? NSImageView {
+            imageView = existing
+        } else {
+            imageView = NSImageView()
+            imageView.imageScaling = .scaleNone
+            imageView.imageAlignment = .alignTopLeft
+            preview.addSubview(imageView)
+        }
+        imageView.image = swipePreviewSnapshot
+        imageView.frame = NSRect(x: 0, y: 0, width: containerWidth, height: containerHeight)
+    }
+
+    private func removeSwipePreview() {
+        swipePreviewView?.removeFromSuperview()
+        swipePreviewView = nil
+        swipePreviewSnapshot = nil
+        swipePreviewDirection = nil
     }
 }
