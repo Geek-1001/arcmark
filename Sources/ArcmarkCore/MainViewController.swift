@@ -860,7 +860,7 @@ extension MainViewController: SwipeGestureServiceDelegate {
         // Save current color so applyWorkspaceStyling can animate the transition
         let currentBgColor: NSColor
         if model.state.isSettingsSelected {
-            currentBgColor = NSColor(calibratedRed: 0.898, green: 0.906, blue: 0.922, alpha: 1.0)
+            currentBgColor = ThemeConstants.Colors.settingsBackground
         } else {
             currentBgColor = model.currentWorkspace.colorId.backgroundColor
         }
@@ -935,7 +935,7 @@ extension MainViewController: SwipeGestureServiceDelegate {
         isSwipeAnimating = true
 
         CATransaction.begin()
-        CATransaction.setAnimationDuration(0.25)
+        CATransaction.setAnimationDuration(ThemeConstants.Animation.durationSlow)
         CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
         CATransaction.setCompletionBlock { [weak self] in
             self?.isSwipeAnimating = false
@@ -1038,7 +1038,7 @@ extension MainViewController: SwipeGestureServiceDelegate {
         // Use the CURRENT workspace's background color so the preview blends seamlessly
         let currentBgColor: NSColor
         if model.state.isSettingsSelected {
-            currentBgColor = NSColor(calibratedRed: 0.898, green: 0.906, blue: 0.922, alpha: 1.0)
+            currentBgColor = ThemeConstants.Colors.settingsBackground
         } else {
             currentBgColor = model.currentWorkspace.colorId.backgroundColor
         }
