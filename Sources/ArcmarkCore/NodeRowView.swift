@@ -15,6 +15,8 @@ final class NodeRowView: BaseView {
     private var iconLeadingConstraint: NSLayoutConstraint?
     private var iconWidthConstraint: NSLayoutConstraint?
     private var iconHeightConstraint: NSLayoutConstraint?
+    private var titleTrailingToDeleteButton: NSLayoutConstraint!
+    private var titleTrailingToEdge: NSLayoutConstraint!
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -56,6 +58,11 @@ final class NodeRowView: BaseView {
         iconWidthConstraint = iconView.widthAnchor.constraint(equalToConstant: 26)
         iconHeightConstraint = iconView.heightAnchor.constraint(equalToConstant: 26)
 
+        titleTrailingToDeleteButton = editableTitle.trailingAnchor.constraint(
+            lessThanOrEqualTo: deleteButton.leadingAnchor, constant: -14)
+        titleTrailingToEdge = editableTitle.trailingAnchor.constraint(
+            lessThanOrEqualTo: trailingAnchor, constant: -16)
+
         NSLayoutConstraint.activate([
             iconLeadingConstraint!,
             iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -64,7 +71,7 @@ final class NodeRowView: BaseView {
 
             editableTitle.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
             editableTitle.centerYAnchor.constraint(equalTo: centerYAnchor),
-            editableTitle.trailingAnchor.constraint(lessThanOrEqualTo: deleteButton.leadingAnchor, constant: -14),
+            titleTrailingToEdge,
 
             deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             deleteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -164,15 +171,20 @@ final class NodeRowView: BaseView {
     }
 
     private func updateVisualState() {
+        let showDelete: Bool
         if isSelected {
             layer?.backgroundColor = metrics.selectedBackgroundColor.cgColor
-            deleteButton.isHidden = true
+            showDelete = false
         } else if isHovered {
             layer?.backgroundColor = metrics.hoverBackgroundColor.cgColor
-            deleteButton.isHidden = !showsDeleteButton
+            showDelete = showsDeleteButton
         } else {
             layer?.backgroundColor = NSColor.clear.cgColor
-            deleteButton.isHidden = true
+            showDelete = false
         }
+
+        deleteButton.isHidden = !showDelete
+        titleTrailingToDeleteButton.isActive = showDelete
+        titleTrailingToEdge.isActive = !showDelete
     }
 }
