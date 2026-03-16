@@ -65,6 +65,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         applyAlwaysOnTopFromDefaults()
         setupAttachmentService()
         setupGlobalHotkey()
+        setupSwipeGesture()
         observeBrowserChanges()
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -253,6 +254,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         mainViewController?.navigateToNextWorkspace()
     }
 
+    // MARK: - Swipe Gesture
+
+    private func setupSwipeGesture() {
+        SwipeGestureService.shared.delegate = mainViewController
+        if let switcher = mainViewController?.workspaceSwitcherView {
+            SwipeGestureService.shared.addExcludedView(switcher)
+        }
+
+        let enabled = UserDefaults.standard.bool(forKey: UserDefaultsKeys.swipeToSwitchEnabled)
+        if enabled {
+            SwipeGestureService.shared.enable(window: window!)
+        }
+    }
+
     // MARK: - Global Hotkey
 
     private func setupGlobalHotkey() {
@@ -384,6 +399,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             name: .toggleSidebarShortcutChanged,
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSwipeToSwitchSettingChanged),
+            name: .swipeToSwitchSettingChanged,
+            object: nil
+        )
     }
 
     @objc private func handleBrowserChanged(_ notification: Notification) {
@@ -473,6 +495,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             GlobalHotkeyService.shared.register(shortcut: shortcut)
         } else {
             GlobalHotkeyService.shared.unregister()
+        }
+    }
+
+    @objc private func handleSwipeToSwitchSettingChanged() {
+        let enabled = UserDefaults.standard.bool(forKey: UserDefaultsKeys.swipeToSwitchEnabled)
+        if enabled {
+            if let window {
+                SwipeGestureService.shared.enable(window: window)
+            }
+        } else {
+            SwipeGestureService.shared.disable()
         }
     }
 

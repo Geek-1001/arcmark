@@ -16,6 +16,7 @@ enum UserDefaultsKeys {
     static let arcImportCount = "arcImportCount"
     static let toggleSidebarShortcut = "toggleSidebarShortcut"
     static let tooltipsEnabled = "tooltipsEnabled"
+    static let swipeToSwitchEnabled = "swipeToSwitchEnabled"
 }
 
 let nodePasteboardType = NSPasteboard.PasteboardType("com.arcmark.node")

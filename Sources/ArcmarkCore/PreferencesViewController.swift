@@ -439,4 +439,5 @@ extension Notification.Name {
     static let sidebarPositionChanged = Notification.Name("sidebarPositionChanged")
     static let toggleSidebarShortcutChanged = Notification.Name("toggleSidebarShortcutChanged")
     static let tooltipsSettingChanged = Notification.Name("tooltipsSettingChanged")
+    static let swipeToSwitchSettingChanged = Notification.Name("swipeToSwitchSettingChanged")
 }
