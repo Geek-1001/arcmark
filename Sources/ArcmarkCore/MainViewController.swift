@@ -38,6 +38,7 @@ final class MainViewController: NSViewController {
     private var lastWorkspaceId: UUID?
     private var pendingWorkspaceRenameId: UUID?
     private var isSwipeAnimating = false
+    private var suppressNodeAnimations = false          // Suppresses collection view animations during swipe transitions
     private var swipeColorAnimationFromColor: NSColor?  // Set before workspace switch to trigger animated color transition
 
     init(model: AppModel) {
@@ -389,7 +390,8 @@ final class MainViewController: NSViewController {
             let filteredNodes = searchCoordinator.filter(nodes: model.currentWorkspace.items)
             let forceExpand = searchCoordinator.isSearchActive
             nodeListViewController.isSearchActive = searchCoordinator.isSearchActive
-            nodeListViewController.reloadData(with: filteredNodes, forceExpand: forceExpand)
+            let animated = !suppressNodeAnimations
+            nodeListViewController.reloadData(with: filteredNodes, forceExpand: forceExpand, animated: animated)
         }
         hasLoaded = true
     }
@@ -873,11 +875,16 @@ extension MainViewController: SwipeGestureServiceDelegate {
             // Set the from-color so reloadData → applyWorkspaceStyling animates the color
             self.swipeColorAnimationFromColor = currentBgColor
 
+            // Suppress collection view animations — the slide animation handles the transition
+            self.suppressNodeAnimations = true
+
             // Switch workspace
             switch direction {
             case .right: self.navigateToPreviousWorkspace()
             case .left: self.navigateToNextWorkspace()
             }
+
+            self.suppressNodeAnimations = false
 
             // Position on opposite side
             CATransaction.begin()
@@ -906,15 +913,17 @@ extension MainViewController: SwipeGestureServiceDelegate {
     // MARK: - Swipe Helpers
 
     private func canNavigatePrevious() -> Bool {
+        // Swipe disabled from/to settings — only between workspaces
         if model.state.isSettingsSelected { return false }
-        return true
+        let workspaces = model.workspaces
+        guard let currentIndex = workspaces.firstIndex(where: { $0.id == model.currentWorkspace.id }) else { return false }
+        return currentIndex > 0
     }
 
     private func canNavigateNext() -> Bool {
+        // Swipe disabled from/to settings — only between workspaces
+        if model.state.isSettingsSelected { return false }
         let workspaces = model.workspaces
-        if model.state.isSettingsSelected {
-            return !workspaces.isEmpty
-        }
         guard let currentIndex = workspaces.firstIndex(where: { $0.id == model.currentWorkspace.id }) else { return false }
         return currentIndex < workspaces.count - 1
     }
@@ -937,11 +946,9 @@ extension MainViewController: SwipeGestureServiceDelegate {
     // MARK: - Swipe Preview
 
     private func adjacentWorkspace(for direction: SwipeDirection) -> Workspace? {
+        // Swipe only between workspaces, not to/from settings
+        if model.state.isSettingsSelected { return nil }
         let workspaces = model.workspaces
-        if model.state.isSettingsSelected {
-            if direction == .left { return workspaces.first }
-            return nil
-        }
         guard let currentIndex = workspaces.firstIndex(where: { $0.id == model.currentWorkspace.id }) else { return nil }
         switch direction {
         case .right:
@@ -952,44 +959,24 @@ extension MainViewController: SwipeGestureServiceDelegate {
     }
 
     /// Captures a bitmap snapshot of the adjacent workspace's content by temporarily
-    /// switching the model and rendering the content views.
+    /// switching the model and rendering the content views (without animations).
     private func capturePreviewSnapshot(for direction: SwipeDirection) {
         swipePreviewSnapshot = nil
         swipePreviewDirection = direction
 
-        let currentId = model.currentWorkspace.id
-        let wasSettings = model.state.isSettingsSelected
+        guard let nextWorkspace = adjacentWorkspace(for: direction) else { return }
 
-        // Determine next workspace
-        let nextWorkspace: Workspace?
-        let nextIsSettings: Bool
-        if let ws = adjacentWorkspace(for: direction) {
-            nextWorkspace = ws
-            nextIsSettings = false
-        } else if direction == .right && !wasSettings {
-            // Going to settings
-            nextWorkspace = nil
-            nextIsSettings = true
-        } else {
-            return
-        }
+        let currentId = model.currentWorkspace.id
 
         // Suppress onChange to prevent external UI updates
         let savedOnChange = model.onChange
         model.onChange = nil
 
-        // Switch to the adjacent workspace
-        if nextIsSettings {
-            model.selectSettings()
-            // For settings, capture the settings view instead
-            settingsViewController.notifyWorkspacesChanged()
-        } else if let ws = nextWorkspace {
-            model.selectWorkspace(id: ws.id)
-            // Update content views with next workspace's data
-            pinnedTabsView.update(pinnedLinks: ws.pinnedLinks)
-            let filteredNodes = searchCoordinator.filter(nodes: ws.items)
-            nodeListViewController.reloadData(with: filteredNodes, forceExpand: false)
-        }
+        // Switch to the adjacent workspace and update views without animation
+        model.selectWorkspace(id: nextWorkspace.id)
+        pinnedTabsView.update(pinnedLinks: nextWorkspace.pinnedLinks)
+        let filteredNodes = searchCoordinator.filter(nodes: nextWorkspace.items)
+        nodeListViewController.reloadData(with: filteredNodes, forceExpand: false, animated: false)
 
         // Force layout so the views render with new data
         workspaceContentStack.layoutSubtreeIfNeeded()
@@ -1003,18 +990,12 @@ extension MainViewController: SwipeGestureServiceDelegate {
             swipePreviewSnapshot = image
         }
 
-        // Restore original workspace
-        if wasSettings {
-            model.selectSettings()
-        } else {
-            model.selectWorkspace(id: currentId)
-        }
-
-        // Restore content views
+        // Restore original workspace and content without animation
+        model.selectWorkspace(id: currentId)
         let currentWorkspace = model.currentWorkspace
         pinnedTabsView.update(pinnedLinks: currentWorkspace.pinnedLinks)
         let currentNodes = searchCoordinator.filter(nodes: currentWorkspace.items)
-        nodeListViewController.reloadData(with: currentNodes, forceExpand: searchCoordinator.isSearchActive)
+        nodeListViewController.reloadData(with: currentNodes, forceExpand: searchCoordinator.isSearchActive, animated: false)
         workspaceContentStack.layoutSubtreeIfNeeded()
 
         // Restore onChange
