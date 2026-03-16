@@ -36,8 +36,8 @@ final class SwipeGestureService: @unchecked Sendable {
     private var isHorizontalGesture = false
     private var hasTriggered = false
 
-    private let directionLockThreshold: CGFloat = 10
-    private let triggerThreshold: CGFloat = 50
+    private let directionLockThreshold: CGFloat = 15
+    private let triggerThreshold: CGFloat = 150
 
     private init() {}
 
