@@ -601,6 +601,9 @@ final class MainViewController: NSViewController {
         model.moveWorkspace(id: workspace.id, direction: .right)
     }
 
+    /// The workspace switcher view, exposed for swipe gesture exclusion.
+    var workspaceSwitcherView: NSView { workspaceSwitcher }
+
     func navigateToPreviousWorkspace() {
         let workspaces = model.workspaces
         if model.state.isSettingsSelected {

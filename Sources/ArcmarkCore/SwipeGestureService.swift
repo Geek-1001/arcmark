@@ -24,6 +24,10 @@ final class SwipeGestureService: @unchecked Sendable {
     private var localMonitor: Any?
     private weak var window: NSWindow?
 
+    /// Views that should take priority over the swipe gesture (e.g., horizontal scroll views).
+    /// If the cursor is over any of these views when a gesture begins, tracking is skipped.
+    private var excludedViews: [WeakView] = []
+
     // Gesture state — accessed synchronously from main-thread event monitor callbacks
     private var isTracking = false
     private var accumulatedDeltaX: CGFloat = 0
@@ -36,6 +40,12 @@ final class SwipeGestureService: @unchecked Sendable {
     private let triggerThreshold: CGFloat = 50
 
     private init() {}
+
+    /// Registers a view whose area should be excluded from swipe gesture detection.
+    @MainActor
+    func addExcludedView(_ view: NSView) {
+        excludedViews.append(WeakView(view: view))
+    }
 
     @MainActor
     func enable(window: NSWindow) {
@@ -97,6 +107,16 @@ final class SwipeGestureService: @unchecked Sendable {
 
         let mouseLocation = NSEvent.mouseLocation
         guard window.frame.contains(mouseLocation) else { return }
+
+        // Don't track if cursor is over an excluded view (e.g., workspace switcher)
+        let windowPoint = window.convertPoint(fromScreen: mouseLocation)
+        for weakView in excludedViews {
+            guard let view = weakView.view else { continue }
+            let viewPoint = view.convert(windowPoint, from: nil)
+            if view.bounds.contains(viewPoint) {
+                return
+            }
+        }
 
         resetState()
         isTracking = true
@@ -163,4 +183,9 @@ final class SwipeGestureService: @unchecked Sendable {
             body(delegate)
         }
     }
+}
+
+/// Weak reference wrapper for NSView to avoid retain cycles in the excluded views list.
+private struct WeakView {
+    weak var view: NSView?
 }
