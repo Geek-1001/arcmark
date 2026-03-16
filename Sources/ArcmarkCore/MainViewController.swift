@@ -850,7 +850,7 @@ extension MainViewController: SwipeGestureServiceDelegate {
         }
 
         guard canNavigate else {
-            animateSnapBack()
+            animateSpringBounce()
             return
         }
 
@@ -935,8 +935,24 @@ extension MainViewController: SwipeGestureServiceDelegate {
         guard let layer = workspaceContentStack.layer else { return }
         isSwipeAnimating = true
 
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(0.25)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+        CATransaction.setCompletionBlock { [weak self] in
+            self?.isSwipeAnimating = false
+            self?.removeSwipePreview()
+        }
+        layer.transform = CATransform3DIdentity
+        CATransaction.commit()
+    }
+
+    /// Spring bounce used when swiping at an edge with no adjacent workspace.
+    private func animateSpringBounce() {
+        guard let layer = workspaceContentStack.layer else { return }
+        isSwipeAnimating = true
+
         let spring = CASpringAnimation(keyPath: "transform.translation.x")
-        spring.fromValue = layer.transform.m41  // current X offset
+        spring.fromValue = layer.transform.m41
         spring.toValue = 0
         spring.mass = 1.0
         spring.stiffness = 400
@@ -948,12 +964,12 @@ extension MainViewController: SwipeGestureServiceDelegate {
 
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
-            layer.removeAnimation(forKey: "snapBack")
+            layer.removeAnimation(forKey: "springBounce")
             layer.transform = CATransform3DIdentity
             self?.isSwipeAnimating = false
             self?.removeSwipePreview()
         }
-        layer.add(spring, forKey: "snapBack")
+        layer.add(spring, forKey: "springBounce")
         CATransaction.commit()
     }
 
