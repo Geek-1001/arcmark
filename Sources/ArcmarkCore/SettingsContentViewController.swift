@@ -30,6 +30,7 @@ final class SettingsContentViewController: NSViewController {
 
     // Display section
     private let tooltipsToggle = CustomToggle(title: "Show full URL tooltip on hover")
+    private let swipeToSwitchToggle = CustomToggle(title: "Swipe to switch workspaces")
 
     // Keyboard Shortcuts section
     private let shortcutRecorder = ShortcutRecorderView()
@@ -243,6 +244,10 @@ final class SettingsContentViewController: NSViewController {
         tooltipsToggle.action = #selector(tooltipsChanged)
         tooltipsToggle.translatesAutoresizingMaskIntoConstraints = false
 
+        swipeToSwitchToggle.target = self
+        swipeToSwitchToggle.action = #selector(swipeToSwitchChanged)
+        swipeToSwitchToggle.translatesAutoresizingMaskIntoConstraints = false
+
         let separatorDisplay = createSeparator()
 
         // Workspace Management Section
@@ -360,6 +365,7 @@ final class SettingsContentViewController: NSViewController {
         contentView.addSubview(separatorKS)
         contentView.addSubview(displayHeader)
         contentView.addSubview(tooltipsToggle)
+        contentView.addSubview(swipeToSwitchToggle)
         contentView.addSubview(separatorDisplay)
         contentView.addSubview(workspaceHeader)
         contentView.addSubview(workspaceCollectionView)
@@ -442,10 +448,15 @@ final class SettingsContentViewController: NSViewController {
             tooltipsToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
             tooltipsToggle.heightAnchor.constraint(equalToConstant: 28),
 
+            swipeToSwitchToggle.leadingAnchor.constraint(equalTo: displayHeader.leadingAnchor),
+            swipeToSwitchToggle.topAnchor.constraint(equalTo: tooltipsToggle.bottomAnchor, constant: 8),
+            swipeToSwitchToggle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
+            swipeToSwitchToggle.heightAnchor.constraint(equalToConstant: 28),
+
             // Separator Display
             separatorDisplay.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
             separatorDisplay.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
-            separatorDisplay.topAnchor.constraint(equalTo: tooltipsToggle.bottomAnchor, constant: sectionSpacing),
+            separatorDisplay.topAnchor.constraint(equalTo: swipeToSwitchToggle.bottomAnchor, constant: sectionSpacing),
             separatorDisplay.heightAnchor.constraint(equalToConstant: 1),
 
             // Workspace Management Header
@@ -614,6 +625,10 @@ final class SettingsContentViewController: NSViewController {
         // Load tooltips state
         let tooltipsEnabled = UserDefaults.standard.bool(forKey: UserDefaultsKeys.tooltipsEnabled)
         tooltipsToggle.isOn = tooltipsEnabled
+
+        // Load swipe to switch state
+        let swipeToSwitchEnabled = UserDefaults.standard.bool(forKey: UserDefaultsKeys.swipeToSwitchEnabled)
+        swipeToSwitchToggle.isOn = swipeToSwitchEnabled
 
         // Apply mutual exclusion and enable states
         updateControlStates()
@@ -795,6 +810,12 @@ final class SettingsContentViewController: NSViewController {
         let enabled = tooltipsToggle.isOn
         UserDefaults.standard.set(enabled, forKey: UserDefaultsKeys.tooltipsEnabled)
         NotificationCenter.default.post(name: .tooltipsSettingChanged, object: nil)
+    }
+
+    @objc private func swipeToSwitchChanged() {
+        let enabled = swipeToSwitchToggle.isOn
+        UserDefaults.standard.set(enabled, forKey: UserDefaultsKeys.swipeToSwitchEnabled)
+        NotificationCenter.default.post(name: .swipeToSwitchSettingChanged, object: nil)
     }
 
     private func shortcutChanged(_ shortcut: KeyboardShortcut?) {
