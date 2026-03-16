@@ -887,8 +887,6 @@ extension MainViewController: SwipeGestureServiceDelegate {
             case .left: self.navigateToNextWorkspace()
             }
 
-            self.suppressNodeAnimations = false
-
             // Position on opposite side
             CATransaction.begin()
             CATransaction.setDisableActions(true)
@@ -900,6 +898,7 @@ extension MainViewController: SwipeGestureServiceDelegate {
             CATransaction.setAnimationDuration(ThemeConstants.Animation.durationNormal)
             CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
             CATransaction.setCompletionBlock { [weak self] in
+                self?.suppressNodeAnimations = false
                 self?.isSwipeAnimating = false
             }
             layer.transform = CATransform3DIdentity
