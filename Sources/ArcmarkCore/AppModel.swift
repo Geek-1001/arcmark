@@ -337,6 +337,16 @@ final class AppModel {
     func groupNodesInNewFolder(nodeIds: [UUID], folderName: String) -> UUID? {
         guard !nodeIds.isEmpty else { return nil }
 
+        // Find locations BEFORE removal to determine correct insertion point
+        let locations = nodeIds.compactMap { findNodeLocation(id: $0, nodes: currentWorkspace.items) }
+
+        // Determine common parent — if all selected nodes share the same parent, use it
+        let parentIds = Set(locations.map { $0.parentId })
+        let commonParentId: UUID? = parentIds.count == 1 ? parentIds.first! : nil
+
+        // Insertion index: earliest position among selected nodes in the common parent
+        let insertionIndex: Int? = parentIds.count == 1 ? locations.map { $0.index }.min() : nil
+
         var nodesToGroup: [Node] = []
 
         updateWorkspace(id: currentWorkspace.id, notify: false) { workspace in
@@ -352,7 +362,7 @@ final class AppModel {
         let folder = Folder(id: UUID(), name: folderName, children: nodesToGroup, isExpanded: true)
 
         updateWorkspace(id: currentWorkspace.id) { workspace in
-            workspace.items.append(.folder(folder))
+            insertNode(.folder(folder), parentId: commonParentId, index: insertionIndex, nodes: &workspace.items)
         }
 
         return folder.id
