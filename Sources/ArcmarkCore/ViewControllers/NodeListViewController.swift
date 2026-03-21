@@ -691,6 +691,8 @@ extension NodeListViewController: NSCollectionViewDelegate {
                         willBeginAt screenPoint: NSPoint,
                         forItemsAt indexPaths: Set<IndexPath>) {
         isDraggingItems = true
+        NodeRowView.isDragging = true
+        NodeRowView.hideSharedTooltip()
     }
 
     func collectionView(_ collectionView: NSCollectionView,
@@ -698,6 +700,7 @@ extension NodeListViewController: NSCollectionViewDelegate {
                         endedAt screenPoint: NSPoint,
                         dragOperation operation: NSDragOperation) {
         isDraggingItems = false
+        NodeRowView.isDragging = false
         hideDropIndicator()
     }
 

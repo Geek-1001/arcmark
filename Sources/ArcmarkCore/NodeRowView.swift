@@ -12,6 +12,7 @@ final class NodeRowView: BaseView {
     private var tooltipShowTask: DispatchWorkItem?
     private static let sharedTooltip = CustomTooltipView()
     private static weak var activeTooltipTask: DispatchWorkItem?
+    static var isDragging = false
     private var iconLeadingConstraint: NSLayoutConstraint?
     private var iconWidthConstraint: NSLayoutConstraint?
     private var iconHeightConstraint: NSLayoutConstraint?
@@ -155,7 +156,7 @@ final class NodeRowView: BaseView {
         tooltipShowTask?.cancel()
         tooltipShowTask = nil
 
-        if isHovered,
+        if isHovered, !NodeRowView.isDragging,
            let url = tooltipURL, !url.isEmpty,
            UserDefaults.standard.bool(forKey: UserDefaultsKeys.tooltipsEnabled) {
             let task = DispatchWorkItem { [weak self] in
