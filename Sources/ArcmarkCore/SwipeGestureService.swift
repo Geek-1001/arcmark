@@ -13,12 +13,12 @@ protocol SwipeGestureServiceDelegate: AnyObject {
 }
 
 /// Detects horizontal trackpad swipes via global+local NSEvent monitors.
-/// Not @MainActor so event monitor callbacks can access state synchronously
-/// (event monitors always run on main thread).
-final class SwipeGestureService: @unchecked Sendable {
-    @MainActor static let shared = SwipeGestureService()
+/// Event monitors always run on the main thread, so @MainActor is safe here.
+@MainActor
+final class SwipeGestureService {
+    static let shared = SwipeGestureService()
 
-    @MainActor weak var delegate: SwipeGestureServiceDelegate?
+    weak var delegate: SwipeGestureServiceDelegate?
 
     private var globalMonitor: Any?
     private var localMonitor: Any?
@@ -42,12 +42,10 @@ final class SwipeGestureService: @unchecked Sendable {
     private init() {}
 
     /// Registers a view whose area should be excluded from swipe gesture detection.
-    @MainActor
     func addExcludedView(_ view: NSView) {
         excludedViews.append(WeakView(view: view))
     }
 
-    @MainActor
     func enable(window: NSWindow) {
         self.window = window
         disable()
@@ -71,7 +69,6 @@ final class SwipeGestureService: @unchecked Sendable {
         }
     }
 
-    @MainActor
     func disable() {
         if let globalMonitor {
             NSEvent.removeMonitor(globalMonitor)
@@ -175,13 +172,9 @@ final class SwipeGestureService: @unchecked Sendable {
         hasTriggered = false
     }
 
-    /// Dispatches delegate calls on MainActor. Since event monitors run on
-    /// the main thread, this executes synchronously via assumeIsolated.
-    private func notifyDelegate(_ body: @escaping @MainActor (SwipeGestureServiceDelegate) -> Void) {
-        MainActor.assumeIsolated {
-            guard let delegate = self.delegate else { return }
-            body(delegate)
-        }
+    private func notifyDelegate(_ body: (SwipeGestureServiceDelegate) -> Void) {
+        guard let delegate else { return }
+        body(delegate)
     }
 }
 
