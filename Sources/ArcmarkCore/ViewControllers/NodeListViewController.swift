@@ -53,6 +53,7 @@ final class NodeListViewController: NSViewController {
     var onBulkOpenLinks: (([UUID]) -> Void)?
     var onPinLink: ((UUID) -> Void)?
     var canPinLink: (() -> Bool)?
+    var onChangeIconRequested: ((UUID, NSView) -> Void)?
 
     // Data provider closure
     var nodeProvider: (() -> [Node])?
@@ -536,6 +537,26 @@ final class NodeListViewController: NSViewController {
     }
 }
 
+// MARK: - Emoji Helper
+
+extension NodeListViewController {
+    static func imageFromEmoji(_ emoji: String, size: CGFloat) -> NSImage {
+        let image = NSImage(size: NSSize(width: size, height: size))
+        image.lockFocus()
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: size * 0.85)
+        ]
+        let string = NSAttributedString(string: emoji, attributes: attributes)
+        let stringSize = string.size()
+        let x = (size - stringSize.width) / 2
+        let y = (size - stringSize.height) / 2
+        string.draw(at: NSPoint(x: x, y: y))
+        image.unlockFocus()
+        image.isTemplate = false
+        return image
+    }
+}
+
 // MARK: - NSCollectionViewDataSource
 
 extension NodeListViewController: NSCollectionViewDataSource {
@@ -569,17 +590,38 @@ extension NodeListViewController: NSCollectionViewDataSource {
                 isSelected: isSelected
             )
         case .link(let link):
-            let globeIconConfig = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
-            let placeholder = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?.withSymbolConfiguration(globeIconConfig)
-            placeholder?.isTemplate = true
-            var iconToUse = placeholder
+            var iconToUse: NSImage?
             var shouldFetch = true
-            if let path = link.faviconPath,
+
+            if let customIcon = link.customIcon {
+                shouldFetch = false
+                switch customIcon {
+                case .emoji(let emoji):
+                    iconToUse = Self.imageFromEmoji(emoji, size: 20)
+                case .sfSymbol(let name):
+                    let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+                    let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+                        .withSymbolConfiguration(config)
+                    image?.isTemplate = true
+                    iconToUse = image
+                case .cachedFavicon(let path):
+                    if FileManager.default.fileExists(atPath: path),
+                       let image = NSImage(contentsOfFile: path) {
+                        image.isTemplate = false
+                        iconToUse = image
+                    }
+                }
+            } else if let path = link.faviconPath,
                FileManager.default.fileExists(atPath: path),
                let image = NSImage(contentsOfFile: path) {
                 image.isTemplate = false
                 iconToUse = image
                 shouldFetch = false
+            } else {
+                let globeIconConfig = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+                let placeholder = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?.withSymbolConfiguration(globeIconConfig)
+                placeholder?.isTemplate = true
+                iconToUse = placeholder
             }
 
             nodeItem.configure(
@@ -855,6 +897,13 @@ extension NodeListViewController: NSMenuDelegate {
             editUrl.representedObject = node.id
             menu.addItem(editUrl)
 
+            menu.addItem(NSMenuItem.separator())
+
+            let changeIcon = NSMenuItem(title: "Change Icon…", action: #selector(contextChangeIcon(_:)), keyEquivalent: "")
+            changeIcon.target = self
+            changeIcon.representedObject = node.id
+            menu.addItem(changeIcon)
+
             let moveMenu = NSMenuItem(title: "Move to", action: nil, keyEquivalent: "")
             let submenu = NSMenu()
             if let workspaces = workspacesProvider?(), let currentId = currentWorkspaceIdProvider?() {
@@ -939,6 +988,13 @@ extension NodeListViewController: NSMenuDelegate {
     @objc private func contextPinLink(_ sender: NSMenuItem) {
         guard let nodeId = sender.representedObject as? UUID else { return }
         onPinLink?(nodeId)
+    }
+
+    @objc private func contextChangeIcon(_ sender: NSMenuItem) {
+        guard let nodeId = sender.representedObject as? UUID,
+              let indexPath = contextIndexPath,
+              let item = collectionView.item(at: indexPath) else { return }
+        onChangeIconRequested?(nodeId, item.view)
     }
 
     private func populateBulkContextMenu(_ menu: NSMenu) {

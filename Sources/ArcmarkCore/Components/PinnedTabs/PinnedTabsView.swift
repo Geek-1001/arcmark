@@ -94,6 +94,10 @@ final class PinnedTabsView: NSView {
         return NSSize(width: NSView.noIntrinsicMetric, height: height)
     }
 
+    func tileView(for linkId: UUID) -> PinnedTabTileView? {
+        tileViews.first(where: { $0.linkId == linkId })
+    }
+
     private func fetchFaviconIfNeeded(for link: Link) {
         guard link.faviconPath == nil || !FileManager.default.fileExists(atPath: link.faviconPath ?? "") else { return }
         guard let url = URL(string: link.url) else { return }
