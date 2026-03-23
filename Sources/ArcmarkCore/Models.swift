@@ -77,11 +77,58 @@ struct Workspace: Codable, Identifiable, Equatable {
     }
 }
 
+enum CustomIcon: Codable, Equatable, Sendable {
+    case emoji(String)
+    case sfSymbol(String)
+    case cachedFavicon(String)
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case value
+    }
+
+    private enum IconType: String, Codable {
+        case emoji
+        case sfSymbol
+        case cachedFavicon
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(IconType.self, forKey: .type)
+        let value = try container.decode(String.self, forKey: .value)
+        switch type {
+        case .emoji:
+            self = .emoji(value)
+        case .sfSymbol:
+            self = .sfSymbol(value)
+        case .cachedFavicon:
+            self = .cachedFavicon(value)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .emoji(let value):
+            try container.encode(IconType.emoji, forKey: .type)
+            try container.encode(value, forKey: .value)
+        case .sfSymbol(let value):
+            try container.encode(IconType.sfSymbol, forKey: .type)
+            try container.encode(value, forKey: .value)
+        case .cachedFavicon(let value):
+            try container.encode(IconType.cachedFavicon, forKey: .type)
+            try container.encode(value, forKey: .value)
+        }
+    }
+}
+
 struct Link: Codable, Identifiable, Equatable, Sendable {
     var id: UUID
     var title: String
     var url: String
     var faviconPath: String?
+    var customIcon: CustomIcon?
 }
 
 struct Folder: Codable, Identifiable, Equatable, Sendable {
