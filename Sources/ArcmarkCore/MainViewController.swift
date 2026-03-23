@@ -981,15 +981,68 @@ extension MainViewController: SwipeGestureServiceDelegate {
         guard let layer = workspaceContentStack.layer else { return }
         isSwipeAnimating = true
 
-        CATransaction.begin()
-        CATransaction.setAnimationDuration(ThemeConstants.Animation.durationSlow)
-        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-        CATransaction.setCompletionBlock { [weak self] in
-            self?.isSwipeAnimating = false
-            self?.removeSwipePreview()
+        let containerWidth = swipeClipContainer.bounds.width
+        let containerHeight = swipeClipContainer.bounds.height
+        let currentOffset = layer.presentation()?.transform.m41 ?? layer.transform.m41
+
+        // Capture snapshot of current workspace content
+        let contentSnapshotView = NSView(frame: NSRect(x: 0, y: 0, width: containerWidth, height: containerHeight))
+        contentSnapshotView.wantsLayer = true
+        let contentBounds = workspaceContentStack.bounds
+        if let bitmap = workspaceContentStack.bitmapImageRepForCachingDisplay(in: contentBounds) {
+            workspaceContentStack.cacheDisplay(in: contentBounds, to: bitmap)
+            let image = NSImage(size: contentBounds.size)
+            image.addRepresentation(bitmap)
+            let imageView = NSImageView(frame: NSRect(x: 0, y: 0, width: containerWidth, height: containerHeight))
+            imageView.imageScaling = .scaleNone
+            imageView.imageAlignment = .alignTopLeft
+            imageView.image = image
+            contentSnapshotView.addSubview(imageView)
         }
+
+        // Build snapshot of adjacent workspace preview
+        let previewSnapshotView = NSView(frame: NSRect(x: 0, y: 0, width: containerWidth, height: containerHeight))
+        previewSnapshotView.wantsLayer = true
+        if let previewImage = swipePreviewSnapshot {
+            let imageView = NSImageView(frame: NSRect(x: 0, y: 0, width: containerWidth, height: containerHeight))
+            imageView.imageScaling = .scaleNone
+            imageView.imageAlignment = .alignTopLeft
+            imageView.image = previewImage
+            previewSnapshotView.addSubview(imageView)
+        }
+
+        // Reset real content and remove preview
+        removeSwipePreview()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         layer.transform = CATransform3DIdentity
         CATransaction.commit()
+        workspaceContentStack.isHidden = true
+
+        // Position snapshots at current visual positions
+        contentSnapshotView.frame.origin.x = currentOffset
+        let previewStartX: CGFloat = currentOffset > 0
+            ? currentOffset - containerWidth  // preview is to the left
+            : currentOffset + containerWidth   // preview is to the right
+        previewSnapshotView.frame.origin.x = previewStartX
+
+        swipeClipContainer.addSubview(previewSnapshotView)
+        swipeClipContainer.addSubview(contentSnapshotView)
+
+        // Animate: content slides back to origin, preview slides off-screen
+        let previewEndX: CGFloat = currentOffset > 0 ? -containerWidth : containerWidth
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = ThemeConstants.Animation.durationFast
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.allowsImplicitAnimation = true
+            contentSnapshotView.animator().frame.origin.x = 0
+            previewSnapshotView.animator().frame.origin.x = previewEndX
+        }, completionHandler: { [weak self] in
+            contentSnapshotView.removeFromSuperview()
+            previewSnapshotView.removeFromSuperview()
+            self?.workspaceContentStack.isHidden = false
+            self?.isSwipeAnimating = false
+        })
     }
 
     /// Spring bounce used when swiping at an edge with no adjacent workspace.
