@@ -912,14 +912,31 @@ extension MainViewController: SwipeGestureServiceDelegate {
         swipeClipContainer.addSubview(currentSnapshotView)
         swipeClipContainer.addSubview(incomingSnapshotView)
 
-        // Animate both snapshots: current slides out, incoming slides in
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = ThemeConstants.Animation.durationNormal
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            context.allowsImplicitAnimation = true
-            currentSnapshotView.animator().frame.origin.x = slideOffX
-            incomingSnapshotView.animator().frame.origin.x = 0
-        }, completionHandler: { [weak self] in
+        // Animate both snapshots with spring physics (matches edge bounce feel)
+        let currentSpring = CASpringAnimation(keyPath: "position.x")
+        currentSpring.fromValue = currentSnapshotView.layer!.position.x
+        currentSpring.toValue = slideOffX + containerWidth / 2
+        currentSpring.mass = 1.0
+        currentSpring.stiffness = 400
+        currentSpring.damping = 22
+        currentSpring.initialVelocity = 0
+        currentSpring.duration = currentSpring.settlingDuration
+        currentSpring.isRemovedOnCompletion = false
+        currentSpring.fillMode = .forwards
+
+        let incomingSpring = CASpringAnimation(keyPath: "position.x")
+        incomingSpring.fromValue = incomingSnapshotView.layer!.position.x
+        incomingSpring.toValue = containerWidth / 2
+        incomingSpring.mass = 1.0
+        incomingSpring.stiffness = 400
+        incomingSpring.damping = 22
+        incomingSpring.initialVelocity = 0
+        incomingSpring.duration = incomingSpring.settlingDuration
+        incomingSpring.isRemovedOnCompletion = false
+        incomingSpring.fillMode = .forwards
+
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
             guard let self else { return }
 
             // Remove snapshots
@@ -952,7 +969,10 @@ extension MainViewController: SwipeGestureServiceDelegate {
             self.workspaceContentStack.isHidden = false
             self.suppressNodeAnimations = false
             self.isSwipeAnimating = false
-        })
+        }
+        currentSnapshotView.layer!.add(currentSpring, forKey: "swipeTransition")
+        incomingSnapshotView.layer!.add(incomingSpring, forKey: "swipeTransition")
+        CATransaction.commit()
     }
 
     func swipeGestureDidCancel(_ service: SwipeGestureService) {
