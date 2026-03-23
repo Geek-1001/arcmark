@@ -66,6 +66,14 @@ final class PinnedTabTileView: BaseControl {
                     image.isTemplate = false
                     faviconView.image = image
                     faviconView.contentTintColor = nil
+                } else {
+                    let config = NSImage.SymbolConfiguration(pointSize: ThemeConstants.Sizing.iconLarge, weight: .semibold)
+                    let globe = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?
+                        .withSymbolConfiguration(config)
+                    globe?.isTemplate = true
+                    faviconView.image = globe
+                    faviconView.contentTintColor = ThemeConstants.Colors.darkGray
+                        .withAlphaComponent(ThemeConstants.Opacity.low)
                 }
             }
         } else if let path = link.faviconPath,
