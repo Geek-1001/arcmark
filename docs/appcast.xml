@@ -6,6 +6,28 @@
         <language>en</language>
         <link>https://github.com/Geek-1001/arcmark</link>
             <item>
+                <title>Version 0.1.9</title>
+                <pubDate>Mon, 23 Mar 2026 15:11:39 +0000</pubDate>
+                <description sparkle:format="markdown">
+New:
+- Added horizontal swipe gesture to switch workspaces. It's off by default and can be enabled from Settings.
+- Added the ability to set a custom favicon for saved links. Select emoji, generic icons, or set the favicon from previously saved websites.
+
+Fixes:
+- Hide tooltip during drag-and-drop reordering.
+- Group selected links into a folder at their common parent level.
+- Improve label truncation width in links on hover state.
+                </description>
+                <enclosure
+                    url="https://github.com/Geek-1001/arcmark/releases/download/v0.1.9/Arcmark-0.1.9.dmg"
+                    sparkle:version="0.1.9"
+                    sparkle:shortVersionString="0.1.9"
+                    sparkle:edSignature="tSTDJD4A+ih/PSf2rCrLwibuP/02RcgfWuDr7cFZnrdOqVDXU6iLdpgh3niMIg0MfxGTP2hc0vZ8IrcFWGpaDA=="
+                    length="3175064"
+                    type="application/octet-stream"
+                />
+            </item>
+            <item>
                 <title>Version 0.1.8</title>
                 <pubDate>Sat, 28 Feb 2026 22:32:23 +0000</pubDate>
                 <description sparkle:format="markdown">
