@@ -841,6 +841,7 @@ extension MainViewController: SwipeGestureServiceDelegate {
         guard let layer = workspaceContentStack.layer else { return }
 
         let containerWidth = swipeClipContainer.bounds.width
+        let containerHeight = swipeClipContainer.bounds.height
 
         // Determine if we can actually navigate
         let canNavigate: Bool
@@ -855,7 +856,6 @@ extension MainViewController: SwipeGestureServiceDelegate {
         }
 
         isSwipeAnimating = true
-        let slideOffX: CGFloat = direction == .right ? containerWidth : -containerWidth
 
         // Save current color so applyWorkspaceStyling can animate the transition
         let currentBgColor: NSColor
@@ -865,23 +865,74 @@ extension MainViewController: SwipeGestureServiceDelegate {
             currentBgColor = model.currentWorkspace.colorId.backgroundColor
         }
 
-        // Animate content sliding off-screen
+        // --- Snapshot-based animation ---
+        // Capture a snapshot of the current workspace content at its current drag position
+        let currentSnapshotView = NSView(frame: NSRect(x: 0, y: 0, width: containerWidth, height: containerHeight))
+        currentSnapshotView.wantsLayer = true
+        let contentBounds = workspaceContentStack.bounds
+        if let bitmap = workspaceContentStack.bitmapImageRepForCachingDisplay(in: contentBounds) {
+            workspaceContentStack.cacheDisplay(in: contentBounds, to: bitmap)
+            let image = NSImage(size: contentBounds.size)
+            image.addRepresentation(bitmap)
+            let imageView = NSImageView(frame: NSRect(x: 0, y: 0, width: containerWidth, height: containerHeight))
+            imageView.imageScaling = .scaleNone
+            imageView.imageAlignment = .alignTopLeft
+            imageView.image = image
+            currentSnapshotView.addSubview(imageView)
+        }
+
+        // Build the incoming snapshot from the already-captured preview
+        let incomingSnapshotView = NSView(frame: NSRect(x: 0, y: 0, width: containerWidth, height: containerHeight))
+        incomingSnapshotView.wantsLayer = true
+        if let previewImage = swipePreviewSnapshot {
+            let imageView = NSImageView(frame: NSRect(x: 0, y: 0, width: containerWidth, height: containerHeight))
+            imageView.imageScaling = .scaleNone
+            imageView.imageAlignment = .alignTopLeft
+            imageView.image = previewImage
+            incomingSnapshotView.addSubview(imageView)
+        }
+
+        // Capture current drag offset before resetting
+        let currentOffset = layer.presentation()?.transform.m41 ?? layer.transform.m41
+        let slideOffX: CGFloat = direction == .right ? containerWidth : -containerWidth
+        let incomingStartX: CGFloat = direction == .right ? currentOffset - containerWidth : currentOffset + containerWidth
+
+        // Remove the drag preview and reset the real content layer
+        removeSwipePreview()
         CATransaction.begin()
-        CATransaction.setAnimationDuration(ThemeConstants.Animation.durationNormal)
-        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeIn))
-        CATransaction.setCompletionBlock { [weak self] in
+        CATransaction.setDisableActions(true)
+        layer.transform = CATransform3DIdentity
+        CATransaction.commit()
+
+        // Hide the real content and place snapshots in the clip container
+        workspaceContentStack.isHidden = true
+
+        currentSnapshotView.frame.origin.x = currentOffset
+        incomingSnapshotView.frame.origin.x = incomingStartX
+        swipeClipContainer.addSubview(currentSnapshotView)
+        swipeClipContainer.addSubview(incomingSnapshotView)
+
+        // Animate both snapshots: current slides out, incoming slides in
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = ThemeConstants.Animation.durationNormal
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.allowsImplicitAnimation = true
+            currentSnapshotView.animator().frame.origin.x = slideOffX
+            incomingSnapshotView.animator().frame.origin.x = 0
+        }, completionHandler: { [weak self] in
             guard let self else { return }
 
-            // Remove preview before switching
-            self.removeSwipePreview()
+            // Remove snapshots
+            currentSnapshotView.removeFromSuperview()
+            incomingSnapshotView.removeFromSuperview()
 
             // Set the from-color so reloadData → applyWorkspaceStyling animates the color
             self.swipeColorAnimationFromColor = currentBgColor
 
-            // Suppress collection view animations — the slide animation handles the transition
+            // Suppress collection view animations — we already animated via snapshots
             self.suppressNodeAnimations = true
 
-            // Suppress async onChange to prevent mid-animation content snap
+            // Suppress async onChange to prevent extra reload
             let savedOnChange = self.model.onChange
             self.model.onChange = nil
 
@@ -891,31 +942,17 @@ extension MainViewController: SwipeGestureServiceDelegate {
             case .left: self.navigateToNextWorkspace()
             }
 
-            // Synchronously update UI while content is off-screen
+            // Synchronously update UI with new workspace data
             self.reloadData()
 
             // Restore onChange for future state changes
             self.model.onChange = savedOnChange
 
-            // Position on opposite side
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            layer.transform = CATransform3DMakeTranslation(-slideOffX, 0, 0)
-            CATransaction.commit()
-
-            // Animate sliding in
-            CATransaction.begin()
-            CATransaction.setAnimationDuration(ThemeConstants.Animation.durationNormal)
-            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
-            CATransaction.setCompletionBlock { [weak self] in
-                self?.suppressNodeAnimations = false
-                self?.isSwipeAnimating = false
-            }
-            layer.transform = CATransform3DIdentity
-            CATransaction.commit()
-        }
-        layer.transform = CATransform3DMakeTranslation(slideOffX, 0, 0)
-        CATransaction.commit()
+            // Show the real content (now displaying new workspace)
+            self.workspaceContentStack.isHidden = false
+            self.suppressNodeAnimations = false
+            self.isSwipeAnimating = false
+        })
     }
 
     func swipeGestureDidCancel(_ service: SwipeGestureService) {
