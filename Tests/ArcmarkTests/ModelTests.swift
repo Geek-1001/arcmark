@@ -624,6 +624,83 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(Set(collectedLinks.map(\.url)), Set(["https://root.com", "https://nested.com"]))
     }
 
+    // MARK: - Custom Icon Tests
+
+    func testCustomIconJSONRoundTrip() throws {
+        let link = Link(id: UUID(), title: "Test", url: "https://test.com", faviconPath: nil, customIcon: .emoji("🔥"))
+        let data = try JSONEncoder().encode(link)
+        let decoded = try JSONDecoder().decode(Link.self, from: data)
+        XCTAssertEqual(decoded.customIcon, .emoji("🔥"))
+    }
+
+    func testCustomIconSFSymbolRoundTrip() throws {
+        let link = Link(id: UUID(), title: "Test", url: "https://test.com", faviconPath: nil, customIcon: .sfSymbol("star.fill"))
+        let data = try JSONEncoder().encode(link)
+        let decoded = try JSONDecoder().decode(Link.self, from: data)
+        XCTAssertEqual(decoded.customIcon, .sfSymbol("star.fill"))
+    }
+
+    func testCustomIconNilRoundTrip() throws {
+        let link = Link(id: UUID(), title: "Test", url: "https://test.com", faviconPath: nil)
+        let data = try JSONEncoder().encode(link)
+        let decoded = try JSONDecoder().decode(Link.self, from: data)
+        XCTAssertNil(decoded.customIcon)
+    }
+
+    func testBackwardCompatibilityNoCustomIcon() throws {
+        let json = """
+        {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "title": "Old Link",
+            "url": "https://old.com"
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(Link.self, from: data)
+        XCTAssertEqual(decoded.title, "Old Link")
+        XCTAssertNil(decoded.customIcon)
+        XCTAssertNil(decoded.faviconPath)
+    }
+
+    func testSetLinkCustomIcon() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let linkId = model.addLink(urlString: "https://a.com", title: "A", parentId: nil)
+
+        // Set emoji custom icon
+        model.setLinkCustomIcon(id: linkId, icon: .emoji("🚀"))
+        if let node = model.nodeById(linkId), case .link(let link) = node {
+            XCTAssertEqual(link.customIcon, .emoji("🚀"))
+        } else {
+            XCTFail("Expected link")
+        }
+
+        // Restore (set to nil)
+        model.setLinkCustomIcon(id: linkId, icon: nil)
+        if let node = model.nodeById(linkId), case .link(let link) = node {
+            XCTAssertNil(link.customIcon)
+        } else {
+            XCTFail("Expected link")
+        }
+    }
+
+    func testSetPinnedLinkCustomIcon() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let linkId = model.addLink(urlString: "https://a.com", title: "A", parentId: nil)
+        model.pinLink(id: linkId)
+
+        model.setPinnedLinkCustomIcon(id: linkId, icon: .sfSymbol("heart.fill"))
+        XCTAssertEqual(model.currentWorkspace.pinnedLinks[0].customIcon, .sfSymbol("heart.fill"))
+
+        model.setPinnedLinkCustomIcon(id: linkId, icon: nil)
+        XCTAssertNil(model.currentWorkspace.pinnedLinks[0].customIcon)
+    }
+
     func testMultipleBrowserProfiles() {
         let store = makeStore()
         store.save(DataStore.defaultState())

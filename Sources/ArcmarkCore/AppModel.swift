@@ -293,6 +293,25 @@ final class AppModel {
         }
     }
 
+    func setLinkCustomIcon(id: UUID, icon: CustomIcon?) {
+        updateNode(id: id) { node in
+            switch node {
+            case .link(var link):
+                link.customIcon = icon
+                node = .link(link)
+            case .folder:
+                break
+            }
+        }
+    }
+
+    func setPinnedLinkCustomIcon(id: UUID, icon: CustomIcon?) {
+        updateWorkspace(id: currentWorkspace.id) { workspace in
+            guard let index = workspace.pinnedLinks.firstIndex(where: { $0.id == id }) else { return }
+            workspace.pinnedLinks[index].customIcon = icon
+        }
+    }
+
     func location(of nodeId: UUID) -> NodeLocation? {
         findNodeLocation(id: nodeId, nodes: currentWorkspace.items)
     }

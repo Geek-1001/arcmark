@@ -46,7 +46,37 @@ final class PinnedTabTileView: BaseControl {
         linkId = link.id
         linkURL = link.url
 
-        if let path = link.faviconPath,
+        if let customIcon = link.customIcon {
+            switch customIcon {
+            case .emoji(let emoji):
+                let image = NodeListViewController.imageFromEmoji(emoji, size: ThemeConstants.Sizing.iconLarge)
+                faviconView.image = image
+                faviconView.contentTintColor = nil
+            case .sfSymbol(let name):
+                let config = NSImage.SymbolConfiguration(pointSize: ThemeConstants.Sizing.iconLarge, weight: .semibold)
+                let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+                    .withSymbolConfiguration(config)
+                image?.isTemplate = true
+                faviconView.image = image
+                faviconView.contentTintColor = ThemeConstants.Colors.darkGray
+                    .withAlphaComponent(ThemeConstants.Opacity.high)
+            case .cachedFavicon(let path):
+                if FileManager.default.fileExists(atPath: path),
+                   let image = NSImage(contentsOfFile: path) {
+                    image.isTemplate = false
+                    faviconView.image = image
+                    faviconView.contentTintColor = nil
+                } else {
+                    let config = NSImage.SymbolConfiguration(pointSize: ThemeConstants.Sizing.iconLarge, weight: .semibold)
+                    let globe = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?
+                        .withSymbolConfiguration(config)
+                    globe?.isTemplate = true
+                    faviconView.image = globe
+                    faviconView.contentTintColor = ThemeConstants.Colors.darkGray
+                        .withAlphaComponent(ThemeConstants.Opacity.low)
+                }
+            }
+        } else if let path = link.faviconPath,
            FileManager.default.fileExists(atPath: path),
            let image = NSImage(contentsOfFile: path) {
             image.isTemplate = false

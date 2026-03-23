@@ -343,6 +343,11 @@ final class MainViewController: NSViewController {
         nodeListViewController.canPinLink = { [weak self] in
             self?.model.canPinMore ?? false
         }
+
+        nodeListViewController.onChangeIconRequested = { [weak self] nodeId, anchorView in
+            guard let self, let node = self.model.nodeById(nodeId), case .link(let link) = node else { return }
+            self.showIconPicker(for: nodeId, relativeTo: anchorView, hasCustomIcon: link.customIcon != nil, isPinned: false)
+        }
     }
 
     private func bindModel() {
@@ -767,12 +772,69 @@ final class MainViewController: NSViewController {
         unpinItem.target = self
         unpinItem.representedObject = linkId
         menu.addItem(unpinItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let changeIcon = NSMenuItem(title: "Change Icon…", action: #selector(changePinnedTabIcon(_:)), keyEquivalent: "")
+        changeIcon.target = self
+        changeIcon.representedObject = linkId
+        menu.addItem(changeIcon)
+
         NSMenu.popUpContextMenu(menu, with: event, for: pinnedTabsView)
     }
 
     @objc private func unpinTab(_ sender: NSMenuItem) {
         guard let linkId = sender.representedObject as? UUID else { return }
         model.unpinLink(id: linkId)
+    }
+
+    @objc private func changePinnedTabIcon(_ sender: NSMenuItem) {
+        guard let linkId = sender.representedObject as? UUID,
+              let link = model.pinnedLinkById(linkId) else { return }
+        // Find the tile view for this pinned link
+        let anchorView = pinnedTabsView.tileView(for: linkId) ?? pinnedTabsView
+        showIconPicker(for: linkId, relativeTo: anchorView, hasCustomIcon: link.customIcon != nil, isPinned: true)
+    }
+
+    private func showIconPicker(for linkId: UUID, relativeTo anchorView: NSView, hasCustomIcon: Bool, isPinned: Bool) {
+        let popover = NSPopover()
+        let pickerController = IconPickerPopoverController()
+        pickerController.showRestoreButton = hasCustomIcon
+
+        pickerController.onIconSelected = { [weak self, weak popover] icon in
+            guard let self else { return }
+            if isPinned {
+                self.model.setPinnedLinkCustomIcon(id: linkId, icon: icon)
+            } else {
+                self.model.setLinkCustomIcon(id: linkId, icon: icon)
+            }
+            popover?.close()
+        }
+
+        pickerController.onRestoreFavicon = { [weak self, weak popover] in
+            guard let self else { return }
+            if isPinned {
+                self.model.setPinnedLinkCustomIcon(id: linkId, icon: nil)
+            } else {
+                self.model.setLinkCustomIcon(id: linkId, icon: nil)
+            }
+            popover?.close()
+        }
+
+        pickerController.onFaviconPathSelected = { [weak self, weak popover] path in
+            guard let self else { return }
+            if isPinned {
+                self.model.setPinnedLinkCustomIcon(id: linkId, icon: .cachedFavicon(path))
+            } else {
+                self.model.setLinkCustomIcon(id: linkId, icon: .cachedFavicon(path))
+            }
+            popover?.close()
+        }
+
+        popover.contentViewController = pickerController
+        popover.contentSize = NSSize(width: 280, height: 320)
+        popover.behavior = .transient
+        popover.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .minY)
     }
 
     // MARK: - Bulk Operations
