@@ -609,6 +609,11 @@ extension NodeListViewController: NSCollectionViewDataSource {
                        let image = NSImage(contentsOfFile: path) {
                         image.isTemplate = false
                         iconToUse = image
+                    } else {
+                        let globeConfig = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+                        let placeholder = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?.withSymbolConfiguration(globeConfig)
+                        placeholder?.isTemplate = true
+                        iconToUse = placeholder
                     }
                 }
             } else if let path = link.faviconPath,
