@@ -881,11 +881,21 @@ extension MainViewController: SwipeGestureServiceDelegate {
             // Suppress collection view animations — the slide animation handles the transition
             self.suppressNodeAnimations = true
 
+            // Suppress async onChange to prevent mid-animation content snap
+            let savedOnChange = self.model.onChange
+            self.model.onChange = nil
+
             // Switch workspace
             switch direction {
             case .right: self.navigateToPreviousWorkspace()
             case .left: self.navigateToNextWorkspace()
             }
+
+            // Synchronously update UI while content is off-screen
+            self.reloadData()
+
+            // Restore onChange for future state changes
+            self.model.onChange = savedOnChange
 
             // Position on opposite side
             CATransaction.begin()
