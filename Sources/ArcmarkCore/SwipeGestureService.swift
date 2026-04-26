@@ -100,7 +100,7 @@ final class SwipeGestureService {
     }
 
     private func handleBegan(_ event: NSEvent) {
-        guard let window else { return }
+        guard let window, window.isVisible else { return }
 
         let mouseLocation = NSEvent.mouseLocation
         guard window.frame.contains(mouseLocation) else { return }
