@@ -6,6 +6,23 @@
         <language>en</language>
         <link>https://github.com/Geek-1001/arcmark</link>
             <item>
+                <title>Version 0.1.10</title>
+                <pubDate>Fri, 08 May 2026 18:10:17 +0000</pubDate>
+                <description sparkle:format="markdown">
+Fixes:
+- When the Arcmark window is in attachment mode and is also hidden, it no longer captures gesture events.  
+- Fixed a bug where the Arcmark window would break the focus for other windows when switching between apps using Command+Tab.
+                </description>
+                <enclosure
+                    url="https://github.com/Geek-1001/arcmark/releases/download/v0.1.10/Arcmark-0.1.10.dmg"
+                    sparkle:version="0.1.10"
+                    sparkle:shortVersionString="0.1.10"
+                    sparkle:edSignature="kzukT3N970wUlylMFFbsMgeRRtLqe8Al39F3G52ZVnFAvcxZEv6tiW+D3N2HRD76ptnDpPkwbl4OI9y8lch9Cg=="
+                    length="3174994"
+                    type="application/octet-stream"
+                />
+            </item>
+            <item>
                 <title>Version 0.1.9</title>
                 <pubDate>Mon, 23 Mar 2026 15:11:39 +0000</pubDate>
                 <description sparkle:format="markdown">
