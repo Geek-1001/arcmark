@@ -543,7 +543,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     }
 
     func attachmentServiceShouldHideWindow(_ service: WindowAttachmentService) {
-        window?.orderOut(nil)
+        guard let window, window.isVisible else { return }
+        window.orderOut(nil)
     }
 
     func attachmentServiceShouldShowWindow(_ service: WindowAttachmentService) {
