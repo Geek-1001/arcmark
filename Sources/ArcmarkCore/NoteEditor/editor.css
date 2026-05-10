@@ -44,7 +44,7 @@ body {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
-  padding: 8px 24px;
+  padding: 8px;
   position: sticky;
   top: 0;
   background: var(--bg);
