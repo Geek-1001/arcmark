@@ -121,6 +121,37 @@ html, body {
   display: none;
 }
 
+.empty-state {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 96px auto 0;
+  max-width: 360px;
+  text-align: center;
+}
+
+.empty-state h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.empty-state p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+body.note-deleted .tabs {
+  visibility: hidden;
+}
+
+body.note-deleted .note-title {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
 .editor {
   outline: none;
   white-space: pre-wrap;

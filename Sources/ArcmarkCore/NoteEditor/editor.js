@@ -17,6 +17,7 @@
   let lastSavedAt = null;
   let savedTickerTimer = null;
   let serverTitle = "";
+  let noteDeleted = false;
 
   // Reads/writes against the contenteditable node go through these two
   // helpers so future iterations can layer syntax-aware visual styling
@@ -70,6 +71,34 @@
     }
   }
 
+  function enterDeletedState() {
+    if (noteDeleted) return;
+    noteDeleted = true;
+    stopSavedTicker();
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    document.body.classList.add("note-deleted");
+    editor.setAttribute("contenteditable", "false");
+
+    const main = document.querySelector("main.content");
+    if (main) {
+      main.innerHTML = "";
+      const card = document.createElement("div");
+      card.className = "empty-state";
+      const heading = document.createElement("h2");
+      heading.textContent = "Note no longer available";
+      const blurb = document.createElement("p");
+      blurb.textContent = "This note was deleted in Arcmark. You can close this tab.";
+      card.appendChild(heading);
+      card.appendChild(blurb);
+      main.appendChild(card);
+    }
+    setStatus("deleted");
+    document.title = "Deleted note — Arcmark";
+  }
+
   function authHeaders(extra) {
     const headers = Object.assign({ "X-Arcmark-Token": token }, extra || {});
     return headers;
@@ -90,6 +119,10 @@
         headers: authHeaders(),
         cache: "no-store"
       });
+      if (response.status === 404) {
+        enterDeletedState();
+        return;
+      }
       if (!response.ok) {
         setStatus(`load failed (${response.status})`);
         return;
@@ -107,7 +140,7 @@
   }
 
   async function saveNote() {
-    if (!noteId) return;
+    if (!noteId || noteDeleted) return;
     setStatus("saving…");
     try {
       const response = await fetch(authedUrl(`/api/notes/${noteId}`), {
@@ -116,6 +149,10 @@
         body: JSON.stringify({ content: getContent() }),
         cache: "no-store"
       });
+      if (response.status === 404) {
+        enterDeletedState();
+        return;
+      }
       if (!response.ok) {
         stopSavedTicker();
         setStatus(`save failed (${response.status})`);
@@ -131,6 +168,7 @@
   }
 
   function scheduleSave() {
+    if (noteDeleted) return;
     if (saveTimer) clearTimeout(saveTimer);
     setStatus("editing…");
     saveTimer = setTimeout(saveNote, 500);
