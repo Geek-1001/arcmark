@@ -678,7 +678,7 @@ extension NodeListViewController: NSCollectionViewDataSource {
                     }
                 }
                 let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
-                let image = NSImage(systemSymbolName: "text.document", accessibilityDescription: nil)?
+                let image = NSImage(systemSymbolName: "text.document.fill", accessibilityDescription: nil)?
                     .withSymbolConfiguration(config)
                 image?.isTemplate = true
                 return image
