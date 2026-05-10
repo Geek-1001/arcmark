@@ -138,19 +138,28 @@ struct Folder: Codable, Identifiable, Equatable, Sendable {
     var isExpanded: Bool
 }
 
+struct Note: Codable, Identifiable, Equatable, Sendable {
+    var id: UUID
+    var title: String
+    var customIcon: CustomIcon?
+}
+
 enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
     case folder(Folder)
     case link(Link)
+    case note(Note)
 
     enum CodingKeys: String, CodingKey {
         case type
         case folder
         case link
+        case note
     }
 
     enum NodeType: String, Codable {
         case folder
         case link
+        case note
     }
 
     var id: UUID {
@@ -159,6 +168,8 @@ enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
             return folder.id
         case .link(let link):
             return link.id
+        case .note(let note):
+            return note.id
         }
     }
 
@@ -168,6 +179,8 @@ enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
             return folder.name
         case .link(let link):
             return link.title
+        case .note(let note):
+            return note.title
         }
     }
 
@@ -189,6 +202,9 @@ enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
         case .link:
             let link = try container.decode(Link.self, forKey: .link)
             self = .link(link)
+        case .note:
+            let note = try container.decode(Note.self, forKey: .note)
+            self = .note(note)
         }
     }
 
@@ -201,6 +217,9 @@ enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
         case .link(let link):
             try container.encode(NodeType.link, forKey: .type)
             try container.encode(link, forKey: .link)
+        case .note(let note):
+            try container.encode(NodeType.note, forKey: .type)
+            try container.encode(note, forKey: .note)
         }
     }
 }

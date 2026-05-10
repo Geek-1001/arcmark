@@ -326,6 +326,8 @@ final class MainViewController: NSViewController {
                 switch node {
                 case .link(let link):
                     self.openLink(link)
+                case .note:
+                    break
                 case .folder(let folder):
                     for child in folder.children {
                         if case .link(let link) = child {

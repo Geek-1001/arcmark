@@ -156,6 +156,9 @@ final class AppModel {
             case .link(var link):
                 link.title = newName
                 node = .link(link)
+            case .note(var note):
+                note.title = newName
+                node = .note(note)
             }
         }
     }
@@ -201,7 +204,7 @@ final class AppModel {
             case .folder(var folder):
                 folder.isExpanded = isExpanded
                 node = .folder(folder)
-            case .link:
+            case .link, .note:
                 break
             }
         }
@@ -216,7 +219,7 @@ final class AppModel {
             case .link(var link):
                 link.faviconPath = path
                 node = .link(link)
-            case .folder:
+            case .folder, .note:
                 break
             }
         }
@@ -229,7 +232,7 @@ final class AppModel {
                 link.url = newUrl
                 link.faviconPath = nil
                 node = .link(link)
-            case .folder:
+            case .folder, .note:
                 break
             }
         }
@@ -249,7 +252,7 @@ final class AppModel {
             case .link(var link):
                 link.title = trimmed
                 node = .link(link)
-            case .folder:
+            case .folder, .note:
                 break
             }
         }
@@ -299,7 +302,7 @@ final class AppModel {
             case .link(var link):
                 link.customIcon = icon
                 node = .link(link)
-            case .folder:
+            case .folder, .note:
                 break
             }
         }
@@ -429,7 +432,7 @@ final class AppModel {
                     }
                     insertNode(node, parentId: parentId, index: index, nodes: &folder.children)
                     nodes[i] = .folder(folder)
-                case .link:
+                case .link, .note:
                     continue
                 }
             }
@@ -448,6 +451,13 @@ final class AppModel {
             switch nodes[index] {
             case .link(let link):
                 if link.id == id {
+                    var node = nodes[index]
+                    mutate(&node)
+                    nodes[index] = node
+                    return true
+                }
+            case .note(let note):
+                if note.id == id {
                     var node = nodes[index]
                     mutate(&node)
                     nodes[index] = node
@@ -476,6 +486,10 @@ final class AppModel {
                 if link.id == id {
                     return nodes.remove(at: index)
                 }
+            case .note(let note):
+                if note.id == id {
+                    return nodes.remove(at: index)
+                }
             case .folder(var folder):
                 if folder.id == id {
                     return nodes.remove(at: index)
@@ -494,6 +508,10 @@ final class AppModel {
             switch node {
             case .link(let link):
                 if link.id == id {
+                    return NodeLocation(parentId: parentId, index: index)
+                }
+            case .note(let note):
+                if note.id == id {
                     return NodeLocation(parentId: parentId, index: index)
                 }
             case .folder(let folder):
@@ -518,6 +536,8 @@ final class AppModel {
             switch node {
             case .link(let link):
                 if link.id == id { return node }
+            case .note(let note):
+                if note.id == id { return node }
             case .folder(let folder):
                 if folder.id == id { return node }
                 if let found = nodeById(id, nodes: folder.children) {
@@ -532,6 +552,8 @@ final class AppModel {
         switch node {
         case .link(let link):
             return link.id == id
+        case .note(let note):
+            return note.id == id
         case .folder(let folder):
             if folder.id == id { return true }
             return folder.children.contains(where: { containsNode(id, within: $0) })
