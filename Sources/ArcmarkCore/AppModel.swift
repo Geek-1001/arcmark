@@ -3,12 +3,14 @@ import os
 
 final class AppModel {
     private let store: DataStore
+    let noteStorage: NoteStorage
     private(set) var state: AppState
     var onChange: (() -> Void)?
     private let logger = Logger(subsystem: "com.arcmark.app", category: "model")
 
     init(store: DataStore = DataStore()) {
         self.store = store
+        self.noteStorage = NoteStorage(store: store)
         self.state = store.load()
 
         if !state.isSettingsSelected {
@@ -147,6 +149,20 @@ final class AppModel {
         return link.id
     }
 
+    @discardableResult
+    func addNote(title: String, parentId: UUID?) -> UUID {
+        let note = Note(id: UUID(), title: title, customIcon: nil)
+        try? noteStorage.write(id: note.id, content: Self.starterNoteContent)
+        insertNode(.note(note), parentId: parentId)
+        return note.id
+    }
+
+    private static let starterNoteContent = """
+    # Untitled
+
+    Start writing your note here…
+    """
+
     func renameNode(id: UUID, newName: String) {
         updateNode(id: id) { node in
             switch node {
@@ -164,8 +180,27 @@ final class AppModel {
     }
 
     func deleteNode(id: UUID) {
+        var removed: Node?
         updateWorkspace(id: currentWorkspace.id) { workspace in
-            _ = removeNode(id: id, nodes: &workspace.items)
+            removed = removeNode(id: id, nodes: &workspace.items)
+        }
+        if let node = removed {
+            cleanupFiles(for: node)
+        }
+    }
+
+    private func cleanupFiles(for node: Node) {
+        switch node {
+        case .note(let note):
+            noteStorage.delete(id: note.id)
+        case .link(let link):
+            if let path = link.faviconPath {
+                try? FileManager.default.removeItem(atPath: path)
+            }
+        case .folder(let folder):
+            for child in folder.children {
+                cleanupFiles(for: child)
+            }
         }
     }
 
@@ -303,6 +338,18 @@ final class AppModel {
                 link.customIcon = icon
                 node = .link(link)
             case .folder, .note:
+                break
+            }
+        }
+    }
+
+    func setNoteCustomIcon(id: UUID, icon: CustomIcon?) {
+        updateNode(id: id) { node in
+            switch node {
+            case .note(var note):
+                note.customIcon = icon
+                node = .note(note)
+            case .folder, .link:
                 break
             }
         }
