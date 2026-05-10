@@ -38,7 +38,6 @@ final class NodeListViewController: NSViewController {
 
     // Callbacks
     var onNodeSelected: ((UUID) -> Void)?
-    var onNodeDoubleClicked: ((UUID) -> Void)?
     var onFolderToggled: ((UUID, Bool) -> Void)?
     var onNodeMoved: ((UUID, UUID?, Int) -> Void)?
     var onNodeDeleted: ((UUID) -> Void)?
@@ -124,10 +123,6 @@ final class NodeListViewController: NSViewController {
         }
         collectionView.onBackgroundClick = { [weak self] in
             self?.clearSelections()
-        }
-        collectionView.onItemDoubleClicked = { [weak self] indexPath in
-            guard let self, let row = self.row(at: indexPath) else { return }
-            self.onNodeDoubleClicked?(row.node.id)
         }
         collectionView.parentViewController = self
 
@@ -1235,7 +1230,6 @@ private final class ContextMenuCollectionView: NSCollectionView {
     var onContextRequest: ((IndexPath?) -> Void)?
     var onDragExit: (() -> Void)?
     var onBackgroundClick: (() -> Void)?
-    var onItemDoubleClicked: ((IndexPath) -> Void)?
     weak var parentViewController: NodeListViewController?
 
     override var mouseDownCanMoveWindow: Bool {
@@ -1249,8 +1243,6 @@ private final class ContextMenuCollectionView: NSCollectionView {
         // If clicking on empty space, notify the callback
         if indexPath == nil {
             onBackgroundClick?()
-        } else if event.clickCount == 2, let indexPath {
-            onItemDoubleClicked?(indexPath)
         }
 
         // Always call super to allow normal click handling

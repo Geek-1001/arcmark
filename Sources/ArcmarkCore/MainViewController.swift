@@ -254,15 +254,13 @@ final class MainViewController: NSViewController {
 
         nodeListViewController.onNodeSelected = { [weak self] nodeId in
             guard let self, let node = self.model.nodeById(nodeId) else { return }
-            if case .link(let link) = node {
+            switch node {
+            case .link(let link):
                 self.openLink(link)
-            }
-        }
-
-        nodeListViewController.onNodeDoubleClicked = { [weak self] nodeId in
-            guard let self, let node = self.model.nodeById(nodeId) else { return }
-            if case .note(let note) = node {
+            case .note(let note):
                 self.openNote(note)
+            case .folder:
+                break
             }
         }
 
