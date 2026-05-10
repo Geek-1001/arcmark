@@ -25,18 +25,11 @@
 html, body {
   margin: 0;
   padding: 0;
-  height: 100%;
   background: var(--bg);
   color: var(--fg);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   font-size: 15px;
   line-height: 1.6;
-}
-
-body {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
 }
 
 .topbar {
@@ -45,7 +38,7 @@ body {
   justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid var(--border);
-  padding: 8px;
+  padding: 12px;
   position: sticky;
   top: 0;
   background: var(--bg);
@@ -114,7 +107,6 @@ body {
 }
 
 .content {
-  flex: 1;
   display: flex;
   justify-content: center;
   padding: 24px;
