@@ -19,7 +19,11 @@ let package = Package(
     ],
     targets: [
         // Core library with all app logic
-        .target(name: "ArcmarkCore", dependencies: ["Sparkle"]),
+        .target(
+            name: "ArcmarkCore",
+            dependencies: ["Sparkle"],
+            resources: [.copy("NoteEditor")]
+        ),
         // Minimal executable entry point
         .executableTarget(
             name: "ArcmarkApp",

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Arcmark Note</title>
+  <link rel="stylesheet" href="/editor/editor.css?token={{TOKEN}}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="title-block">
+      <div id="note-title" class="note-title"></div>
+      <div id="status" class="status" aria-live="polite"></div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button id="tab-edit" class="tab active" role="tab" aria-selected="true" aria-controls="pane-edit">
+        <span class="tab-label">Edit</span>
+        <span class="shortcut" data-key="E"></span>
+      </button>
+      <button id="tab-preview" class="tab" role="tab" aria-selected="false" aria-controls="pane-preview">
+        <span class="tab-label">Preview</span>
+        <span class="shortcut" data-key="L"></span>
+      </button>
+    </nav>
+  </header>
+  <main class="content">
+    <div id="pane-edit" class="pane edit-pane" role="tabpanel" aria-labelledby="tab-edit">
+      <div id="editor" class="editor" contenteditable="plaintext-only" spellcheck="false"></div>
+    </div>
+    <div id="pane-preview" class="pane preview-pane" role="tabpanel" aria-labelledby="tab-preview" hidden></div>
+  </main>
+  <script src="/editor/vendor/marked.min.js?token={{TOKEN}}"></script>
+  <script src="/editor/vendor/purify.min.js?token={{TOKEN}}"></script>
+  <script src="/editor/editor.js?token={{TOKEN}}"></script>
+</body>
+</html>

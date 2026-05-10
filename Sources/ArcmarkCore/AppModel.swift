@@ -3,12 +3,14 @@ import os
 
 final class AppModel {
     private let store: DataStore
+    let noteStorage: NoteStorage
     private(set) var state: AppState
     var onChange: (() -> Void)?
     private let logger = Logger(subsystem: "com.arcmark.app", category: "model")
 
     init(store: DataStore = DataStore()) {
         self.store = store
+        self.noteStorage = NoteStorage(store: store)
         self.state = store.load()
 
         if !state.isSettingsSelected {
@@ -147,6 +149,20 @@ final class AppModel {
         return link.id
     }
 
+    @discardableResult
+    func addNote(title: String, parentId: UUID?) -> UUID {
+        let note = Note(id: UUID(), title: title, customIcon: nil)
+        try? noteStorage.write(id: note.id, content: Self.starterNoteContent)
+        insertNode(.note(note), parentId: parentId)
+        return note.id
+    }
+
+    private static let starterNoteContent = """
+    # Untitled
+
+    Start writing your note here…
+    """
+
     func renameNode(id: UUID, newName: String) {
         updateNode(id: id) { node in
             switch node {
@@ -156,13 +172,35 @@ final class AppModel {
             case .link(var link):
                 link.title = newName
                 node = .link(link)
+            case .note(var note):
+                note.title = newName
+                node = .note(note)
             }
         }
     }
 
     func deleteNode(id: UUID) {
+        var removed: Node?
         updateWorkspace(id: currentWorkspace.id) { workspace in
-            _ = removeNode(id: id, nodes: &workspace.items)
+            removed = removeNode(id: id, nodes: &workspace.items)
+        }
+        if let node = removed {
+            cleanupFiles(for: node)
+        }
+    }
+
+    private func cleanupFiles(for node: Node) {
+        switch node {
+        case .note(let note):
+            noteStorage.delete(id: note.id)
+        case .link:
+            // Favicons are cached per host and shared across every link to
+            // that host, so deleting one link must not remove the file.
+            break
+        case .folder(let folder):
+            for child in folder.children {
+                cleanupFiles(for: child)
+            }
         }
     }
 
@@ -201,7 +239,7 @@ final class AppModel {
             case .folder(var folder):
                 folder.isExpanded = isExpanded
                 node = .folder(folder)
-            case .link:
+            case .link, .note:
                 break
             }
         }
@@ -216,7 +254,7 @@ final class AppModel {
             case .link(var link):
                 link.faviconPath = path
                 node = .link(link)
-            case .folder:
+            case .folder, .note:
                 break
             }
         }
@@ -229,7 +267,7 @@ final class AppModel {
                 link.url = newUrl
                 link.faviconPath = nil
                 node = .link(link)
-            case .folder:
+            case .folder, .note:
                 break
             }
         }
@@ -249,7 +287,7 @@ final class AppModel {
             case .link(var link):
                 link.title = trimmed
                 node = .link(link)
-            case .folder:
+            case .folder, .note:
                 break
             }
         }
@@ -299,7 +337,19 @@ final class AppModel {
             case .link(var link):
                 link.customIcon = icon
                 node = .link(link)
-            case .folder:
+            case .folder, .note:
+                break
+            }
+        }
+    }
+
+    func setNoteCustomIcon(id: UUID, icon: CustomIcon?) {
+        updateNode(id: id) { node in
+            switch node {
+            case .note(var note):
+                note.customIcon = icon
+                node = .note(note)
+            case .folder, .link:
                 break
             }
         }
@@ -429,7 +479,7 @@ final class AppModel {
                     }
                     insertNode(node, parentId: parentId, index: index, nodes: &folder.children)
                     nodes[i] = .folder(folder)
-                case .link:
+                case .link, .note:
                     continue
                 }
             }
@@ -448,6 +498,13 @@ final class AppModel {
             switch nodes[index] {
             case .link(let link):
                 if link.id == id {
+                    var node = nodes[index]
+                    mutate(&node)
+                    nodes[index] = node
+                    return true
+                }
+            case .note(let note):
+                if note.id == id {
                     var node = nodes[index]
                     mutate(&node)
                     nodes[index] = node
@@ -476,6 +533,10 @@ final class AppModel {
                 if link.id == id {
                     return nodes.remove(at: index)
                 }
+            case .note(let note):
+                if note.id == id {
+                    return nodes.remove(at: index)
+                }
             case .folder(var folder):
                 if folder.id == id {
                     return nodes.remove(at: index)
@@ -494,6 +555,10 @@ final class AppModel {
             switch node {
             case .link(let link):
                 if link.id == id {
+                    return NodeLocation(parentId: parentId, index: index)
+                }
+            case .note(let note):
+                if note.id == id {
                     return NodeLocation(parentId: parentId, index: index)
                 }
             case .folder(let folder):
@@ -518,6 +583,8 @@ final class AppModel {
             switch node {
             case .link(let link):
                 if link.id == id { return node }
+            case .note(let note):
+                if note.id == id { return node }
             case .folder(let folder):
                 if folder.id == id { return node }
                 if let found = nodeById(id, nodes: folder.children) {
@@ -532,6 +599,8 @@ final class AppModel {
         switch node {
         case .link(let link):
             return link.id == id
+        case .note(let note):
+            return note.id == id
         case .folder(let folder):
             if folder.id == id { return true }
             return folder.children.contains(where: { containsNode(id, within: $0) })

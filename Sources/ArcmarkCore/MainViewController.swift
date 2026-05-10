@@ -4,6 +4,7 @@ import AppKit
 @MainActor
 final class MainViewController: NSViewController {
     let model: AppModel
+    var noteServer: NoteServer?
 
     // Coordinators and child view controllers
     private let searchCoordinator = SearchCoordinator()
@@ -253,8 +254,13 @@ final class MainViewController: NSViewController {
 
         nodeListViewController.onNodeSelected = { [weak self] nodeId in
             guard let self, let node = self.model.nodeById(nodeId) else { return }
-            if case .link(let link) = node {
+            switch node {
+            case .link(let link):
                 self.openLink(link)
+            case .note(let note):
+                self.openNote(note)
+            case .folder:
+                break
             }
         }
 
@@ -305,6 +311,10 @@ final class MainViewController: NSViewController {
             self?.createFolderAndBeginRename(parentId: parentId)
         }
 
+        nodeListViewController.onNewNoteRequested = { [weak self] parentId in
+            self?.createNoteAndBeginRename(parentId: parentId)
+        }
+
         nodeListViewController.onLinkUrlEdited = { [weak self] nodeId, newUrl in
             self?.model.updateLinkUrl(id: nodeId, newUrl: newUrl)
         }
@@ -326,6 +336,8 @@ final class MainViewController: NSViewController {
                 switch node {
                 case .link(let link):
                     self.openLink(link)
+                case .note:
+                    break
                 case .folder(let folder):
                     for child in folder.children {
                         if case .link(let link) = child {
@@ -345,8 +357,15 @@ final class MainViewController: NSViewController {
         }
 
         nodeListViewController.onChangeIconRequested = { [weak self] nodeId, anchorView in
-            guard let self, let node = self.model.nodeById(nodeId), case .link(let link) = node else { return }
-            self.showIconPicker(for: nodeId, relativeTo: anchorView, hasCustomIcon: link.customIcon != nil, isPinned: false)
+            guard let self, let node = self.model.nodeById(nodeId) else { return }
+            switch node {
+            case .link(let link):
+                self.showIconPicker(for: nodeId, relativeTo: anchorView, hasCustomIcon: link.customIcon != nil, kind: .link)
+            case .note(let note):
+                self.showIconPicker(for: nodeId, relativeTo: anchorView, hasCustomIcon: note.customIcon != nil, kind: .note)
+            case .folder:
+                break
+            }
         }
     }
 
@@ -672,6 +691,19 @@ final class MainViewController: NSViewController {
         nodeListViewController.scheduleInlineRename(for: newId)
     }
 
+    func createNoteAndBeginRename(parentId: UUID?) {
+        if let parentId {
+            model.setFolderExpanded(id: parentId, isExpanded: true)
+        }
+        let newId = model.addNote(title: "Untitled", parentId: parentId)
+        nodeListViewController.scheduleInlineRename(for: newId)
+    }
+
+    private func openNote(_ note: Note) {
+        guard let url = noteServer?.editorURL(noteId: note.id) else { return }
+        BrowserManager.open(url: url, profile: nil)
+    }
+
     @objc func paste(_ sender: Any?) {
         pasteLink()
     }
@@ -793,41 +825,44 @@ final class MainViewController: NSViewController {
               let link = model.pinnedLinkById(linkId) else { return }
         // Find the tile view for this pinned link
         let anchorView = pinnedTabsView.tileView(for: linkId) ?? pinnedTabsView
-        showIconPicker(for: linkId, relativeTo: anchorView, hasCustomIcon: link.customIcon != nil, isPinned: true)
+        showIconPicker(for: linkId, relativeTo: anchorView, hasCustomIcon: link.customIcon != nil, kind: .pinnedLink)
     }
 
-    private func showIconPicker(for linkId: UUID, relativeTo anchorView: NSView, hasCustomIcon: Bool, isPinned: Bool) {
+    enum IconPickerKind {
+        case link
+        case pinnedLink
+        case note
+    }
+
+    private func showIconPicker(for nodeId: UUID, relativeTo anchorView: NSView, hasCustomIcon: Bool, kind: IconPickerKind) {
         let popover = NSPopover()
         let pickerController = IconPickerPopoverController()
         pickerController.showRestoreButton = hasCustomIcon
 
-        pickerController.onIconSelected = { [weak self, weak popover] icon in
+        let applyIcon: (CustomIcon?) -> Void = { [weak self] icon in
             guard let self else { return }
-            if isPinned {
-                self.model.setPinnedLinkCustomIcon(id: linkId, icon: icon)
-            } else {
-                self.model.setLinkCustomIcon(id: linkId, icon: icon)
+            switch kind {
+            case .link:
+                self.model.setLinkCustomIcon(id: nodeId, icon: icon)
+            case .pinnedLink:
+                self.model.setPinnedLinkCustomIcon(id: nodeId, icon: icon)
+            case .note:
+                self.model.setNoteCustomIcon(id: nodeId, icon: icon)
             }
+        }
+
+        pickerController.onIconSelected = { [weak popover] icon in
+            applyIcon(icon)
             popover?.close()
         }
 
-        pickerController.onRestoreFavicon = { [weak self, weak popover] in
-            guard let self else { return }
-            if isPinned {
-                self.model.setPinnedLinkCustomIcon(id: linkId, icon: nil)
-            } else {
-                self.model.setLinkCustomIcon(id: linkId, icon: nil)
-            }
+        pickerController.onRestoreFavicon = { [weak popover] in
+            applyIcon(nil)
             popover?.close()
         }
 
-        pickerController.onFaviconPathSelected = { [weak self, weak popover] path in
-            guard let self else { return }
-            if isPinned {
-                self.model.setPinnedLinkCustomIcon(id: linkId, icon: .cachedFavicon(path))
-            } else {
-                self.model.setLinkCustomIcon(id: linkId, icon: .cachedFavicon(path))
-            }
+        pickerController.onFaviconPathSelected = { [weak popover] path in
+            applyIcon(.cachedFavicon(path))
             popover?.close()
         }
 

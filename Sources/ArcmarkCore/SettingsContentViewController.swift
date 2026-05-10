@@ -1032,6 +1032,8 @@ final class SettingsContentViewController: NSViewController {
         switch node {
         case .link(let link):
             appModel.addLink(urlString: link.url, title: link.title, parentId: parentId)
+        case .note:
+            break
         case .folder(let folder):
             let folderId = appModel.addFolder(name: folder.name, parentId: parentId, isExpanded: false)
             // Recursively add children

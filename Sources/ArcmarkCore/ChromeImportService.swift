@@ -212,6 +212,8 @@ final class ChromeImportService: Sendable {
             switch node {
             case .link:
                 links += 1
+            case .note:
+                continue
             case .folder(let folder):
                 folders += 1
                 let childStats = countNodes(folder.children)

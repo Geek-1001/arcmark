@@ -48,6 +48,7 @@ final class NodeListViewController: NSViewController {
     var onBulkNodesCopied: (([UUID]) -> Void)?
     var onBulkNodesDeleted: (([UUID]) -> Void)?
     var onNewFolderRequested: ((UUID?) -> Void)?
+    var onNewNoteRequested: ((UUID?) -> Void)?
     var onLinkUrlEdited: ((UUID, String) -> Void)?
     var onOpenFolderLinks: ((UUID) -> Void)?
     var onBulkOpenLinks: (([UUID]) -> Void)?
@@ -655,6 +656,47 @@ extension NodeListViewController: NSCollectionViewDataSource {
                     )
                 }
             }
+        case .note(let note):
+            let iconToUse: NSImage? = {
+                if let customIcon = note.customIcon {
+                    switch customIcon {
+                    case .emoji(let emoji):
+                        return Self.imageFromEmoji(emoji, size: 20)
+                    case .sfSymbol(let name):
+                        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+                        let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+                            .withSymbolConfiguration(config)
+                        image?.isTemplate = true
+                        return image
+                    case .cachedFavicon(let path):
+                        if FileManager.default.fileExists(atPath: path),
+                           let image = NSImage(contentsOfFile: path) {
+                            image.isTemplate = false
+                            return image
+                        }
+                        return nil
+                    }
+                }
+                let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+                let image = NSImage(systemSymbolName: "text.document.fill", accessibilityDescription: nil)?
+                    .withSymbolConfiguration(config)
+                image?.isTemplate = true
+                return image
+            }()
+
+            nodeItem.configure(
+                title: note.title,
+                icon: iconToUse,
+                titleFont: listMetrics.linkTitleFont,
+                depth: row.depth,
+                metrics: listMetrics,
+                showDelete: true,
+                onDelete: { [weak self] in
+                    self?.onNodeDeleted?(note.id)
+                    self?.clearSelections()
+                },
+                isSelected: isSelected
+            )
         }
 
         return nodeItem
@@ -720,6 +762,8 @@ extension NodeListViewController: NSCollectionViewDelegate {
                 self.onFolderToggled?(folder.id, !folder.isExpanded)
             case .link(let link):
                 self.onNodeSelected?(link.id)
+            case .note(let note):
+                self.onNodeSelected?(note.id)
             }
 
             self.collectionView.deselectItems(at: indexPaths)
@@ -808,6 +852,14 @@ extension NodeListViewController: NSCollectionViewDelegate {
                     targetParentId = nil
                     targetIndex = nodes.count
                 }
+            case .note(let note):
+                if let location = findNodeLocation?(note.id) {
+                    targetParentId = location.parentId
+                    targetIndex = location.index
+                } else {
+                    targetParentId = nil
+                    targetIndex = nodes.count
+                }
             }
         } else {
             targetParentId = nil
@@ -838,6 +890,10 @@ extension NodeListViewController: NSMenuDelegate {
             let newFolder = NSMenuItem(title: "New Folder…", action: #selector(contextNewFolder), keyEquivalent: "")
             newFolder.target = self
             menu.addItem(newFolder)
+
+            let newNote = NSMenuItem(title: "New Note…", action: #selector(contextNewNote), keyEquivalent: "")
+            newNote.target = self
+            menu.addItem(newNote)
             return
         }
 
@@ -849,6 +905,11 @@ extension NodeListViewController: NSMenuDelegate {
             newNested.target = self
             newNested.representedObject = node.id
             menu.addItem(newNested)
+
+            let newNoteInFolder = NSMenuItem(title: "New Note in Folder…", action: #selector(contextNewNoteInFolder(_:)), keyEquivalent: "")
+            newNoteInFolder.target = self
+            newNoteInFolder.representedObject = node.id
+            menu.addItem(newNoteInFolder)
 
             let hasLinks = folder.children.contains { if case .link = $0 { return true } else { return false } }
             let openLinks = NSMenuItem(title: "Open All Links", action: hasLinks ? #selector(contextOpenFolderLinks(_:)) : nil, keyEquivalent: "")
@@ -926,6 +987,35 @@ extension NodeListViewController: NSMenuDelegate {
             delete.target = self
             delete.representedObject = node.id
             menu.addItem(delete)
+        case .note:
+            let rename = NSMenuItem(title: "Rename…", action: #selector(contextRename), keyEquivalent: "")
+            rename.target = self
+            menu.addItem(rename)
+
+            menu.addItem(NSMenuItem.separator())
+
+            let changeIcon = NSMenuItem(title: "Change Icon…", action: #selector(contextChangeIcon(_:)), keyEquivalent: "")
+            changeIcon.target = self
+            changeIcon.representedObject = node.id
+            menu.addItem(changeIcon)
+
+            let moveMenu = NSMenuItem(title: "Move to", action: nil, keyEquivalent: "")
+            let submenu = NSMenu()
+            if let workspaces = workspacesProvider?(), let currentId = currentWorkspaceIdProvider?() {
+                for workspace in workspaces where workspace.id != currentId {
+                    let item = NSMenuItem(title: workspace.name, action: #selector(contextMoveToWorkspace), keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = ["nodeId": node.id, "workspaceId": workspace.id]
+                    submenu.addItem(item)
+                }
+            }
+            moveMenu.submenu = submenu
+            menu.addItem(moveMenu)
+
+            let delete = NSMenuItem(title: "Delete", action: #selector(contextDelete), keyEquivalent: "")
+            delete.target = self
+            delete.representedObject = node.id
+            menu.addItem(delete)
         }
     }
 
@@ -933,9 +1023,18 @@ extension NodeListViewController: NSMenuDelegate {
         onNewFolderRequested?(nil)
     }
 
+    @objc private func contextNewNote() {
+        onNewNoteRequested?(nil)
+    }
+
     @objc private func contextNewNestedFolder(_ sender: NSMenuItem) {
         guard let nodeId = sender.representedObject as? UUID else { return }
         onNewFolderRequested?(nodeId)
+    }
+
+    @objc private func contextNewNoteInFolder(_ sender: NSMenuItem) {
+        guard let nodeId = sender.representedObject as? UUID else { return }
+        onNewNoteRequested?(nodeId)
     }
 
     @objc private func contextRename() {
@@ -1035,6 +1134,8 @@ extension NodeListViewController: NSMenuDelegate {
             switch node {
             case .link:
                 openableLinkCount += 1
+            case .note:
+                break
             case .folder(let folder):
                 openableLinkCount += folder.children.filter { if case .link = $0 { return true } else { return false } }.count
             }

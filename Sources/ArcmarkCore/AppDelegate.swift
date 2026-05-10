@@ -11,6 +11,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var preferencesWindowController: PreferencesWindowController?
     private var alwaysOnTopMenuItem: NSMenuItem?
     private var updaterController: SPUStandardUpdaterController!
+    private var noteServer: NoteServer?
 
     // Attachment state
     private var isAttachmentMode: Bool = false
@@ -32,6 +33,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         let mainViewController = MainViewController(model: model)
         mainViewController.updater = updaterController.updater
         self.mainViewController = mainViewController
+
+        let noteServer = NoteServer(model: model)
+        noteServer.start()
+        mainViewController.noteServer = noteServer
+        self.noteServer = noteServer
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 340, height: 680),
@@ -74,6 +80,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         if let window, !isAttachmentMode {
             saveWindowFrame(window)
         }
+        noteServer?.stop()
     }
 
     public func windowDidResize(_ notification: Notification) {

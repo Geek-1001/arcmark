@@ -8,6 +8,9 @@ enum NodeFiltering {
             case .link(let link):
                 let matches = link.title.lowercased().contains(lower)
                 return matches ? node : nil
+            case .note(let note):
+                let matches = note.title.lowercased().contains(lower)
+                return matches ? node : nil
             case .folder(var folder):
                 let children = filter(nodes: folder.children, query: query)
                 if !children.isEmpty {
