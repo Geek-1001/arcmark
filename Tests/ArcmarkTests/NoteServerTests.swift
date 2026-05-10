@@ -78,6 +78,37 @@ final class NoteServerTests: XCTestCase {
         XCTAssertTrue((json?["content"] as? String ?? "").contains("# Untitled"))
     }
 
+    func testGetReturns404WhenNoteDeleted() async throws {
+        let (server, model) = try await startServer()
+        defer { server.stop() }
+        let noteId = model.addNote(title: "Doomed", parentId: nil)
+        model.deleteNode(id: noteId)
+
+        let (status, _) = try await request(
+            method: "GET",
+            path: "/api/notes/\(noteId.uuidString)?token=\(server.token)",
+            port: server.port
+        )
+        XCTAssertEqual(status, 404)
+    }
+
+    func testPutReturns404WhenNoteDeleted() async throws {
+        let (server, model) = try await startServer()
+        defer { server.stop() }
+        let noteId = model.addNote(title: "Doomed", parentId: nil)
+        model.deleteNode(id: noteId)
+
+        let body = try JSONSerialization.data(withJSONObject: ["content": "should not write"])
+        let (status, _) = try await request(
+            method: "PUT",
+            path: "/api/notes/\(noteId.uuidString)?token=\(server.token)",
+            body: body,
+            port: server.port
+        )
+        XCTAssertEqual(status, 404)
+        XCTAssertEqual(model.noteStorage.read(id: noteId), "")
+    }
+
     func testPutWritesContent() async throws {
         let (server, model) = try await startServer()
         defer { server.stop() }

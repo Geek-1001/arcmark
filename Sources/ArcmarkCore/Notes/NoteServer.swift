@@ -219,15 +219,21 @@ final class NoteServer {
         }
     }
 
+    private func noteTitle(id: UUID) -> String? {
+        guard let node = model?.nodeById(id) else { return nil }
+        if case .note(let note) = node { return note.title }
+        return nil
+    }
+
     private func handleGetNote(idString: String, on connection: NWConnection) {
         guard let id = UUID(uuidString: idString) else {
             sendStatus(400, message: "Bad Note Id", on: connection)
             return
         }
-        let title = model?.nodeById(id).flatMap { node -> String? in
-            if case .note(let note) = node { return note.title }
-            return nil
-        } ?? ""
+        guard let title = noteTitle(id: id) else {
+            sendStatus(404, message: "Note Not Found", on: connection)
+            return
+        }
         let content = noteStorage.read(id: id)
         let payload: [String: Any] = [
             "id": id.uuidString,
@@ -240,6 +246,11 @@ final class NoteServer {
     private func handlePutNote(idString: String, body: Data, on connection: NWConnection) {
         guard let id = UUID(uuidString: idString) else {
             sendStatus(400, message: "Bad Note Id", on: connection)
+            return
+        }
+        guard noteTitle(id: id) != nil else {
+            // The sidebar entry is gone; do not resurrect the .md file.
+            sendStatus(404, message: "Note Not Found", on: connection)
             return
         }
         guard let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
