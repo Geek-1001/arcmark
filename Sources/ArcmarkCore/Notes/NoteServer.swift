@@ -146,7 +146,9 @@ final class NoteServer {
             headers[name] = value
         }
 
-        let contentLength = Int(headers["content-length"] ?? "0") ?? 0
+        // Treat malformed or negative Content-Length as zero so the body
+        // slice below cannot be inverted (which would trap).
+        let contentLength = max(0, Int(headers["content-length"] ?? "0") ?? 0)
         let bodyStart = headerEnd.upperBound
         let bodyAvailable = buffer.count - bodyStart
         if bodyAvailable < contentLength {
