@@ -55,6 +55,18 @@ final class DataStore {
         return iconsURL
     }
 
+    func notesDirectory() -> URL {
+        let notesURL = baseDirectory.appendingPathComponent("Notes", isDirectory: true)
+        if !fileManager.fileExists(atPath: notesURL.path) {
+            try? fileManager.createDirectory(at: notesURL, withIntermediateDirectories: true)
+        }
+        return notesURL
+    }
+
+    func noteFileURL(for id: UUID) -> URL {
+        notesDirectory().appendingPathComponent("\(id.uuidString).md")
+    }
+
     private func ensureDirectories() {
         if !fileManager.fileExists(atPath: baseDirectory.path) {
             try? fileManager.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
