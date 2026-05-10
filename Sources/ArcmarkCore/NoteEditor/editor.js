@@ -158,7 +158,14 @@
   tabEdit.addEventListener("click", showEdit);
   tabPreview.addEventListener("click", showPreview);
 
-  // Cmd+E (macOS) / Ctrl+E (Windows/Linux) → Edit, Cmd/Ctrl+K → Preview.
+  // Render shortcut hints in the tab buttons. macOS users see ⌘, others Ctrl.
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "");
+  const modifierLabel = isMac ? "⌘" : "Ctrl+";
+  document.querySelectorAll(".shortcut").forEach(function (el) {
+    el.textContent = modifierLabel + el.dataset.key;
+  });
+
+  // Cmd+E (macOS) / Ctrl+E (Windows/Linux) → Edit, Cmd/Ctrl+R → Preview.
   document.addEventListener("keydown", function (event) {
     if (!(event.metaKey || event.ctrlKey)) return;
     if (event.shiftKey || event.altKey) return;
@@ -167,7 +174,7 @@
       event.preventDefault();
       showEdit();
       editor.focus();
-    } else if (key === "k") {
+    } else if (key === "r") {
       event.preventDefault();
       showPreview();
     }

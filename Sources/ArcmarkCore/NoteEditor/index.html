@@ -10,8 +10,14 @@
 <body>
   <header class="topbar">
     <nav class="tabs" role="tablist">
-      <button id="tab-edit" class="tab active" role="tab" aria-selected="true" aria-controls="pane-edit">Edit</button>
-      <button id="tab-preview" class="tab" role="tab" aria-selected="false" aria-controls="pane-preview">Preview</button>
+      <button id="tab-edit" class="tab active" role="tab" aria-selected="true" aria-controls="pane-edit">
+        <span class="tab-label">Edit</span>
+        <span class="shortcut" data-key="E"></span>
+      </button>
+      <button id="tab-preview" class="tab" role="tab" aria-selected="false" aria-controls="pane-preview">
+        <span class="tab-label">Preview</span>
+        <span class="shortcut" data-key="R"></span>
+      </button>
     </nav>
     <div id="status" class="status" aria-live="polite"></div>
   </header>
