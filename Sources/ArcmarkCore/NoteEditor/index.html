@@ -9,6 +9,10 @@
 </head>
 <body>
   <header class="topbar">
+    <div class="title-block">
+      <div id="note-title" class="note-title"></div>
+      <div id="status" class="status" aria-live="polite"></div>
+    </div>
     <nav class="tabs" role="tablist">
       <button id="tab-edit" class="tab active" role="tab" aria-selected="true" aria-controls="pane-edit">
         <span class="tab-label">Edit</span>
@@ -19,7 +23,6 @@
         <span class="shortcut" data-key="L"></span>
       </button>
     </nav>
-    <div id="status" class="status" aria-live="polite"></div>
   </header>
   <main class="content">
     <div id="pane-edit" class="pane edit-pane" role="tabpanel" aria-labelledby="tab-edit">

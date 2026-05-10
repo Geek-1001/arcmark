@@ -11,10 +11,12 @@
   const tabEdit = document.getElementById("tab-edit");
   const tabPreview = document.getElementById("tab-preview");
   const statusEl = document.getElementById("status");
+  const titleEl = document.getElementById("note-title");
 
   let saveTimer = null;
   let lastSavedAt = null;
   let savedTickerTimer = null;
+  let serverTitle = "";
 
   // Reads/writes against the contenteditable node go through these two
   // helpers so future iterations can layer syntax-aware visual styling
@@ -29,6 +31,18 @@
 
   function setStatus(text) {
     statusEl.textContent = text;
+  }
+
+  function extractTitleFromContent(text) {
+    const match = text.match(/^[ \t]*#[ \t]+(.+?)[ \t]*$/m);
+    return match ? match[1].trim() : "";
+  }
+
+  function refreshTitle() {
+    const fromContent = extractTitleFromContent(getContent());
+    const resolved = fromContent || serverTitle || "Untitled";
+    titleEl.textContent = resolved;
+    document.title = `${resolved} — Arcmark`;
   }
 
   function updateSavedTicker() {
@@ -75,9 +89,8 @@
       }
       const data = await response.json();
       setContent(data.content || "");
-      if (data.title) {
-        document.title = `${data.title} — Arcmark`;
-      }
+      serverTitle = data.title || "";
+      refreshTitle();
       lastSavedAt = Date.now();
       setStatus("saved");
       scheduleSavedTicker();
@@ -153,7 +166,10 @@
     scheduleSave();
   });
 
-  editor.addEventListener("input", scheduleSave);
+  editor.addEventListener("input", function () {
+    refreshTitle();
+    scheduleSave();
+  });
 
   tabEdit.addEventListener("click", showEdit);
   tabPreview.addEventListener("click", showPreview);
