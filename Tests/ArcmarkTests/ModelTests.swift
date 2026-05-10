@@ -484,6 +484,8 @@ final class ModelTests: XCTestCase {
             switch node {
             case .link(let link):
                 collectedLinks.append(link)
+            case .note:
+                break
             case .folder(let folder):
                 for child in folder.children {
                     if case .link(let link) = child {
@@ -514,6 +516,8 @@ final class ModelTests: XCTestCase {
             switch node {
             case .link(let link):
                 collectedLinks.append(link)
+            case .note:
+                break
             case .folder(let folder):
                 for child in folder.children {
                     if case .link(let link) = child {
@@ -546,6 +550,8 @@ final class ModelTests: XCTestCase {
             switch node {
             case .link(let link):
                 collectedLinks.append(link)
+            case .note:
+                break
             case .folder(let folder):
                 for child in folder.children {
                     if case .link(let link) = child {
@@ -578,6 +584,8 @@ final class ModelTests: XCTestCase {
             switch node {
             case .link(let link):
                 collectedLinks.append(link)
+            case .note:
+                break
             case .folder(let folder):
                 for child in folder.children {
                     if case .link(let link) = child {
@@ -610,6 +618,8 @@ final class ModelTests: XCTestCase {
             switch node {
             case .link(let link):
                 collectedLinks.append(link)
+            case .note:
+                break
             case .folder(let folder):
                 for child in folder.children {
                     if case .link(let link) = child {
@@ -699,6 +709,157 @@ final class ModelTests: XCTestCase {
 
         model.setPinnedLinkCustomIcon(id: linkId, icon: nil)
         XCTAssertNil(model.currentWorkspace.pinnedLinks[0].customIcon)
+    }
+
+    // MARK: - Note Tests
+
+    func testNoteJSONRoundTrip() throws {
+        let note = Note(id: UUID(), title: "My Note", customIcon: .emoji("📝"))
+        let folder = Folder(id: UUID(), name: "Folder", children: [.note(note)], isExpanded: true)
+        let workspace = Workspace(id: UUID(), name: "Inbox", colorId: .ember, items: [.folder(folder), .note(Note(id: UUID(), title: "Top-level", customIcon: nil))])
+        let state = AppState(schemaVersion: 1, workspaces: [workspace], selectedWorkspaceId: workspace.id, isSettingsSelected: false)
+
+        let data = try JSONEncoder().encode(state)
+        let decoded = try JSONDecoder().decode(AppState.self, from: data)
+        XCTAssertEqual(state, decoded)
+
+        guard case .folder(let decodedFolder) = decoded.workspaces[0].items[0],
+              case .note(let decodedNote) = decodedFolder.children[0] else {
+            XCTFail("Expected nested note inside folder")
+            return
+        }
+        XCTAssertEqual(decodedNote.title, "My Note")
+        XCTAssertEqual(decodedNote.customIcon, .emoji("📝"))
+    }
+
+    func testBackwardCompatibilityNoNotes() throws {
+        // Pre-Note schema: items contain only folder/link entries. Decoding must succeed.
+        let json = """
+        {
+            "schemaVersion": 1,
+            "workspaces": [{
+                "id": "00000000-0000-0000-0000-000000000010",
+                "name": "Legacy",
+                "colorId": "ember",
+                "items": [
+                    {"type": "link", "link": {"id": "00000000-0000-0000-0000-000000000011", "title": "Legacy Link", "url": "https://legacy.com"}}
+                ],
+                "pinnedLinks": []
+            }],
+            "selectedWorkspaceId": "00000000-0000-0000-0000-000000000010",
+            "isSettingsSelected": false
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(AppState.self, from: data)
+        XCTAssertEqual(decoded.workspaces[0].items.count, 1)
+        if case .link(let link) = decoded.workspaces[0].items[0] {
+            XCTAssertEqual(link.title, "Legacy Link")
+        } else {
+            XCTFail("Expected link to decode")
+        }
+    }
+
+    func testAddNote() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let noteId = model.addNote(title: "Test Note", parentId: nil)
+        XCTAssertEqual(model.currentWorkspace.items.count, 1)
+        if case .note(let note) = model.currentWorkspace.items[0] {
+            XCTAssertEqual(note.id, noteId)
+            XCTAssertEqual(note.title, "Test Note")
+        } else {
+            XCTFail("Expected note at root")
+        }
+
+        // Starter content should be written to disk
+        let content = model.noteStorage.read(id: noteId)
+        XCTAssertTrue(content.contains("# Untitled"))
+    }
+
+    func testRenameNote() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let noteId = model.addNote(title: "Old", parentId: nil)
+        model.renameNode(id: noteId, newName: "New")
+
+        if case .note(let note) = model.nodeById(noteId) {
+            XCTAssertEqual(note.title, "New")
+        } else {
+            XCTFail("Expected note")
+        }
+    }
+
+    func testSetNoteCustomIcon() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let noteId = model.addNote(title: "Note", parentId: nil)
+        model.setNoteCustomIcon(id: noteId, icon: .sfSymbol("note.text"))
+
+        if case .note(let note) = model.nodeById(noteId) {
+            XCTAssertEqual(note.customIcon, .sfSymbol("note.text"))
+        } else {
+            XCTFail("Expected note")
+        }
+
+        model.setNoteCustomIcon(id: noteId, icon: nil)
+        if case .note(let note) = model.nodeById(noteId) {
+            XCTAssertNil(note.customIcon)
+        }
+    }
+
+    func testDeleteNoteRemovesFile() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let noteId = model.addNote(title: "Doomed", parentId: nil)
+        let fileURL = store.noteFileURL(for: noteId)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+
+        model.deleteNode(id: noteId)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
+    func testDeleteFolderCleansUpContainedNotes() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let folderId = model.addFolder(name: "Parent", parentId: nil)
+        let noteAId = model.addNote(title: "A", parentId: folderId)
+        let nestedFolderId = model.addFolder(name: "Nested", parentId: folderId)
+        let noteBId = model.addNote(title: "B", parentId: nestedFolderId)
+
+        let urlA = store.noteFileURL(for: noteAId)
+        let urlB = store.noteFileURL(for: noteBId)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: urlA.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: urlB.path))
+
+        model.deleteNode(id: folderId)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: urlA.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: urlB.path))
+    }
+
+    func testNoteFilteringByTitle() {
+        let note1 = Note(id: UUID(), title: "Project Plan", customIcon: nil)
+        let note2 = Note(id: UUID(), title: "Recipes", customIcon: nil)
+        let nodes: [Node] = [.note(note1), .note(note2)]
+
+        let results = NodeFiltering.filter(nodes: nodes, query: "project")
+        XCTAssertEqual(results.count, 1)
+        if case .note(let filtered) = results[0] {
+            XCTAssertEqual(filtered.title, "Project Plan")
+        } else {
+            XCTFail("Expected note in filter results")
+        }
     }
 
     func testMultipleBrowserProfiles() {
