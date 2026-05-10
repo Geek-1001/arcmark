@@ -8,6 +8,7 @@ description = 'A workspace-based bookmark manager for macOS'
 license = 'MIT'
 category = 'public.app-category.productivity'
 icon = 'Resources/AppIcon.png'
+minimum_macos_version = '13.0'
 
 [apps.Arcmark.plist]
 CFBundleIdentifier = 'com.arcmark.app'
