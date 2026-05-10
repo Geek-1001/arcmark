@@ -18,7 +18,7 @@ final class NoteServer {
     private(set) var port: UInt16 = 0
     let token: String
 
-    init(model: AppModel, resourcesURL: URL? = Bundle.main.resourceURL) {
+    init(model: AppModel, resourcesURL: URL? = Bundle.module.resourceURL) {
         self.model = model
         self.noteStorage = model.noteStorage
         self.resourcesURL = resourcesURL
