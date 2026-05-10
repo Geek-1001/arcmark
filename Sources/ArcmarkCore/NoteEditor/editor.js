@@ -63,6 +63,13 @@
     savedTickerTimer = setInterval(updateSavedTicker, 5000);
   }
 
+  function stopSavedTicker() {
+    if (savedTickerTimer) {
+      clearInterval(savedTickerTimer);
+      savedTickerTimer = null;
+    }
+  }
+
   function authHeaders(extra) {
     const headers = Object.assign({ "X-Arcmark-Token": token }, extra || {});
     return headers;
@@ -110,6 +117,7 @@
         cache: "no-store"
       });
       if (!response.ok) {
+        stopSavedTicker();
         setStatus(`save failed (${response.status})`);
         return;
       }
@@ -117,6 +125,7 @@
       setStatus("saved");
       scheduleSavedTicker();
     } catch (err) {
+      stopSavedTicker();
       setStatus("save failed");
     }
   }
