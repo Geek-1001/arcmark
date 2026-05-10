@@ -205,8 +205,6 @@ final class NoteServer {
         switch (request.method, request.path) {
         case ("GET", "/"), ("GET", "/index.html"):
             serveIndexHTML(on: connection)
-        case ("GET", "/favicon.ico"):
-            sendResponse(status: 204, statusMessage: "No Content", contentType: "image/x-icon", body: Data(), on: connection)
         case ("GET", let path) where path.hasPrefix("/editor/"):
             let relative = String(path.dropFirst("/editor/".count))
             serveEditorAsset(relative: relative, on: connection)
