@@ -285,8 +285,15 @@ final class NoteServer {
     }
 
     private func serveEditorAsset(relative: String, on connection: NWConnection) {
-        // Reject path traversal
-        if relative.contains("..") || relative.hasPrefix("/") {
+        // Percent-decode first so that escaped traversal sequences (e.g.
+        // `%2e%2e`) are caught by the check below — `Data(contentsOf:)`
+        // resolves the URL via its decoded path, which would otherwise
+        // collapse them back into `..`.
+        guard let decoded = relative.removingPercentEncoding else {
+            sendStatus(400, message: "Bad Path", on: connection)
+            return
+        }
+        if decoded.contains("..") || decoded.hasPrefix("/") {
             sendStatus(400, message: "Bad Path", on: connection)
             return
         }
@@ -296,9 +303,17 @@ final class NoteServer {
             return
         }
 
-        let assetURL = resourcesURL
-            .appendingPathComponent("NoteEditor", isDirectory: true)
-            .appendingPathComponent(relative)
+        let editorRoot = resourcesURL.appendingPathComponent("NoteEditor", isDirectory: true)
+        let assetURL = editorRoot.appendingPathComponent(decoded)
+
+        // Belt-and-braces: ensure the resolved path stays under the editor
+        // root after symlink/`..` resolution.
+        let resolvedAsset = assetURL.standardizedFileURL.resolvingSymlinksInPath().path
+        let resolvedRoot = editorRoot.standardizedFileURL.resolvingSymlinksInPath().path
+        if !resolvedAsset.hasPrefix(resolvedRoot + "/") {
+            sendStatus(400, message: "Bad Path", on: connection)
+            return
+        }
 
         guard let data = try? Data(contentsOf: assetURL) else {
             sendStatus(404, message: "Asset Missing", on: connection)
