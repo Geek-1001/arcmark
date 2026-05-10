@@ -165,7 +165,7 @@
     el.textContent = modifierLabel + el.dataset.key;
   });
 
-  // Cmd+E (macOS) / Ctrl+E (Windows/Linux) → Edit, Cmd/Ctrl+R → Preview.
+  // Cmd+E (macOS) / Ctrl+E (Windows/Linux) → Edit, Cmd/Ctrl+L → Preview.
   document.addEventListener("keydown", function (event) {
     if (!(event.metaKey || event.ctrlKey)) return;
     if (event.shiftKey || event.altKey) return;
@@ -174,7 +174,7 @@
       event.preventDefault();
       showEdit();
       editor.focus();
-    } else if (key === "r") {
+    } else if (key === "l") {
       event.preventDefault();
       showPreview();
     }
