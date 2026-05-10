@@ -158,5 +158,20 @@
   tabEdit.addEventListener("click", showEdit);
   tabPreview.addEventListener("click", showPreview);
 
+  // Cmd+E (macOS) / Ctrl+E (Windows/Linux) → Edit, Cmd/Ctrl+K → Preview.
+  document.addEventListener("keydown", function (event) {
+    if (!(event.metaKey || event.ctrlKey)) return;
+    if (event.shiftKey || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (key === "e") {
+      event.preventDefault();
+      showEdit();
+      editor.focus();
+    } else if (key === "k") {
+      event.preventDefault();
+      showPreview();
+    }
+  });
+
   loadNote();
 })();
