@@ -38,6 +38,7 @@ final class NodeListViewController: NSViewController {
 
     // Callbacks
     var onNodeSelected: ((UUID) -> Void)?
+    var onNodeDoubleClicked: ((UUID) -> Void)?
     var onFolderToggled: ((UUID, Bool) -> Void)?
     var onNodeMoved: ((UUID, UUID?, Int) -> Void)?
     var onNodeDeleted: ((UUID) -> Void)?
@@ -48,6 +49,7 @@ final class NodeListViewController: NSViewController {
     var onBulkNodesCopied: (([UUID]) -> Void)?
     var onBulkNodesDeleted: (([UUID]) -> Void)?
     var onNewFolderRequested: ((UUID?) -> Void)?
+    var onNewNoteRequested: ((UUID?) -> Void)?
     var onLinkUrlEdited: ((UUID, String) -> Void)?
     var onOpenFolderLinks: ((UUID) -> Void)?
     var onBulkOpenLinks: (([UUID]) -> Void)?
@@ -122,6 +124,10 @@ final class NodeListViewController: NSViewController {
         }
         collectionView.onBackgroundClick = { [weak self] in
             self?.clearSelections()
+        }
+        collectionView.onItemDoubleClicked = { [weak self] indexPath in
+            guard let self, let row = self.row(at: indexPath) else { return }
+            self.onNodeDoubleClicked?(row.node.id)
         }
         collectionView.parentViewController = self
 
@@ -889,6 +895,10 @@ extension NodeListViewController: NSMenuDelegate {
             let newFolder = NSMenuItem(title: "New Folder…", action: #selector(contextNewFolder), keyEquivalent: "")
             newFolder.target = self
             menu.addItem(newFolder)
+
+            let newNote = NSMenuItem(title: "New Note…", action: #selector(contextNewNote), keyEquivalent: "")
+            newNote.target = self
+            menu.addItem(newNote)
             return
         }
 
@@ -900,6 +910,11 @@ extension NodeListViewController: NSMenuDelegate {
             newNested.target = self
             newNested.representedObject = node.id
             menu.addItem(newNested)
+
+            let newNoteInFolder = NSMenuItem(title: "New Note in Folder…", action: #selector(contextNewNoteInFolder(_:)), keyEquivalent: "")
+            newNoteInFolder.target = self
+            newNoteInFolder.representedObject = node.id
+            menu.addItem(newNoteInFolder)
 
             let hasLinks = folder.children.contains { if case .link = $0 { return true } else { return false } }
             let openLinks = NSMenuItem(title: "Open All Links", action: hasLinks ? #selector(contextOpenFolderLinks(_:)) : nil, keyEquivalent: "")
@@ -1013,9 +1028,18 @@ extension NodeListViewController: NSMenuDelegate {
         onNewFolderRequested?(nil)
     }
 
+    @objc private func contextNewNote() {
+        onNewNoteRequested?(nil)
+    }
+
     @objc private func contextNewNestedFolder(_ sender: NSMenuItem) {
         guard let nodeId = sender.representedObject as? UUID else { return }
         onNewFolderRequested?(nodeId)
+    }
+
+    @objc private func contextNewNoteInFolder(_ sender: NSMenuItem) {
+        guard let nodeId = sender.representedObject as? UUID else { return }
+        onNewNoteRequested?(nodeId)
     }
 
     @objc private func contextRename() {
@@ -1211,6 +1235,7 @@ private final class ContextMenuCollectionView: NSCollectionView {
     var onContextRequest: ((IndexPath?) -> Void)?
     var onDragExit: (() -> Void)?
     var onBackgroundClick: (() -> Void)?
+    var onItemDoubleClicked: ((IndexPath) -> Void)?
     weak var parentViewController: NodeListViewController?
 
     override var mouseDownCanMoveWindow: Bool {
@@ -1224,6 +1249,8 @@ private final class ContextMenuCollectionView: NSCollectionView {
         // If clicking on empty space, notify the callback
         if indexPath == nil {
             onBackgroundClick?()
+        } else if event.clickCount == 2, let indexPath {
+            onItemDoubleClicked?(indexPath)
         }
 
         // Always call super to allow normal click handling
