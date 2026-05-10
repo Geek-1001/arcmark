@@ -188,6 +188,13 @@ final class NoteServer {
             return
         }
 
+        // Browsers fetch /favicon.ico automatically with no token; serve a
+        // 204 so we don't log noisy 401s.
+        if request.method == "GET" && request.path == "/favicon.ico" {
+            sendResponse(status: 204, statusMessage: "No Content", contentType: "image/x-icon", body: Data(), on: connection)
+            return
+        }
+
         // Token check (applies to all routes — including static assets)
         let providedToken = request.query["token"] ?? request.headers["x-arcmark-token"] ?? ""
         if !constantTimeEqual(providedToken, token) {
@@ -197,7 +204,9 @@ final class NoteServer {
 
         switch (request.method, request.path) {
         case ("GET", "/"), ("GET", "/index.html"):
-            serveStatic(name: "index.html", on: connection)
+            serveIndexHTML(on: connection)
+        case ("GET", "/favicon.ico"):
+            sendResponse(status: 204, statusMessage: "No Content", contentType: "image/x-icon", body: Data(), on: connection)
         case ("GET", let path) where path.hasPrefix("/editor/"):
             let relative = String(path.dropFirst("/editor/".count))
             serveEditorAsset(relative: relative, on: connection)
@@ -250,11 +259,23 @@ final class NoteServer {
 
     // MARK: - Static asset serving
 
-    private func serveStatic(name: String, on connection: NWConnection) {
-        serveEditorAsset(relative: name, on: connection, allowIndex: true)
+    private func serveIndexHTML(on connection: NWConnection) {
+        guard let resourcesURL else {
+            sendStatus(500, message: "No Resources", on: connection)
+            return
+        }
+        let assetURL = resourcesURL
+            .appendingPathComponent("NoteEditor", isDirectory: true)
+            .appendingPathComponent("index.html")
+        guard var html = try? String(contentsOf: assetURL, encoding: .utf8) else {
+            sendStatus(404, message: "Asset Missing", on: connection)
+            return
+        }
+        html = html.replacingOccurrences(of: "{{TOKEN}}", with: token)
+        sendResponse(status: 200, statusMessage: "OK", contentType: "text/html; charset=utf-8", body: Data(html.utf8), on: connection)
     }
 
-    private func serveEditorAsset(relative: String, on connection: NWConnection, allowIndex: Bool = false) {
+    private func serveEditorAsset(relative: String, on connection: NWConnection) {
         // Reject path traversal
         if relative.contains("..") || relative.hasPrefix("/") {
             sendStatus(400, message: "Bad Path", on: connection)
@@ -266,16 +287,9 @@ final class NoteServer {
             return
         }
 
-        let assetURL: URL
-        if allowIndex {
-            assetURL = resourcesURL
-                .appendingPathComponent("NoteEditor", isDirectory: true)
-                .appendingPathComponent(relative)
-        } else {
-            assetURL = resourcesURL
-                .appendingPathComponent("NoteEditor", isDirectory: true)
-                .appendingPathComponent(relative)
-        }
+        let assetURL = resourcesURL
+            .appendingPathComponent("NoteEditor", isDirectory: true)
+            .appendingPathComponent(relative)
 
         guard let data = try? Data(contentsOf: assetURL) else {
             sendStatus(404, message: "Asset Missing", on: connection)
