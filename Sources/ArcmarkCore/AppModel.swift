@@ -193,10 +193,10 @@ final class AppModel {
         switch node {
         case .note(let note):
             noteStorage.delete(id: note.id)
-        case .link(let link):
-            if let path = link.faviconPath {
-                try? FileManager.default.removeItem(atPath: path)
-            }
+        case .link:
+            // Favicons are cached per host and shared across every link to
+            // that host, so deleting one link must not remove the file.
+            break
         case .folder(let folder):
             for child in folder.children {
                 cleanupFiles(for: child)
