@@ -152,16 +152,10 @@ final class AppModel {
     @discardableResult
     func addNote(title: String, parentId: UUID?) -> UUID {
         let note = Note(id: UUID(), title: title, customIcon: nil)
-        try? noteStorage.write(id: note.id, content: Self.starterNoteContent)
+        try? noteStorage.write(id: note.id, content: "")
         insertNode(.note(note), parentId: parentId)
         return note.id
     }
-
-    private static let starterNoteContent = """
-    # Untitled
-
-    Start writing your note here…
-    """
 
     func renameNode(id: UUID, newName: String) {
         updateNode(id: id) { node in

@@ -28,6 +28,15 @@
 
   function setContent(value) {
     editor.textContent = value;
+    refreshEmptyState();
+  }
+
+  // Browsers may leave a stray <br> or trailing newline inside a
+  // contenteditable after the user deletes all text, so normalize before
+  // deciding whether to show the placeholder.
+  function refreshEmptyState() {
+    const isEmpty = editor.innerText.replace(/\n+$/, "") === "";
+    editor.classList.toggle("is-empty", isEmpty);
   }
 
   function setStatus(text) {
@@ -226,10 +235,12 @@
     range.collapse(false);
     selection.removeAllRanges();
     selection.addRange(range);
+    refreshEmptyState();
     scheduleSave();
   });
 
   editor.addEventListener("input", function () {
+    refreshEmptyState();
     refreshTitle();
     scheduleSave();
   });

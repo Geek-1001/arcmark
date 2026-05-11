@@ -774,9 +774,9 @@ final class ModelTests: XCTestCase {
             XCTFail("Expected note at root")
         }
 
-        // Starter content should be written to disk
+        // New notes start with empty content; the editor shows a placeholder instead.
         let content = model.noteStorage.read(id: noteId)
-        XCTAssertTrue(content.contains("# Untitled"))
+        XCTAssertEqual(content, "")
     }
 
     func testRenameNote() {
