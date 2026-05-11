@@ -166,6 +166,15 @@ body.server-disconnected .note-title {
   line-height: 1.7;
   min-height: calc(100vh - 120px);
   caret-color: var(--accent);
+  position: relative;
+}
+
+.editor.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
 }
 
 .preview-pane h1,
