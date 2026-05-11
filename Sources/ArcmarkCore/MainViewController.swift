@@ -711,11 +711,16 @@ final class MainViewController: NSViewController {
     @objc private func pasteLink() {
         guard let pasted = NSPasteboard.general.string(forType: .string) else { return }
         let urls = extractUrls(from: pasted)
-        guard !urls.isEmpty else { return }
-        for url in urls {
-            let linkId = model.addLink(urlString: url.absoluteString, title: titleForUrl(url), parentId: nil)
-            fetchTitleForNewLink(id: linkId, url: url)
+        if !urls.isEmpty {
+            for url in urls {
+                let linkId = model.addLink(urlString: url.absoluteString, title: titleForUrl(url), parentId: nil)
+                fetchTitleForNewLink(id: linkId, url: url)
+            }
+            return
         }
+        let trimmed = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        model.addNote(title: "Untitled", parentId: nil, content: trimmed)
     }
 
     private func openLink(_ link: Link) {
