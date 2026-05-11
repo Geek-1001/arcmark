@@ -150,9 +150,9 @@ final class AppModel {
     }
 
     @discardableResult
-    func addNote(title: String, parentId: UUID?) -> UUID {
+    func addNote(title: String, parentId: UUID?, content: String = "") -> UUID {
         let note = Note(id: UUID(), title: title, customIcon: nil)
-        try? noteStorage.write(id: note.id, content: "")
+        try? noteStorage.write(id: note.id, content: content)
         insertNode(.note(note), parentId: parentId)
         return note.id
     }
