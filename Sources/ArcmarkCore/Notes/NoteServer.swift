@@ -4,9 +4,8 @@ import os
 
 /// Minimal loopback-only HTTP server that backs the bundled markdown note editor.
 ///
-/// Binds to 127.0.0.1 on a system-assigned ephemeral port, authenticates every
-/// request with a 256-bit random token, and rejects requests whose Host header
-/// doesn't match 127.0.0.1:<port> (DNS rebinding defense).
+/// Binds to 127.0.0.1 on a system-assigned ephemeral port and rejects requests
+/// whose Host header doesn't match 127.0.0.1:<port> (DNS rebinding defense).
 @MainActor
 final class NoteServer {
     private let logger = Logger(subsystem: "com.arcmark.app", category: "noteserver")
@@ -16,23 +15,11 @@ final class NoteServer {
 
     private var listener: NWListener?
     private(set) var port: UInt16 = 0
-    let token: String
 
     init(model: AppModel, resourcesURL: URL? = Bundle.module.resourceURL) {
         self.model = model
         self.noteStorage = model.noteStorage
         self.resourcesURL = resourcesURL
-        self.token = Self.generateToken()
-    }
-
-    private static func generateToken() -> String {
-        var bytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-        let data = Data(bytes)
-        return data.base64EncodedString()
-            .replacingOccurrences(of: "+", with: "-")
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "=", with: "")
     }
 
     func start() {
@@ -81,7 +68,7 @@ final class NoteServer {
 
     func editorURL(noteId: UUID) -> URL? {
         guard port > 0 else { return nil }
-        return URL(string: "http://127.0.0.1:\(port)/?id=\(noteId.uuidString)&token=\(token)")
+        return URL(string: "http://127.0.0.1:\(port)/?id=\(noteId.uuidString)")
     }
 
     // MARK: - Connection handling
@@ -190,17 +177,8 @@ final class NoteServer {
             return
         }
 
-        // Browsers fetch /favicon.ico automatically with no token; serve a
-        // 204 so we don't log noisy 401s.
         if request.method == "GET" && request.path == "/favicon.ico" {
             sendResponse(status: 204, statusMessage: "No Content", contentType: "image/x-icon", body: Data(), on: connection)
-            return
-        }
-
-        // Token check (applies to all routes — including static assets)
-        let providedToken = request.query["token"] ?? request.headers["x-arcmark-token"] ?? ""
-        if !constantTimeEqual(providedToken, token) {
-            sendStatus(401, message: "Unauthorized", on: connection)
             return
         }
 
@@ -278,11 +256,10 @@ final class NoteServer {
         let assetURL = resourcesURL
             .appendingPathComponent("NoteEditor", isDirectory: true)
             .appendingPathComponent("index.html")
-        guard var html = try? String(contentsOf: assetURL, encoding: .utf8) else {
+        guard let html = try? String(contentsOf: assetURL, encoding: .utf8) else {
             sendStatus(404, message: "Asset Missing", on: connection)
             return
         }
-        html = html.replacingOccurrences(of: "{{TOKEN}}", with: token)
         sendResponse(status: 200, statusMessage: "OK", contentType: "text/html; charset=utf-8", body: Data(html.utf8), on: connection)
     }
 
@@ -368,14 +345,4 @@ final class NoteServer {
         })
     }
 
-    private func constantTimeEqual(_ a: String, _ b: String) -> Bool {
-        let lhs = Array(a.utf8)
-        let rhs = Array(b.utf8)
-        if lhs.count != rhs.count { return false }
-        var result: UInt8 = 0
-        for i in 0..<lhs.count {
-            result |= lhs[i] ^ rhs[i]
-        }
-        return result == 0
-    }
 }

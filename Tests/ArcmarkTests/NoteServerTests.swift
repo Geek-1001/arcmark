@@ -51,25 +51,16 @@ final class NoteServerTests: XCTestCase {
         let (server, _) = try await startServer()
         defer { server.stop() }
         XCTAssertGreaterThan(server.port, 0)
-        XCTAssertFalse(server.token.isEmpty)
     }
 
-    func testGetWithoutTokenIsUnauthorized() async throws {
-        let (server, _) = try await startServer()
-        defer { server.stop() }
-        let id = UUID()
-        let (status, _) = try await request(method: "GET", path: "/api/notes/\(id.uuidString)", port: server.port)
-        XCTAssertEqual(status, 401)
-    }
-
-    func testGetWithTokenReturnsNoteJSON() async throws {
+    func testGetReturnsNoteJSON() async throws {
         let (server, model) = try await startServer()
         defer { server.stop() }
         let noteId = model.addNote(title: "Server Test", parentId: nil)
 
         let (status, body) = try await request(
             method: "GET",
-            path: "/api/notes/\(noteId.uuidString)?token=\(server.token)",
+            path: "/api/notes/\(noteId.uuidString)",
             port: server.port
         )
         XCTAssertEqual(status, 200)
@@ -86,7 +77,7 @@ final class NoteServerTests: XCTestCase {
 
         let (status, _) = try await request(
             method: "GET",
-            path: "/api/notes/\(noteId.uuidString)?token=\(server.token)",
+            path: "/api/notes/\(noteId.uuidString)",
             port: server.port
         )
         XCTAssertEqual(status, 404)
@@ -101,7 +92,7 @@ final class NoteServerTests: XCTestCase {
         let body = try JSONSerialization.data(withJSONObject: ["content": "should not write"])
         let (status, _) = try await request(
             method: "PUT",
-            path: "/api/notes/\(noteId.uuidString)?token=\(server.token)",
+            path: "/api/notes/\(noteId.uuidString)",
             body: body,
             port: server.port
         )
@@ -117,7 +108,7 @@ final class NoteServerTests: XCTestCase {
         let body = try JSONSerialization.data(withJSONObject: ["content": "## Updated"])
         let (status, _) = try await request(
             method: "PUT",
-            path: "/api/notes/\(noteId.uuidString)?token=\(server.token)",
+            path: "/api/notes/\(noteId.uuidString)",
             body: body,
             port: server.port
         )
