@@ -143,13 +143,18 @@ html, body {
   margin: 0;
 }
 
-body.note-deleted .tabs {
+body.note-deleted .tabs,
+body.server-disconnected .tabs {
   visibility: hidden;
 }
 
 body.note-deleted .note-title {
   opacity: 0.5;
   text-decoration: line-through;
+}
+
+body.server-disconnected .note-title {
+  opacity: 0.5;
 }
 
 .editor {

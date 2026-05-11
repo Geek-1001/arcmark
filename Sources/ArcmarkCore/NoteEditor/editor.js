@@ -17,6 +17,7 @@
   let savedTickerTimer = null;
   let serverTitle = "";
   let noteDeleted = false;
+  let serverDisconnected = false;
 
   // Reads/writes against the contenteditable node go through these two
   // helpers so future iterations can layer syntax-aware visual styling
@@ -98,6 +99,34 @@
     document.title = "Deleted note — Arcmark";
   }
 
+  function enterDisconnectedState() {
+    if (serverDisconnected) return;
+    serverDisconnected = true;
+    stopSavedTicker();
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    document.body.classList.add("server-disconnected");
+    editor.setAttribute("contenteditable", "false");
+
+    const main = document.querySelector("main.content");
+    if (main) {
+      main.innerHTML = "";
+      const card = document.createElement("div");
+      card.className = "empty-state";
+      const heading = document.createElement("h2");
+      heading.textContent = "Editor disconnected";
+      const blurb = document.createElement("p");
+      blurb.textContent = "Arcmark restarted, so this tab can no longer reach the editor. Reopen this note from Arcmark to continue editing.";
+      card.appendChild(heading);
+      card.appendChild(blurb);
+      main.appendChild(card);
+    }
+    setStatus("disconnected");
+    document.title = "Disconnected — Arcmark";
+  }
+
   async function loadNote() {
     if (!noteId) {
       setStatus("missing note id");
@@ -123,12 +152,12 @@
       setStatus("saved");
       scheduleSavedTicker();
     } catch (err) {
-      setStatus("load failed");
+      enterDisconnectedState();
     }
   }
 
   async function saveNote() {
-    if (!noteId || noteDeleted) return;
+    if (!noteId || noteDeleted || serverDisconnected) return;
     setStatus("saving…");
     try {
       const response = await fetch(`/api/notes/${noteId}`, {
@@ -150,13 +179,12 @@
       setStatus("saved");
       scheduleSavedTicker();
     } catch (err) {
-      stopSavedTicker();
-      setStatus("save failed");
+      enterDisconnectedState();
     }
   }
 
   function scheduleSave() {
-    if (noteDeleted) return;
+    if (noteDeleted || serverDisconnected) return;
     if (saveTimer) clearTimeout(saveTimer);
     setStatus("editing…");
     saveTimer = setTimeout(saveNote, 500);
