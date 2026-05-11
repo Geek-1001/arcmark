@@ -3,7 +3,6 @@
 
   const params = new URLSearchParams(window.location.search);
   const noteId = params.get("id");
-  const token = params.get("token");
 
   const editor = document.getElementById("editor");
   const previewPane = document.getElementById("pane-preview");
@@ -99,24 +98,13 @@
     document.title = "Deleted note — Arcmark";
   }
 
-  function authHeaders(extra) {
-    const headers = Object.assign({ "X-Arcmark-Token": token }, extra || {});
-    return headers;
-  }
-
-  function authedUrl(path) {
-    const sep = path.includes("?") ? "&" : "?";
-    return `${path}${sep}token=${encodeURIComponent(token)}`;
-  }
-
   async function loadNote() {
     if (!noteId) {
       setStatus("missing note id");
       return;
     }
     try {
-      const response = await fetch(authedUrl(`/api/notes/${noteId}`), {
-        headers: authHeaders(),
+      const response = await fetch(`/api/notes/${noteId}`, {
         cache: "no-store"
       });
       if (response.status === 404) {
@@ -143,9 +131,9 @@
     if (!noteId || noteDeleted) return;
     setStatus("saving…");
     try {
-      const response = await fetch(authedUrl(`/api/notes/${noteId}`), {
+      const response = await fetch(`/api/notes/${noteId}`, {
         method: "PUT",
-        headers: authHeaders({ "Content-Type": "application/json" }),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: getContent() }),
         cache: "no-store"
       });
