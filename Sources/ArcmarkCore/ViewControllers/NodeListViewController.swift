@@ -645,6 +645,7 @@ extension NodeListViewController: NSCollectionViewDataSource {
                 },
                 isSelected: isSelected,
                 isScheduled: link.scheduledOpenAt != nil,
+                scheduleBadgeBackgroundColor: workspaceColor.backgroundColor,
                 tooltipURL: link.url
             )
 
