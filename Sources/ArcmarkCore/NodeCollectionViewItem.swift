@@ -16,6 +16,8 @@ final class NodeCollectionViewItem: NSCollectionViewItem {
                    showDelete: Bool,
                    onDelete: (() -> Void)?,
                    isSelected: Bool,
+                   isScheduled: Bool = false,
+                   scheduleBadgeBackgroundColor: NSColor? = nil,
                    tooltipURL: String? = nil) {
         view.alphaValue = 1
         view.layer?.transform = CATransform3DIdentity
@@ -28,6 +30,8 @@ final class NodeCollectionViewItem: NSCollectionViewItem {
             metrics: metrics,
             onDelete: onDelete,
             isSelected: isSelected,
+            isScheduled: isScheduled,
+            scheduleBadgeBackgroundColor: scheduleBadgeBackgroundColor,
             tooltipURL: tooltipURL
         )
     }

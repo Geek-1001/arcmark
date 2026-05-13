@@ -4,8 +4,13 @@ final class NodeRowView: BaseView {
     private let iconView = NSImageView()
     private let editableTitle = InlineEditableTextField()
     private let deleteButton = NSButton()
+    private let clockBadgeContainer = NSView()
+    private let clockBadgeHoverOverlay = NSView()
+    private let clockIconView = NSImageView()
     private var isSelected = false
     private var showsDeleteButton = false
+    private var isScheduled = false
+    private var scheduleBadgeBackgroundColor: NSColor?
     private var metrics = ListMetrics()
     private var onDelete: (() -> Void)?
     private var tooltipURL: String?
@@ -18,6 +23,10 @@ final class NodeRowView: BaseView {
     private var iconHeightConstraint: NSLayoutConstraint?
     private var titleTrailingToDeleteButton: NSLayoutConstraint!
     private var titleTrailingToEdge: NSLayoutConstraint!
+
+    private static let scheduleBadgeSize: CGFloat = 14
+    private static let scheduleBadgePadding: CGFloat = 1.5
+    private static var scheduleBadgeIconSize: CGFloat { scheduleBadgeSize - scheduleBadgePadding * 2 }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -51,9 +60,25 @@ final class NodeRowView: BaseView {
         deleteButton.action = #selector(handleDelete)
         deleteButton.setButtonType(.momentaryChange)
 
+        clockBadgeContainer.translatesAutoresizingMaskIntoConstraints = false
+        clockBadgeContainer.wantsLayer = true
+        clockBadgeContainer.isHidden = true
+        clockBadgeContainer.layer?.cornerRadius = Self.scheduleBadgeSize / 2
+        clockBadgeContainer.layer?.masksToBounds = true
+
+        clockBadgeHoverOverlay.translatesAutoresizingMaskIntoConstraints = false
+        clockBadgeHoverOverlay.wantsLayer = true
+        clockBadgeHoverOverlay.isHidden = true
+
+        clockIconView.translatesAutoresizingMaskIntoConstraints = false
+        clockIconView.imageScaling = .scaleProportionallyDown
+
         addSubview(iconView)
         addSubview(editableTitle)
         addSubview(deleteButton)
+        addSubview(clockBadgeContainer)
+        clockBadgeContainer.addSubview(clockBadgeHoverOverlay)
+        clockBadgeContainer.addSubview(clockIconView)
 
         iconLeadingConstraint = iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16)
         iconWidthConstraint = iconView.widthAnchor.constraint(equalToConstant: 26)
@@ -77,7 +102,22 @@ final class NodeRowView: BaseView {
             deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             deleteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             deleteButton.widthAnchor.constraint(equalToConstant: 22),
-            deleteButton.heightAnchor.constraint(equalToConstant: 22)
+            deleteButton.heightAnchor.constraint(equalToConstant: 22),
+
+            clockBadgeContainer.centerXAnchor.constraint(equalTo: iconView.trailingAnchor),
+            clockBadgeContainer.centerYAnchor.constraint(equalTo: iconView.bottomAnchor),
+            clockBadgeContainer.widthAnchor.constraint(equalToConstant: Self.scheduleBadgeSize),
+            clockBadgeContainer.heightAnchor.constraint(equalToConstant: Self.scheduleBadgeSize),
+
+            clockBadgeHoverOverlay.leadingAnchor.constraint(equalTo: clockBadgeContainer.leadingAnchor),
+            clockBadgeHoverOverlay.trailingAnchor.constraint(equalTo: clockBadgeContainer.trailingAnchor),
+            clockBadgeHoverOverlay.topAnchor.constraint(equalTo: clockBadgeContainer.topAnchor),
+            clockBadgeHoverOverlay.bottomAnchor.constraint(equalTo: clockBadgeContainer.bottomAnchor),
+
+            clockIconView.centerXAnchor.constraint(equalTo: clockBadgeContainer.centerXAnchor),
+            clockIconView.centerYAnchor.constraint(equalTo: clockBadgeContainer.centerYAnchor),
+            clockIconView.widthAnchor.constraint(equalToConstant: Self.scheduleBadgeIconSize),
+            clockIconView.heightAnchor.constraint(equalToConstant: Self.scheduleBadgeIconSize)
         ])
 
     }
@@ -89,12 +129,17 @@ final class NodeRowView: BaseView {
                    metrics: ListMetrics,
                    onDelete: (() -> Void)?,
                    isSelected: Bool,
+                   isScheduled: Bool = false,
+                   scheduleBadgeBackgroundColor: NSColor? = nil,
                    tooltipURL: String? = nil) {
         tooltipShowTask?.cancel()
         tooltipShowTask = nil
         self.tooltipURL = tooltipURL
         self.metrics = metrics
         self.isSelected = isSelected
+        self.isScheduled = isScheduled
+        self.scheduleBadgeBackgroundColor = scheduleBadgeBackgroundColor
+        configureClockBadge()
         updateVisualState()
         if editableTitle.isEditing {
             if editableTitle.text != title {
@@ -173,19 +218,37 @@ final class NodeRowView: BaseView {
 
     private func updateVisualState() {
         let showDelete: Bool
+        let showBadgeHoverOverlay: Bool
         if isSelected {
             layer?.backgroundColor = metrics.selectedBackgroundColor.cgColor
             showDelete = false
+            showBadgeHoverOverlay = false
         } else if isHovered {
             layer?.backgroundColor = metrics.hoverBackgroundColor.cgColor
             showDelete = showsDeleteButton
+            showBadgeHoverOverlay = true
         } else {
             layer?.backgroundColor = NSColor.clear.cgColor
             showDelete = false
+            showBadgeHoverOverlay = false
         }
 
         deleteButton.isHidden = !showDelete
+        clockBadgeContainer.isHidden = !isScheduled
+        clockBadgeHoverOverlay.isHidden = !showBadgeHoverOverlay
+        clockBadgeHoverOverlay.layer?.backgroundColor = metrics.hoverBackgroundColor.cgColor
+
         titleTrailingToDeleteButton.isActive = showDelete
         titleTrailingToEdge.isActive = !showDelete
+    }
+
+    private func configureClockBadge() {
+        guard isScheduled else { return }
+        let config = NSImage.SymbolConfiguration(pointSize: Self.scheduleBadgeIconSize, weight: .bold)
+        clockIconView.image = NSImage(systemSymbolName: "clock.fill", accessibilityDescription: "Scheduled")?
+            .withSymbolConfiguration(config)
+        clockIconView.contentTintColor = ThemeConstants.Colors.darkGray
+            .withAlphaComponent(ThemeConstants.Opacity.high)
+        clockBadgeContainer.layer?.backgroundColor = (scheduleBadgeBackgroundColor ?? .clear).cgColor
     }
 }

@@ -129,6 +129,7 @@ struct Link: Codable, Identifiable, Equatable, Sendable {
     var url: String
     var faviconPath: String?
     var customIcon: CustomIcon?
+    var scheduledOpenAt: Date?
 }
 
 struct Folder: Codable, Identifiable, Equatable, Sendable {
@@ -227,6 +228,13 @@ enum Node: Codable, Identifiable, Equatable, Hashable, Sendable {
 struct NodeLocation: Equatable {
     var parentId: UUID?
     var index: Int
+}
+
+struct ScheduledLinkRef: Equatable, Sendable {
+    let workspaceId: UUID
+    let linkId: UUID
+    let url: String
+    let fireAt: Date
 }
 
 enum WorkspaceMoveDirection {

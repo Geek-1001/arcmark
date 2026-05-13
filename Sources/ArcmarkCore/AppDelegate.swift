@@ -12,6 +12,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var alwaysOnTopMenuItem: NSMenuItem?
     private var updaterController: SPUStandardUpdaterController!
     private var noteServer: NoteServer?
+    private var scheduler: SchedulerService?
 
     // Attachment state
     private var isAttachmentMode: Bool = false
@@ -73,7 +74,52 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         setupGlobalHotkey()
         setupSwipeGesture()
         observeBrowserChanges()
+        setupScheduler(model: model)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func setupScheduler(model: AppModel) {
+        let scheduler = SchedulerService()
+        self.scheduler = scheduler
+
+        scheduler.onFire = { [weak model] ref in
+            guard let model else { return }
+            if let url = URL(string: ref.url) {
+                let profile = model.state.workspaces
+                    .first(where: { $0.id == ref.workspaceId })?
+                    .browserProfiles[BrowserManager.resolveDefaultBrowserBundleId() ?? ""]
+                BrowserManager.open(url: url, profile: profile)
+            }
+            model.cancelSchedule(id: ref.linkId)
+        }
+
+        let previousOnChange = model.onChange
+        model.onChange = { [weak scheduler, weak model] in
+            previousOnChange?()
+            guard let scheduler, let model else { return }
+            scheduler.sync(with: model.allScheduledLinks())
+        }
+
+        scheduler.sync(with: model.allScheduledLinks())
+
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleSchedulerWakeOrActivate),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSchedulerWakeOrActivate),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleSchedulerWakeOrActivate() {
+        guard let scheduler, let model = mainViewController?.model else { return }
+        scheduler.sync(with: model.allScheduledLinks())
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
