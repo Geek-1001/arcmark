@@ -356,6 +356,14 @@ final class MainViewController: NSViewController {
             self?.model.canPinMore ?? false
         }
 
+        nodeListViewController.onLinkScheduled = { [weak self] id, date in
+            self?.model.scheduleLink(id: id, at: date)
+        }
+
+        nodeListViewController.onLinkScheduleCleared = { [weak self] id in
+            self?.model.cancelSchedule(id: id)
+        }
+
         nodeListViewController.onChangeIconRequested = { [weak self] nodeId, anchorView in
             guard let self, let node = self.model.nodeById(nodeId) else { return }
             switch node {

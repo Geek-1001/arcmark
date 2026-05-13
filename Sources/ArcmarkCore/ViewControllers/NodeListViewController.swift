@@ -55,6 +55,8 @@ final class NodeListViewController: NSViewController {
     var onPinLink: ((UUID) -> Void)?
     var canPinLink: (() -> Bool)?
     var onChangeIconRequested: ((UUID, NSView) -> Void)?
+    var onLinkScheduled: ((UUID, Date) -> Void)?
+    var onLinkScheduleCleared: ((UUID) -> Void)?
 
     // Data provider closure
     var nodeProvider: (() -> [Node])?
@@ -970,6 +972,31 @@ extension NodeListViewController: NSMenuDelegate {
             changeIcon.representedObject = node.id
             menu.addItem(changeIcon)
 
+            let scheduleItem = NSMenuItem(title: "Schedule", action: nil, keyEquivalent: "")
+            let scheduleSubmenu = NSMenu()
+            let presets: [(String, Int)] = [
+                ("In 1 day", 1),
+                ("In 2 days", 2),
+                ("In 3 days", 3),
+                ("In 1 week", 7),
+                ("In 2 weeks", 14),
+            ]
+            for (label, days) in presets {
+                let item = NSMenuItem(title: label, action: #selector(contextScheduleLink(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = ScheduleMenuPayload(linkId: node.id, days: days)
+                scheduleSubmenu.addItem(item)
+            }
+            if case .link(let link) = node, link.scheduledOpenAt != nil {
+                scheduleSubmenu.addItem(.separator())
+                let clear = NSMenuItem(title: "Clear Schedule", action: #selector(contextClearSchedule(_:)), keyEquivalent: "")
+                clear.target = self
+                clear.representedObject = node.id
+                scheduleSubmenu.addItem(clear)
+            }
+            scheduleItem.submenu = scheduleSubmenu
+            menu.addItem(scheduleItem)
+
             let moveMenu = NSMenuItem(title: "Move to", action: nil, keyEquivalent: "")
             let submenu = NSMenu()
             if let workspaces = workspacesProvider?(), let currentId = currentWorkspaceIdProvider?() {
@@ -1101,6 +1128,17 @@ extension NodeListViewController: NSMenuDelegate {
         onChangeIconRequested?(nodeId, item.view)
     }
 
+    @objc private func contextScheduleLink(_ sender: NSMenuItem) {
+        guard let payload = sender.representedObject as? ScheduleMenuPayload else { return }
+        guard let fireDate = Calendar.current.date(byAdding: .day, value: payload.days, to: Date()) else { return }
+        onLinkScheduled?(payload.linkId, fireDate)
+    }
+
+    @objc private func contextClearSchedule(_ sender: NSMenuItem) {
+        guard let linkId = sender.representedObject as? UUID else { return }
+        onLinkScheduleCleared?(linkId)
+    }
+
     private func populateBulkContextMenu(_ menu: NSMenu) {
         let count = selectedNodeIds.count
 
@@ -1222,6 +1260,15 @@ private struct NodeListRow {
 
     var id: UUID {
         node.id
+    }
+}
+
+private final class ScheduleMenuPayload {
+    let linkId: UUID
+    let days: Int
+    init(linkId: UUID, days: Int) {
+        self.linkId = linkId
+        self.days = days
     }
 }
 
