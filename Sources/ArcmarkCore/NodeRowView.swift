@@ -4,8 +4,10 @@ final class NodeRowView: BaseView {
     private let iconView = NSImageView()
     private let editableTitle = InlineEditableTextField()
     private let deleteButton = NSButton()
+    private let clockIconView = NSImageView()
     private var isSelected = false
     private var showsDeleteButton = false
+    private var isScheduled = false
     private var metrics = ListMetrics()
     private var onDelete: (() -> Void)?
     private var tooltipURL: String?
@@ -18,6 +20,7 @@ final class NodeRowView: BaseView {
     private var iconHeightConstraint: NSLayoutConstraint?
     private var titleTrailingToDeleteButton: NSLayoutConstraint!
     private var titleTrailingToEdge: NSLayoutConstraint!
+    private var titleTrailingToClock: NSLayoutConstraint!
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -51,9 +54,14 @@ final class NodeRowView: BaseView {
         deleteButton.action = #selector(handleDelete)
         deleteButton.setButtonType(.momentaryChange)
 
+        clockIconView.translatesAutoresizingMaskIntoConstraints = false
+        clockIconView.imageScaling = .scaleProportionallyDown
+        clockIconView.isHidden = true
+
         addSubview(iconView)
         addSubview(editableTitle)
         addSubview(deleteButton)
+        addSubview(clockIconView)
 
         iconLeadingConstraint = iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16)
         iconWidthConstraint = iconView.widthAnchor.constraint(equalToConstant: 26)
@@ -63,6 +71,8 @@ final class NodeRowView: BaseView {
             lessThanOrEqualTo: deleteButton.leadingAnchor, constant: -14)
         titleTrailingToEdge = editableTitle.trailingAnchor.constraint(
             lessThanOrEqualTo: trailingAnchor, constant: -16)
+        titleTrailingToClock = editableTitle.trailingAnchor.constraint(
+            lessThanOrEqualTo: clockIconView.leadingAnchor, constant: -8)
 
         NSLayoutConstraint.activate([
             iconLeadingConstraint!,
@@ -77,7 +87,12 @@ final class NodeRowView: BaseView {
             deleteButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             deleteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             deleteButton.widthAnchor.constraint(equalToConstant: 22),
-            deleteButton.heightAnchor.constraint(equalToConstant: 22)
+            deleteButton.heightAnchor.constraint(equalToConstant: 22),
+
+            clockIconView.trailingAnchor.constraint(equalTo: deleteButton.leadingAnchor, constant: -8),
+            clockIconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            clockIconView.widthAnchor.constraint(equalToConstant: ThemeConstants.Sizing.iconSmall),
+            clockIconView.heightAnchor.constraint(equalToConstant: ThemeConstants.Sizing.iconSmall)
         ])
 
     }
@@ -89,12 +104,15 @@ final class NodeRowView: BaseView {
                    metrics: ListMetrics,
                    onDelete: (() -> Void)?,
                    isSelected: Bool,
+                   isScheduled: Bool = false,
                    tooltipURL: String? = nil) {
         tooltipShowTask?.cancel()
         tooltipShowTask = nil
         self.tooltipURL = tooltipURL
         self.metrics = metrics
         self.isSelected = isSelected
+        self.isScheduled = isScheduled
+        configureClockIcon()
         updateVisualState()
         if editableTitle.isEditing {
             if editableTitle.text != title {
@@ -185,7 +203,19 @@ final class NodeRowView: BaseView {
         }
 
         deleteButton.isHidden = !showDelete
-        titleTrailingToDeleteButton.isActive = showDelete
-        titleTrailingToEdge.isActive = !showDelete
+        clockIconView.isHidden = !isScheduled
+
+        titleTrailingToClock.isActive = isScheduled
+        titleTrailingToDeleteButton.isActive = !isScheduled && showDelete
+        titleTrailingToEdge.isActive = !isScheduled && !showDelete
+    }
+
+    private func configureClockIcon() {
+        guard isScheduled else { return }
+        let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .medium)
+        clockIconView.image = NSImage(systemSymbolName: "clock.fill", accessibilityDescription: "Scheduled")?
+            .withSymbolConfiguration(config)
+        clockIconView.contentTintColor = ThemeConstants.Colors.darkGray
+            .withAlphaComponent(ThemeConstants.Opacity.medium)
     }
 }

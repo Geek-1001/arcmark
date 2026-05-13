@@ -644,6 +644,7 @@ extension NodeListViewController: NSCollectionViewDataSource {
                     self?.clearSelections()
                 },
                 isSelected: isSelected,
+                isScheduled: link.scheduledOpenAt != nil,
                 tooltipURL: link.url
             )
 
