@@ -862,6 +862,103 @@ final class ModelTests: XCTestCase {
         }
     }
 
+    // MARK: - Scheduled Link Tests
+
+    func testLinkRoundTripWithSchedule() throws {
+        let fireAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let link = Link(
+            id: UUID(),
+            title: "Scheduled",
+            url: "https://example.com",
+            faviconPath: nil,
+            customIcon: nil,
+            scheduledOpenAt: fireAt
+        )
+        let data = try JSONEncoder().encode(link)
+        let decoded = try JSONDecoder().decode(Link.self, from: data)
+        XCTAssertEqual(decoded.scheduledOpenAt, fireAt)
+    }
+
+    func testLinkDecodesLegacyMissingScheduledOpenAt() throws {
+        let legacyJSON = """
+        {
+            "id": "00000000-0000-0000-0000-0000000000aa",
+            "title": "Legacy",
+            "url": "https://legacy.example.com"
+        }
+        """.data(using: .utf8)!
+        let link = try JSONDecoder().decode(Link.self, from: legacyJSON)
+        XCTAssertNil(link.scheduledOpenAt)
+    }
+
+    func testScheduleLinkSetsDate() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let linkId = model.addLink(urlString: "https://a.com", title: "A", parentId: nil)
+        let fireAt = Date(timeIntervalSinceNow: 60)
+        model.scheduleLink(id: linkId, at: fireAt)
+
+        guard let node = model.nodeById(linkId), case .link(let link) = node else {
+            XCTFail("Expected link"); return
+        }
+        XCTAssertEqual(link.scheduledOpenAt, fireAt)
+    }
+
+    func testCancelScheduleClearsDate() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let linkId = model.addLink(urlString: "https://a.com", title: "A", parentId: nil)
+        model.scheduleLink(id: linkId, at: Date(timeIntervalSinceNow: 60))
+        model.cancelSchedule(id: linkId)
+
+        guard let node = model.nodeById(linkId), case .link(let link) = node else {
+            XCTFail("Expected link"); return
+        }
+        XCTAssertNil(link.scheduledOpenAt)
+    }
+
+    func testDeleteNodeRemovesScheduledLinkFromState() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        let linkId = model.addLink(urlString: "https://a.com", title: "A", parentId: nil)
+        model.scheduleLink(id: linkId, at: Date(timeIntervalSinceNow: 60))
+        XCTAssertEqual(model.allScheduledLinks().count, 1)
+
+        model.deleteNode(id: linkId)
+        XCTAssertEqual(model.allScheduledLinks().count, 0)
+    }
+
+    func testAllScheduledLinksWalksFoldersAndWorkspaces() {
+        let store = makeStore()
+        store.save(DataStore.defaultState())
+        let model = AppModel(store: store)
+
+        // Workspace A: nested folder containing a scheduled link
+        let folderId = model.addFolder(name: "Folder", parentId: nil)
+        let nestedFolderId = model.addFolder(name: "Nested", parentId: folderId)
+        let nestedLinkId = model.addLink(urlString: "https://nested.com", title: "Nested", parentId: nestedFolderId)
+        model.scheduleLink(id: nestedLinkId, at: Date(timeIntervalSince1970: 1_000_000))
+
+        // Workspace B: top-level scheduled link
+        let workspaceBId = model.createWorkspace(name: "B", colorId: .moss)
+        let topLinkId = model.addLink(urlString: "https://top.com", title: "Top", parentId: nil)
+        model.scheduleLink(id: topLinkId, at: Date(timeIntervalSince1970: 2_000_000))
+
+        // Switch back so we exercise cross-workspace traversal
+        model.selectWorkspace(id: workspaceBId)
+
+        let scheduled = model.allScheduledLinks()
+        XCTAssertEqual(scheduled.count, 2)
+        let linkIds = Set(scheduled.map { $0.linkId })
+        XCTAssertEqual(linkIds, Set([nestedLinkId, topLinkId]))
+    }
+
     func testMultipleBrowserProfiles() {
         let store = makeStore()
         store.save(DataStore.defaultState())
