@@ -129,6 +129,7 @@ struct Link: Codable, Identifiable, Equatable, Sendable {
     var url: String
     var faviconPath: String?
     var customIcon: CustomIcon?
+    var scheduledOpenAt: Date?
 }
 
 struct Folder: Codable, Identifiable, Equatable, Sendable {
