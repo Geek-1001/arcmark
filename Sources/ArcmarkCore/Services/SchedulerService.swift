@@ -5,10 +5,18 @@ import os
 final class SchedulerService {
     private var timers: [UUID: DispatchSourceTimer] = [:]
     private let logger = Logger(subsystem: "com.arcmark.app", category: "scheduler")
+    private var isSyncing = false
 
     var onFire: ((ScheduledLinkRef) -> Void)?
 
     func sync(with schedules: [ScheduledLinkRef]) {
+        // Reentry guard: onFire mutates model state, which triggers onChange,
+        // which calls sync again. Without this, overdue refs after the first
+        // would be fired by both the recursive sync and the outer loop.
+        guard !isSyncing else { return }
+        isSyncing = true
+        defer { isSyncing = false }
+
         for (_, timer) in timers { timer.cancel() }
         timers.removeAll()
 
