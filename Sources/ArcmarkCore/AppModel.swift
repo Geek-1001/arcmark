@@ -254,6 +254,47 @@ final class AppModel {
         }
     }
 
+    func scheduleLink(id: UUID, at date: Date) {
+        updateNode(id: id) { node in
+            if case .link(var link) = node {
+                link.scheduledOpenAt = date
+                node = .link(link)
+            }
+        }
+    }
+
+    func cancelSchedule(id: UUID) {
+        updateNode(id: id) { node in
+            if case .link(var link) = node {
+                link.scheduledOpenAt = nil
+                node = .link(link)
+            }
+        }
+    }
+
+    func allScheduledLinks() -> [ScheduledLinkRef] {
+        var result: [ScheduledLinkRef] = []
+        for workspace in state.workspaces {
+            collectScheduled(in: workspace.items, workspaceId: workspace.id, into: &result)
+        }
+        return result
+    }
+
+    private func collectScheduled(in nodes: [Node], workspaceId: UUID, into result: inout [ScheduledLinkRef]) {
+        for node in nodes {
+            switch node {
+            case .link(let link):
+                if let fireAt = link.scheduledOpenAt {
+                    result.append(ScheduledLinkRef(workspaceId: workspaceId, linkId: link.id, url: link.url, fireAt: fireAt))
+                }
+            case .folder(let folder):
+                collectScheduled(in: folder.children, workspaceId: workspaceId, into: &result)
+            case .note:
+                break
+            }
+        }
+    }
+
     func updateLinkUrl(id: UUID, newUrl: String) {
         updateNode(id: id) { node in
             switch node {

@@ -230,6 +230,13 @@ struct NodeLocation: Equatable {
     var index: Int
 }
 
+struct ScheduledLinkRef: Equatable, Sendable {
+    let workspaceId: UUID
+    let linkId: UUID
+    let url: String
+    let fireAt: Date
+}
+
 enum WorkspaceMoveDirection {
     case left
     case right
