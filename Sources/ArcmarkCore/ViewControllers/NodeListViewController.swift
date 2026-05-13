@@ -976,17 +976,19 @@ extension NodeListViewController: NSMenuDelegate {
 
             let scheduleItem = NSMenuItem(title: "Schedule", action: nil, keyEquivalent: "")
             let scheduleSubmenu = NSMenu()
-            let presets: [(String, Int)] = [
-                ("In 1 day", 1),
-                ("In 2 days", 2),
-                ("In 3 days", 3),
-                ("In 1 week", 7),
-                ("In 2 weeks", 14),
+
+            let presets: [(String, Calendar.Component, Int)] = [
+                ("In 1 hour", .hour, 1),
+                ("In 1 day", .day, 1),
+                ("In 2 days", .day, 2),
+                ("In 3 days", .day, 3),
+                ("In 1 week", .day, 7),
+                ("In 2 weeks", .day, 14),
             ]
-            for (label, days) in presets {
+            for (label, component, value) in presets {
                 let item = NSMenuItem(title: label, action: #selector(contextScheduleLink(_:)), keyEquivalent: "")
                 item.target = self
-                item.representedObject = ScheduleMenuPayload(linkId: node.id, days: days)
+                item.representedObject = ScheduleMenuPayload(linkId: node.id, component: component, value: value)
                 scheduleSubmenu.addItem(item)
             }
             if case .link(let link) = node, link.scheduledOpenAt != nil {
@@ -1132,7 +1134,7 @@ extension NodeListViewController: NSMenuDelegate {
 
     @objc private func contextScheduleLink(_ sender: NSMenuItem) {
         guard let payload = sender.representedObject as? ScheduleMenuPayload else { return }
-        guard let fireDate = Calendar.current.date(byAdding: .day, value: payload.days, to: Date()) else { return }
+        guard let fireDate = Calendar.current.date(byAdding: payload.component, value: payload.value, to: Date()) else { return }
         onLinkScheduled?(payload.linkId, fireDate)
     }
 
@@ -1267,10 +1269,12 @@ private struct NodeListRow {
 
 private final class ScheduleMenuPayload {
     let linkId: UUID
-    let days: Int
-    init(linkId: UUID, days: Int) {
+    let component: Calendar.Component
+    let value: Int
+    init(linkId: UUID, component: Calendar.Component, value: Int) {
         self.linkId = linkId
-        self.days = days
+        self.component = component
+        self.value = value
     }
 }
 
