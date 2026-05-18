@@ -452,6 +452,19 @@ final class AppModel {
         nodeById(id, nodes: currentWorkspace.items)
     }
 
+    func nodeAcrossWorkspaces(id: UUID) -> Node? {
+        for workspace in state.workspaces {
+            if let node = nodeById(id, nodes: workspace.items) {
+                return node
+            }
+        }
+        return nil
+    }
+
+    func workspaceId(forNodeId id: UUID) -> UUID? {
+        workspaceIdContaining(nodeId: id)
+    }
+
     func findNode(id: UUID, in nodes: [Node]) -> Node? {
         for node in nodes {
             if node.id == id {

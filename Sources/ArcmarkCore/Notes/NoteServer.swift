@@ -188,19 +188,66 @@ final class NoteServer {
         case ("GET", let path) where path.hasPrefix("/editor/"):
             let relative = String(path.dropFirst("/editor/".count))
             serveEditorAsset(relative: relative, on: connection)
+
+        // State / queries
+        case ("GET", "/api/state"):
+            handleGetState(on: connection)
+        case ("GET", "/api/workspaces"):
+            handleListWorkspaces(on: connection)
+        case ("GET", let path) where path.hasPrefix("/api/workspaces/") && path.hasSuffix("/tree"):
+            let middle = path.dropFirst("/api/workspaces/".count).dropLast("/tree".count)
+            handleWorkspaceTree(idString: String(middle), on: connection)
+
+        // Workspaces
+        case ("POST", "/api/workspaces"):
+            handleCreateWorkspace(body: request.body, on: connection)
+        case ("PATCH", let path) where path.hasPrefix("/api/workspaces/"):
+            let idString = String(path.dropFirst("/api/workspaces/".count))
+            handlePatchWorkspace(idString: idString, body: request.body, on: connection)
+
+        // Folders
+        case ("POST", "/api/folders"):
+            handleCreateFolder(body: request.body, on: connection)
+        case ("PATCH", let path) where path.hasPrefix("/api/folders/"):
+            let idString = String(path.dropFirst("/api/folders/".count))
+            handlePatchFolder(idString: idString, body: request.body, on: connection)
+
+        // Links
+        case ("POST", "/api/links"):
+            handleCreateLink(body: request.body, on: connection)
+        case ("PATCH", let path) where path.hasPrefix("/api/links/"):
+            let idString = String(path.dropFirst("/api/links/".count))
+            handlePatchLink(idString: idString, body: request.body, on: connection)
+
+        // Notes — create + metadata patch. Content read/write stays on the
+        // existing GET/PUT routes below, shared with the bundled editor.
+        case ("POST", "/api/notes"):
+            handleCreateNote(body: request.body, on: connection)
+        case ("PATCH", let path) where path.hasPrefix("/api/notes/"):
+            let idString = String(path.dropFirst("/api/notes/".count))
+            handlePatchNote(idString: idString, body: request.body, on: connection)
         case ("GET", let path) where path.hasPrefix("/api/notes/"):
             let idString = String(path.dropFirst("/api/notes/".count))
             handleGetNote(idString: idString, on: connection)
         case ("PUT", let path) where path.hasPrefix("/api/notes/"):
             let idString = String(path.dropFirst("/api/notes/".count))
             handlePutNote(idString: idString, body: request.body, on: connection)
+
+        // Generic node ops
+        case ("DELETE", let path) where path.hasPrefix("/api/nodes/"):
+            let idString = String(path.dropFirst("/api/nodes/".count))
+            handleDeleteNode(idString: idString, on: connection)
+        case ("POST", let path) where path.hasPrefix("/api/nodes/") && path.hasSuffix("/move"):
+            let middle = path.dropFirst("/api/nodes/".count).dropLast("/move".count)
+            handleMoveNode(idString: String(middle), body: request.body, on: connection)
+
         default:
             sendStatus(404, message: "Not Found", on: connection)
         }
     }
 
     private func noteTitle(id: UUID) -> String? {
-        guard let node = model?.nodeById(id) else { return nil }
+        guard let node = model?.nodeAcrossWorkspaces(id: id) else { return nil }
         if case .note(let note) = node { return note.title }
         return nil
     }
@@ -244,6 +291,440 @@ final class NoteServer {
         } catch {
             sendStatus(500, message: "Write Failed", on: connection)
         }
+    }
+
+    // MARK: - Agent API handlers
+
+    private func handleGetState(on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let data = try encoder.encode(model.state)
+            sendOkRawJSON(top: ["state": data], on: connection)
+        } catch {
+            sendError(status: 500, code: "encode_failed", message: "Failed to encode state", on: connection)
+        }
+    }
+
+    private func handleListWorkspaces(on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        let list: [[String: Any]] = model.workspaces.map { ws in
+            [
+                "id": ws.id.uuidString,
+                "name": ws.name,
+                "colorId": ws.colorId.rawValue
+            ]
+        }
+        sendOk(["workspaces": list], on: connection)
+    }
+
+    private func handleWorkspaceTree(idString: String, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let id = UUID(uuidString: idString) else {
+            sendError(status: 400, code: "bad_id", message: "Invalid workspace id", on: connection)
+            return
+        }
+        guard let workspace = model.workspaces.first(where: { $0.id == id }) else {
+            sendError(status: 404, code: "workspace_not_found", message: "Workspace not found", on: connection)
+            return
+        }
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let data = try encoder.encode(workspace)
+            sendOkRawJSON(top: ["workspace": data], on: connection)
+        } catch {
+            sendError(status: 500, code: "encode_failed", message: "Failed to encode workspace", on: connection)
+        }
+    }
+
+    private func handleCreateWorkspace(body: Data, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let json = parseJSONObject(body) else {
+            sendError(status: 400, code: "bad_body", message: "Body must be a JSON object", on: connection)
+            return
+        }
+        guard let name = (json["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            sendError(status: 400, code: "bad_name", message: "name is required", on: connection)
+            return
+        }
+        let color: WorkspaceColorId
+        if let raw = json["colorId"] as? String {
+            guard let resolved = Self.resolveColor(raw) else {
+                sendError(status: 400, code: "bad_color", message: "Unknown colorId: \(raw)", on: connection)
+                return
+            }
+            color = resolved
+        } else {
+            color = .defaultColor()
+        }
+        let id = model.createWorkspace(name: name, colorId: color)
+        sendOk(["id": id.uuidString], on: connection)
+    }
+
+    private func handlePatchWorkspace(idString: String, body: Data, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let id = UUID(uuidString: idString) else {
+            sendError(status: 400, code: "bad_id", message: "Invalid workspace id", on: connection)
+            return
+        }
+        guard model.workspaces.contains(where: { $0.id == id }) else {
+            sendError(status: 404, code: "workspace_not_found", message: "Workspace not found", on: connection)
+            return
+        }
+        guard let json = parseJSONObject(body) else {
+            sendError(status: 400, code: "bad_body", message: "Body must be a JSON object", on: connection)
+            return
+        }
+        if let name = (json["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            model.renameWorkspace(id: id, newName: name)
+        }
+        if let raw = json["colorId"] as? String {
+            guard let resolved = Self.resolveColor(raw) else {
+                sendError(status: 400, code: "bad_color", message: "Unknown colorId: \(raw)", on: connection)
+                return
+            }
+            model.updateWorkspaceColor(id: id, colorId: resolved)
+        }
+        sendOk([:], on: connection)
+    }
+
+    private func handleCreateFolder(body: Data, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let json = parseJSONObject(body) else {
+            sendError(status: 400, code: "bad_body", message: "Body must be a JSON object", on: connection)
+            return
+        }
+        guard let wsId = Self.parseUUID(json["workspace_id"]) else {
+            sendError(status: 400, code: "bad_workspace_id", message: "workspace_id is required", on: connection)
+            return
+        }
+        guard let name = (json["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            sendError(status: 400, code: "bad_name", message: "name is required", on: connection)
+            return
+        }
+        let parentId = Self.parseOptionalUUID(json["parent_id"])
+        if let parentResult = validateParent(workspaceId: wsId, parentId: parentId, expectFolder: true) {
+            switch parentResult {
+            case .success: break
+            case .failure(let code, let message):
+                sendError(status: 404, code: code, message: message, on: connection)
+                return
+            }
+        }
+        let expanded = (json["expanded"] as? Bool) ?? true
+        guard let id = model.addFolder(name: name, workspaceId: wsId, parentId: parentId, isExpanded: expanded) else {
+            sendError(status: 404, code: "workspace_not_found", message: "Workspace not found", on: connection)
+            return
+        }
+        sendOk(["id": id.uuidString], on: connection)
+    }
+
+    private func handlePatchFolder(idString: String, body: Data, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let id = UUID(uuidString: idString) else {
+            sendError(status: 400, code: "bad_id", message: "Invalid id", on: connection)
+            return
+        }
+        guard let node = model.nodeAcrossWorkspaces(id: id), case .folder = node else {
+            sendError(status: 404, code: "folder_not_found", message: "Folder not found", on: connection)
+            return
+        }
+        guard let json = parseJSONObject(body) else {
+            sendError(status: 400, code: "bad_body", message: "Body must be a JSON object", on: connection)
+            return
+        }
+        if let name = (json["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            model.renameNode(id: id, newName: name)
+        }
+        if let expanded = json["expanded"] as? Bool {
+            model.setFolderExpanded(id: id, isExpanded: expanded)
+        }
+        sendOk([:], on: connection)
+    }
+
+    private func handleCreateLink(body: Data, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let json = parseJSONObject(body) else {
+            sendError(status: 400, code: "bad_body", message: "Body must be a JSON object", on: connection)
+            return
+        }
+        guard let wsId = Self.parseUUID(json["workspace_id"]) else {
+            sendError(status: 400, code: "bad_workspace_id", message: "workspace_id is required", on: connection)
+            return
+        }
+        guard let url = (json["url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !url.isEmpty else {
+            sendError(status: 400, code: "bad_url", message: "url is required", on: connection)
+            return
+        }
+        let parentId = Self.parseOptionalUUID(json["parent_id"])
+        if let result = validateParent(workspaceId: wsId, parentId: parentId, expectFolder: true) {
+            switch result {
+            case .success: break
+            case .failure(let code, let message):
+                sendError(status: 404, code: code, message: message, on: connection)
+                return
+            }
+        }
+        let providedTitle = (json["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title: String
+        if let providedTitle, !providedTitle.isEmpty {
+            title = providedTitle
+        } else {
+            title = URL(string: url)?.host ?? url
+        }
+        guard let id = model.addLink(urlString: url, title: title, workspaceId: wsId, parentId: parentId) else {
+            sendError(status: 404, code: "workspace_not_found", message: "Workspace not found", on: connection)
+            return
+        }
+        sendOk(["id": id.uuidString], on: connection)
+    }
+
+    private func handlePatchLink(idString: String, body: Data, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let id = UUID(uuidString: idString) else {
+            sendError(status: 400, code: "bad_id", message: "Invalid id", on: connection)
+            return
+        }
+        guard let node = model.nodeAcrossWorkspaces(id: id), case .link = node else {
+            sendError(status: 404, code: "link_not_found", message: "Link not found", on: connection)
+            return
+        }
+        guard let json = parseJSONObject(body) else {
+            sendError(status: 400, code: "bad_body", message: "Body must be a JSON object", on: connection)
+            return
+        }
+        if let title = (json["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+            model.renameNode(id: id, newName: title)
+        }
+        if let url = (json["url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !url.isEmpty {
+            model.updateLinkUrl(id: id, newUrl: url)
+        }
+        sendOk([:], on: connection)
+    }
+
+    private func handleCreateNote(body: Data, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let json = parseJSONObject(body) else {
+            sendError(status: 400, code: "bad_body", message: "Body must be a JSON object", on: connection)
+            return
+        }
+        guard let wsId = Self.parseUUID(json["workspace_id"]) else {
+            sendError(status: 400, code: "bad_workspace_id", message: "workspace_id is required", on: connection)
+            return
+        }
+        guard let title = (json["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else {
+            sendError(status: 400, code: "bad_title", message: "title is required", on: connection)
+            return
+        }
+        let parentId = Self.parseOptionalUUID(json["parent_id"])
+        if let result = validateParent(workspaceId: wsId, parentId: parentId, expectFolder: true) {
+            switch result {
+            case .success: break
+            case .failure(let code, let message):
+                sendError(status: 404, code: code, message: message, on: connection)
+                return
+            }
+        }
+        let content = (json["content"] as? String) ?? ""
+        guard let id = model.addNote(title: title, workspaceId: wsId, parentId: parentId, content: content) else {
+            sendError(status: 404, code: "workspace_not_found", message: "Workspace not found", on: connection)
+            return
+        }
+        sendOk(["id": id.uuidString], on: connection)
+    }
+
+    private func handlePatchNote(idString: String, body: Data, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let id = UUID(uuidString: idString) else {
+            sendError(status: 400, code: "bad_id", message: "Invalid id", on: connection)
+            return
+        }
+        guard let node = model.nodeAcrossWorkspaces(id: id), case .note = node else {
+            sendError(status: 404, code: "note_not_found", message: "Note not found", on: connection)
+            return
+        }
+        guard let json = parseJSONObject(body) else {
+            sendError(status: 400, code: "bad_body", message: "Body must be a JSON object", on: connection)
+            return
+        }
+        if let title = (json["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+            model.renameNode(id: id, newName: title)
+        }
+        sendOk([:], on: connection)
+    }
+
+    private func handleDeleteNode(idString: String, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let id = UUID(uuidString: idString) else {
+            sendError(status: 400, code: "bad_id", message: "Invalid id", on: connection)
+            return
+        }
+        guard model.nodeAcrossWorkspaces(id: id) != nil else {
+            sendError(status: 404, code: "node_not_found", message: "Node not found", on: connection)
+            return
+        }
+        model.deleteNode(id: id)
+        sendOk([:], on: connection)
+    }
+
+    private func handleMoveNode(idString: String, body: Data, on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        guard let id = UUID(uuidString: idString) else {
+            sendError(status: 400, code: "bad_id", message: "Invalid id", on: connection)
+            return
+        }
+        guard let sourceWsId = model.workspaceId(forNodeId: id) else {
+            sendError(status: 404, code: "node_not_found", message: "Node not found", on: connection)
+            return
+        }
+        guard let json = parseJSONObject(body) else {
+            sendError(status: 400, code: "bad_body", message: "Body must be a JSON object", on: connection)
+            return
+        }
+        let toWsId = Self.parseOptionalUUID(json["to_workspace_id"])
+        let toParentId = Self.parseOptionalUUID(json["to_parent_id"])
+        let index = json["index"] as? Int
+
+        let destWsId = toWsId ?? sourceWsId
+        guard model.workspaces.contains(where: { $0.id == destWsId }) else {
+            sendError(status: 404, code: "workspace_not_found", message: "Destination workspace not found", on: connection)
+            return
+        }
+        if let toParentId {
+            guard let parentNode = model.nodeAcrossWorkspaces(id: toParentId), case .folder = parentNode else {
+                sendError(status: 404, code: "parent_not_found", message: "Target parent folder not found", on: connection)
+                return
+            }
+            if model.workspaceId(forNodeId: toParentId) != destWsId {
+                sendError(status: 400, code: "parent_wrong_workspace", message: "Target parent is in a different workspace", on: connection)
+                return
+            }
+        }
+
+        if destWsId == sourceWsId {
+            model.moveNode(id: id, toParentId: toParentId, index: index ?? Int.max)
+        } else {
+            model.moveNodeToWorkspace(id: id, workspaceId: destWsId, parentId: toParentId, index: index)
+        }
+        sendOk([:], on: connection)
+    }
+
+    // MARK: - Agent API helpers
+
+    private enum ParentValidation {
+        case success
+        case failure(code: String, message: String)
+    }
+
+    private func validateParent(workspaceId: UUID, parentId: UUID?, expectFolder: Bool) -> ParentValidation? {
+        guard let parentId else { return nil }
+        guard let model else { return .failure(code: "model_unavailable", message: "App model not available") }
+        guard let workspace = model.workspaces.first(where: { $0.id == workspaceId }) else {
+            return .failure(code: "workspace_not_found", message: "Workspace not found")
+        }
+        guard let node = model.findNode(id: parentId, in: workspace.items) else {
+            return .failure(code: "parent_not_found", message: "Parent folder not found in workspace")
+        }
+        if expectFolder, case .folder = node { return .success }
+        if expectFolder { return .failure(code: "parent_not_folder", message: "parent_id must reference a folder") }
+        return .success
+    }
+
+    private func parseJSONObject(_ data: Data) -> [String: Any]? {
+        if data.isEmpty { return [:] }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
+    private static func parseUUID(_ value: Any?) -> UUID? {
+        guard let s = value as? String else { return nil }
+        return UUID(uuidString: s)
+    }
+
+    private static func parseOptionalUUID(_ value: Any?) -> UUID? {
+        guard let s = value as? String, !s.isEmpty else { return nil }
+        return UUID(uuidString: s)
+    }
+
+    private static func resolveColor(_ raw: String) -> WorkspaceColorId? {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        if let direct = WorkspaceColorId(rawValue: trimmed) {
+            return direct == .settingsBackground ? nil : direct
+        }
+        let lower = trimmed.lowercased()
+        for case let c in WorkspaceColorId.allCases where c.name.lowercased() == lower {
+            return c
+        }
+        return nil
+    }
+
+    private func sendOk(_ payload: [String: Any], on connection: NWConnection) {
+        var dict = payload
+        dict["ok"] = true
+        sendJSON(dict, on: connection)
+    }
+
+    private func sendOkRawJSON(top: [String: Data], on connection: NWConnection) {
+        // Builds `{"ok":true,"<key>":<rawJson>,...}` so we can splice in
+        // pre-encoded JSON (e.g. AppState) without lossy round-tripping.
+        var parts: [String] = ["\"ok\":true"]
+        for (key, data) in top {
+            let escapedKey = key.replacingOccurrences(of: "\"", with: "\\\"")
+            let json = String(data: data, encoding: .utf8) ?? "null"
+            parts.append("\"\(escapedKey)\":\(json)")
+        }
+        let body = Data("{\(parts.joined(separator: ","))}".utf8)
+        sendResponse(status: 200, statusMessage: "OK", contentType: "application/json; charset=utf-8", body: body, on: connection)
+    }
+
+    private func sendError(status: Int, code: String, message: String, on connection: NWConnection) {
+        let payload: [String: Any] = [
+            "ok": false,
+            "error": message,
+            "code": code
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data("{\"ok\":false}".utf8)
+        sendResponse(status: status, statusMessage: "Error", contentType: "application/json; charset=utf-8", body: data, on: connection)
     }
 
     // MARK: - Static asset serving
