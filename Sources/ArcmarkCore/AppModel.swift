@@ -134,26 +134,48 @@ final class AppModel {
 
     @discardableResult
     func addFolder(name: String, parentId: UUID?, isExpanded: Bool = true) -> UUID {
+        addFolder(name: name, workspaceId: currentWorkspace.id, parentId: parentId, isExpanded: isExpanded) ?? UUID()
+    }
+
+    @discardableResult
+    func addFolder(name: String, workspaceId: UUID, parentId: UUID?, isExpanded: Bool = true) -> UUID? {
+        guard state.workspaces.contains(where: { $0.id == workspaceId }) else { return nil }
         let folder = Folder(id: UUID(), name: name, children: [], isExpanded: isExpanded)
-        let node = Node.folder(folder)
-        insertNode(node, parentId: parentId)
+        updateWorkspace(id: workspaceId) { workspace in
+            insertNode(.folder(folder), parentId: parentId, index: nil, nodes: &workspace.items)
+        }
         return folder.id
     }
 
     @discardableResult
     func addLink(urlString: String, title: String, parentId: UUID?) -> UUID {
+        addLink(urlString: urlString, title: title, workspaceId: currentWorkspace.id, parentId: parentId) ?? UUID()
+    }
+
+    @discardableResult
+    func addLink(urlString: String, title: String, workspaceId: UUID, parentId: UUID?) -> UUID? {
+        guard state.workspaces.contains(where: { $0.id == workspaceId }) else { return nil }
         let link = Link(id: UUID(), title: title, url: urlString, faviconPath: nil)
-        let node = Node.link(link)
-        insertNode(node, parentId: parentId)
+        updateWorkspace(id: workspaceId) { workspace in
+            insertNode(.link(link), parentId: parentId, index: nil, nodes: &workspace.items)
+        }
         logger.debug("Added link \(title, privacy: .public) -> \(urlString, privacy: .public)")
         return link.id
     }
 
     @discardableResult
     func addNote(title: String, parentId: UUID?, content: String = "") -> UUID {
+        addNote(title: title, workspaceId: currentWorkspace.id, parentId: parentId, content: content) ?? UUID()
+    }
+
+    @discardableResult
+    func addNote(title: String, workspaceId: UUID, parentId: UUID?, content: String = "") -> UUID? {
+        guard state.workspaces.contains(where: { $0.id == workspaceId }) else { return nil }
         let note = Note(id: UUID(), title: title, customIcon: nil)
         try? noteStorage.write(id: note.id, content: content)
-        insertNode(.note(note), parentId: parentId)
+        updateWorkspace(id: workspaceId) { workspace in
+            insertNode(.note(note), parentId: parentId, index: nil, nodes: &workspace.items)
+        }
         return note.id
     }
 
@@ -174,8 +196,9 @@ final class AppModel {
     }
 
     func deleteNode(id: UUID) {
+        guard let wsId = workspaceIdContaining(nodeId: id) else { return }
         var removed: Node?
-        updateWorkspace(id: currentWorkspace.id) { workspace in
+        updateWorkspace(id: wsId) { workspace in
             removed = removeNode(id: id, nodes: &workspace.items)
         }
         if let node = removed {
@@ -199,10 +222,12 @@ final class AppModel {
     }
 
     func moveNode(id: UUID, toParentId: UUID?, index: Int) {
-        guard let location = findNodeLocation(id: id, nodes: currentWorkspace.items) else { return }
-        if let toParentId, isDescendant(nodeId: toParentId, in: id) { return }
+        guard let sourceWsId = workspaceIdContaining(nodeId: id),
+              let sourceWs = state.workspaces.first(where: { $0.id == sourceWsId }),
+              let location = findNodeLocation(id: id, nodes: sourceWs.items) else { return }
+        if let toParentId, isDescendant(nodeId: toParentId, ofAncestor: id, in: sourceWs.items) { return }
 
-        updateWorkspace(id: currentWorkspace.id) { workspace in
+        updateWorkspace(id: sourceWsId) { workspace in
             guard let removedNode = removeNode(id: id, nodes: &workspace.items) else { return }
 
             var targetIndex = max(0, index)
@@ -215,15 +240,37 @@ final class AppModel {
     }
 
     func moveNodeToWorkspace(id: UUID, workspaceId: UUID) {
-        guard workspaceId != currentWorkspace.id else { return }
+        moveNodeToWorkspace(id: id, workspaceId: workspaceId, parentId: nil, index: nil)
+    }
+
+    func moveNodeToWorkspace(id: UUID, workspaceId: UUID, parentId: UUID?, index: Int?) {
+        guard state.workspaces.contains(where: { $0.id == workspaceId }) else { return }
+        guard let sourceWsId = workspaceIdContaining(nodeId: id) else { return }
+        guard sourceWsId != workspaceId else {
+            // Same-workspace move — delegate to moveNode if a target was provided.
+            if let index {
+                moveNode(id: id, toParentId: parentId, index: index)
+            }
+            return
+        }
+        if let parentId,
+           let destWs = state.workspaces.first(where: { $0.id == workspaceId }),
+           findNodeLocation(id: parentId, nodes: destWs.items) == nil {
+            return
+        }
+
         var removedNode: Node?
-        updateWorkspace(id: currentWorkspace.id) { workspace in
+        updateWorkspace(id: sourceWsId, notify: false) { workspace in
             removedNode = removeNode(id: id, nodes: &workspace.items)
         }
-        guard let node = removedNode else { return }
+        guard let node = removedNode else {
+            // Restore notification so observers see the no-op revert if any.
+            persist()
+            return
+        }
 
         updateWorkspace(id: workspaceId) { workspace in
-            workspace.items.append(node)
+            insertNode(node, parentId: parentId, index: index, nodes: &workspace.items)
         }
     }
 
@@ -485,7 +532,8 @@ final class AppModel {
     }
 
     private func updateNode(id: UUID, notify: Bool = true, _ mutate: (inout Node) -> Void) {
-        updateWorkspace(id: currentWorkspace.id, notify: notify) { workspace in
+        guard let wsId = workspaceIdContaining(nodeId: id) else { return }
+        updateWorkspace(id: wsId, notify: notify) { workspace in
             _ = updateNode(id: id, nodes: &workspace.items, mutate)
         }
     }
@@ -611,6 +659,20 @@ final class AppModel {
     private func isDescendant(nodeId: UUID, in potentialAncestorId: UUID) -> Bool {
         guard let ancestor = nodeById(potentialAncestorId, nodes: currentWorkspace.items) else { return false }
         return containsNode(nodeId, within: ancestor)
+    }
+
+    private func isDescendant(nodeId: UUID, ofAncestor ancestorId: UUID, in nodes: [Node]) -> Bool {
+        guard let ancestor = nodeById(ancestorId, nodes: nodes) else { return false }
+        return containsNode(nodeId, within: ancestor)
+    }
+
+    private func workspaceIdContaining(nodeId: UUID) -> UUID? {
+        for workspace in state.workspaces {
+            if findNodeLocation(id: nodeId, nodes: workspace.items) != nil {
+                return workspace.id
+            }
+        }
+        return nil
     }
 
     private func nodeById(_ id: UUID, nodes: [Node]) -> Node? {
