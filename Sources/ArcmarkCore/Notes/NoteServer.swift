@@ -626,6 +626,11 @@ final class NoteServer {
         let toParentId = Self.parseOptionalUUID(json["to_parent_id"])
         let index = json["index"] as? Int
 
+        if json["to_workspace_id"] == nil, json["to_parent_id"] == nil, json["index"] == nil {
+            sendError(status: 400, code: "no_move_params", message: "Provide at least one of to_workspace_id, to_parent_id, or index", on: connection)
+            return
+        }
+
         let destWsId = toWsId ?? sourceWsId
         guard model.workspaces.contains(where: { $0.id == destWsId }) else {
             sendError(status: 404, code: "workspace_not_found", message: "Destination workspace not found", on: connection)
