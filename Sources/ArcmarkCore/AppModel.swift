@@ -263,11 +263,7 @@ final class AppModel {
         updateWorkspace(id: sourceWsId, notify: false) { workspace in
             removedNode = removeNode(id: id, nodes: &workspace.items)
         }
-        guard let node = removedNode else {
-            // Restore notification so observers see the no-op revert if any.
-            persist()
-            return
-        }
+        guard let node = removedNode else { return }
 
         updateWorkspace(id: workspaceId) { workspace in
             insertNode(node, parentId: parentId, index: index, nodes: &workspace.items)
