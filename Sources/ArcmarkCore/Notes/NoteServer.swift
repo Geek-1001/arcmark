@@ -392,15 +392,27 @@ final class NoteServer {
             sendError(status: 400, code: "bad_body", message: "Body must be a JSON object", on: connection)
             return
         }
-        if let name = (json["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
-            model.renameWorkspace(id: id, newName: name)
-        }
+        // Resolve all fields before mutating so a bad colorId can't leave
+        // a partial rename applied.
+        let trimmedName = (json["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newName: String? = (trimmedName?.isEmpty == false) ? trimmedName : nil
+
+        let newColor: WorkspaceColorId?
         if let raw = json["colorId"] as? String {
             guard let resolved = Self.resolveColor(raw) else {
                 sendError(status: 400, code: "bad_color", message: "Unknown colorId: \(raw)", on: connection)
                 return
             }
-            model.updateWorkspaceColor(id: id, colorId: resolved)
+            newColor = resolved
+        } else {
+            newColor = nil
+        }
+
+        if let newName {
+            model.renameWorkspace(id: id, newName: newName)
+        }
+        if let newColor {
+            model.updateWorkspaceColor(id: id, colorId: newColor)
         }
         sendOk([:], on: connection)
     }
