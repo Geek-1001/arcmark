@@ -134,7 +134,10 @@ final class AppModel {
 
     @discardableResult
     func addFolder(name: String, parentId: UUID?, isExpanded: Bool = true) -> UUID {
-        addFolder(name: name, workspaceId: currentWorkspace.id, parentId: parentId, isExpanded: isExpanded) ?? UUID()
+        guard let id = addFolder(name: name, workspaceId: currentWorkspace.id, parentId: parentId, isExpanded: isExpanded) else {
+            preconditionFailure("currentWorkspace is missing from state.workspaces")
+        }
+        return id
     }
 
     @discardableResult
@@ -149,7 +152,10 @@ final class AppModel {
 
     @discardableResult
     func addLink(urlString: String, title: String, parentId: UUID?) -> UUID {
-        addLink(urlString: urlString, title: title, workspaceId: currentWorkspace.id, parentId: parentId) ?? UUID()
+        guard let id = addLink(urlString: urlString, title: title, workspaceId: currentWorkspace.id, parentId: parentId) else {
+            preconditionFailure("currentWorkspace is missing from state.workspaces")
+        }
+        return id
     }
 
     @discardableResult
@@ -165,7 +171,10 @@ final class AppModel {
 
     @discardableResult
     func addNote(title: String, parentId: UUID?, content: String = "") -> UUID {
-        addNote(title: title, workspaceId: currentWorkspace.id, parentId: parentId, content: content) ?? UUID()
+        guard let id = addNote(title: title, workspaceId: currentWorkspace.id, parentId: parentId, content: content) else {
+            preconditionFailure("currentWorkspace is missing from state.workspaces")
+        }
+        return id
     }
 
     @discardableResult
