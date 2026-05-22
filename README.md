@@ -81,6 +81,33 @@ To import bookmarks from Arc browser:
 
 Arc stores your workspace locally in `~/Library/Application Support/Arc/StorableSidebar.json`. Arcmark parses this file to recreate exactly the same folder and spaces structure you've had previously.
 
+## Agent Skill
+
+Arcmark ships an agent skill in `skills/arcmark/` that lets Claude Code (and
+other skill-aware agents) organize bookmarks, folders, and notes on your
+behalf while the app is running. Two ways to install it:
+
+**Option 1 — `npx skills`** (installs into every supported agent at once):
+
+```bash
+npx skills add Geek-1001/arcmark
+```
+
+**Option 2 — copy the folder directly.** Grab `skills/arcmark/` from this
+repo and drop it into the skills directory of whichever agent you use,
+for example:
+
+```bash
+# Claude Code (project-local)
+cp -R skills/arcmark .claude/skills/
+
+# Claude Code (user-wide)
+cp -R skills/arcmark ~/.claude/skills/
+```
+
+Arcmark must be running for the skill to work — it talks to a local HTTP
+server inside the app.
+
 ## Building from Source
 
 ### Prerequisites

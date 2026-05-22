@@ -13,6 +13,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var updaterController: SPUStandardUpdaterController!
     private var noteServer: NoteServer?
     private var scheduler: SchedulerService?
+    private var agentEndpointFileURL: URL?
 
     // Attachment state
     private var isAttachmentMode: Bool = false
@@ -39,6 +40,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         noteServer.start()
         mainViewController.noteServer = noteServer
         self.noteServer = noteServer
+        publishAgentEndpoint(noteServer: noteServer)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 340, height: 680),
@@ -127,6 +129,32 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             saveWindowFrame(window)
         }
         noteServer?.stop()
+        if let agentEndpointFileURL {
+            try? FileManager.default.removeItem(at: agentEndpointFileURL)
+        }
+    }
+
+    private func publishAgentEndpoint(noteServer: NoteServer) {
+        let url = DataStore().agentEndpointFileURL()
+        agentEndpointFileURL = url
+        try? FileManager.default.removeItem(at: url)
+
+        Task { @MainActor [weak noteServer] in
+            for _ in 0..<200 {
+                if let port = noteServer?.port, port > 0 {
+                    let payload: [String: Any] = [
+                        "port": Int(port),
+                        "host": "127.0.0.1",
+                        "schemaVersion": 1
+                    ]
+                    if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]) {
+                        try? data.write(to: url, options: [.atomic])
+                    }
+                    return
+                }
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
+        }
     }
 
     public func windowDidResize(_ notification: Notification) {

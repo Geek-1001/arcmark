@@ -67,6 +67,10 @@ final class DataStore {
         notesDirectory().appendingPathComponent("\(id.uuidString).md")
     }
 
+    func agentEndpointFileURL() -> URL {
+        baseDirectory.appendingPathComponent("agent-endpoint.json")
+    }
+
     private func ensureDirectories() {
         if !fileManager.fileExists(atPath: baseDirectory.path) {
             try? fileManager.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
