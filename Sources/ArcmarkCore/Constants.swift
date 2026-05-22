@@ -33,6 +33,7 @@ struct LayoutConstants {
 struct ListMetrics {
     let rowHeight: CGFloat = 40
     let verticalGap: CGFloat = 4
+    let overscrollBottom: CGFloat = 150
     let leftPadding: CGFloat = 8
     let iconSize: CGFloat = 20
     let indentWidth: CGFloat = 16
