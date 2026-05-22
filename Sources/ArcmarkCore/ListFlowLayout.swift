@@ -9,7 +9,7 @@ final class ListFlowLayout: NSCollectionViewFlowLayout {
         scrollDirection = .vertical
         minimumLineSpacing = metrics.verticalGap
         minimumInteritemSpacing = 0
-        sectionInset = NSEdgeInsets(top: metrics.verticalGap, left: 0, bottom: metrics.verticalGap, right: 0)
+        sectionInset = NSEdgeInsets(top: metrics.verticalGap, left: 0, bottom: metrics.overscrollBottom, right: 0)
     }
 
     required init?(coder: NSCoder) {
@@ -18,7 +18,7 @@ final class ListFlowLayout: NSCollectionViewFlowLayout {
         scrollDirection = .vertical
         minimumLineSpacing = metrics.verticalGap
         minimumInteritemSpacing = 0
-        sectionInset = NSEdgeInsets(top: metrics.verticalGap, left: 0, bottom: metrics.verticalGap, right: 0)
+        sectionInset = NSEdgeInsets(top: metrics.verticalGap, left: 0, bottom: metrics.overscrollBottom, right: 0)
     }
 
     override func prepare() {
