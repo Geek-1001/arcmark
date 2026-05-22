@@ -139,7 +139,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         agentEndpointFileURL = url
         try? FileManager.default.removeItem(at: url)
 
-        Task { @MainActor [weak self, weak noteServer] in
+        Task { @MainActor [weak noteServer] in
             for _ in 0..<200 {
                 if let port = noteServer?.port, port > 0 {
                     let payload: [String: Any] = [
@@ -150,7 +150,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
                     if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted]) {
                         try? data.write(to: url, options: [.atomic])
                     }
-                    self?.agentEndpointFileURL = url
                     return
                 }
                 try? await Task.sleep(nanoseconds: 50_000_000)
