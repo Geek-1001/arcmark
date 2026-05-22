@@ -316,6 +316,32 @@ final class NoteServerTests: XCTestCase {
         XCTAssertNotNil(treeJson["workspace"])
     }
 
+    func testCurrentWorkspaceReturnsSelected() async throws {
+        let (server, model) = try await startServer()
+        defer { server.stop() }
+        let wsId = try XCTUnwrap(model.workspaces.first?.id)
+        model.selectWorkspace(id: wsId)
+
+        let (status, json) = try await apiRequest("GET", "/api/workspaces/current", port: server.port)
+        XCTAssertEqual(status, 200)
+        XCTAssertEqual(json["selected"] as? Bool, true)
+        XCTAssertEqual(json["settingsSelected"] as? Bool, false)
+        let workspace = try XCTUnwrap(json["workspace"] as? [String: Any])
+        XCTAssertEqual(workspace["id"] as? String, wsId.uuidString)
+    }
+
+    func testCurrentWorkspaceReportsSettings() async throws {
+        let (server, model) = try await startServer()
+        defer { server.stop() }
+        model.selectSettings()
+
+        let (status, json) = try await apiRequest("GET", "/api/workspaces/current", port: server.port)
+        XCTAssertEqual(status, 200)
+        XCTAssertEqual(json["selected"] as? Bool, false)
+        XCTAssertEqual(json["settingsSelected"] as? Bool, true)
+        XCTAssertTrue(json["workspace"] is NSNull)
+    }
+
     func testCreateWorkspaceRejectsUnknownColor() async throws {
         // Bind `model` so NoteServer's weak reference stays alive.
         let (server, model) = try await startServer()

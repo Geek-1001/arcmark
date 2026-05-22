@@ -194,6 +194,8 @@ final class NoteServer {
             handleGetState(on: connection)
         case ("GET", "/api/workspaces"):
             handleListWorkspaces(on: connection)
+        case ("GET", "/api/workspaces/current"):
+            handleCurrentWorkspace(on: connection)
         case ("GET", let path) where path.hasPrefix("/api/workspaces/") && path.hasSuffix("/tree"):
             let middle = path.dropFirst("/api/workspaces/".count).dropLast("/tree".count)
             handleWorkspaceTree(idString: String(middle), on: connection)
@@ -323,6 +325,37 @@ final class NoteServer {
             ]
         }
         sendOk(["workspaces": list], on: connection)
+    }
+
+    private func handleCurrentWorkspace(on connection: NWConnection) {
+        guard let model else {
+            sendError(status: 503, code: "model_unavailable", message: "App model not available", on: connection)
+            return
+        }
+        let state = model.state
+        let selectedId = state.selectedWorkspaceId
+        let workspace = selectedId.flatMap { id in model.workspaces.first(where: { $0.id == id }) }
+
+        if let workspace {
+            let payload: [String: Any] = [
+                "selected": true,
+                "settingsSelected": state.isSettingsSelected,
+                "workspace": [
+                    "id": workspace.id.uuidString,
+                    "name": workspace.name,
+                    "colorId": workspace.colorId.rawValue
+                ]
+            ]
+            sendOk(payload, on: connection)
+            return
+        }
+
+        let payload: [String: Any] = [
+            "selected": false,
+            "settingsSelected": state.isSettingsSelected,
+            "workspace": NSNull()
+        ]
+        sendOk(payload, on: connection)
     }
 
     private func handleWorkspaceTree(idString: String, on connection: NWConnection) {

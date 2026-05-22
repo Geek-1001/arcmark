@@ -164,6 +164,7 @@ const COMMANDS = {
   'tree': cmdTree,
 
   'workspaces:list': cmdWorkspacesList,
+  'workspaces:current': cmdWorkspacesCurrent,
   'workspaces:create': cmdWorkspacesCreate,
   'workspaces:rename': cmdWorkspacesRename,
   'workspaces:set-color': cmdWorkspacesSetColor,
@@ -202,6 +203,15 @@ async function cmdTree(args) {
 async function cmdWorkspacesList() {
   const out = await request('GET', '/api/workspaces');
   printJSON(out.workspaces || []);
+}
+
+async function cmdWorkspacesCurrent() {
+  const out = await request('GET', '/api/workspaces/current');
+  printJSON({
+    selected: out.selected === true,
+    settingsSelected: out.settingsSelected === true,
+    workspace: out.workspace ?? null,
+  });
 }
 
 async function cmdWorkspacesCreate(args) {
@@ -383,6 +393,7 @@ State:
 
 Workspaces (cannot be deleted by the agent):
   workspaces:list
+  workspaces:current                   Workspace currently visible in the app.
   workspaces:create        --name "X" [--color NAME]
   workspaces:rename ID     --name "Y"
   workspaces:set-color ID  --color NAME

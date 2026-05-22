@@ -42,6 +42,7 @@ file editing.
 
 | User phrasing | Command |
 |---|---|
+| "Save this here" / "Add this to the workspace I'm in" | `workspaces:current` to get the id, then `links:create --workspace WS_ID --url URL` |
 | "Save this link in my Reading workspace" | `links:create --workspace WS_ID --url URL` |
 | "Add a folder called Reading" | `folders:create --workspace WS_ID --name "Reading"` |
 | "Group these tabs into a Research folder in my Reading workspace" | create folder, then `nodes:move` each link with `--to-parent FOLDER_ID` |
@@ -58,6 +59,11 @@ file editing.
 1. **Find ids first.** Run `arcmark.js state` (or `arcmark.js workspaces:list`
    plus `arcmark.js tree WORKSPACE_ID`) to discover the workspace, folder,
    and node UUIDs you need. Never invent or guess ids.
+   - When the user says "this workspace", "the current one", "the one I'm
+     in", or "here", resolve it with `arcmark.js workspaces:current`. The
+     response is `{ selected, settingsSelected, workspace: { id, name, colorId } | null }`.
+     If `selected` is false (e.g. the user is on the Settings screen),
+     ask which workspace to use instead of guessing.
 2. **Decide on a target.** Pick which workspace and (optionally) parent
    folder a new node should live in. If the user is ambiguous, ask.
 3. **Compose atomic mutations.** Run one CLI command per action. Each
@@ -124,6 +130,7 @@ state                                  Dump the full AppState JSON.
 tree WORKSPACE_ID                      Dump one workspace's tree.
 
 workspaces:list
+workspaces:current                       Workspace currently visible in the app.
 workspaces:create        --name "X" [--color NAME]
 workspaces:rename ID     --name "Y"
 workspaces:set-color ID  --color NAME
