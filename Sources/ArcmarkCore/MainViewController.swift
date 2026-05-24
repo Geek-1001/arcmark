@@ -155,7 +155,7 @@ final class MainViewController: NSViewController {
         }
 
         // Workspace content stack (animated during swipe)
-        let contentStack = NSStackView(views: [pinnedTabsView, nodeListViewController.view, scheduledLinksAccordion, bottomBar])
+        let contentStack = NSStackView(views: [pinnedTabsView, scheduledLinksAccordion, nodeListViewController.view, bottomBar])
         contentStack.orientation = .vertical
         contentStack.spacing = 10
         contentStack.translatesAutoresizingMaskIntoConstraints = false

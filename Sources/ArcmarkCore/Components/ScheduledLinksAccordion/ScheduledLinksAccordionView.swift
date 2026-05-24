@@ -8,11 +8,12 @@ final class ScheduledLinksAccordionView: NSView {
     var onExpandChanged: ((Bool) -> Void)?
 
     private static let expandedHeight: CGFloat = 300
+    private static let contentDividerGap: CGFloat = ThemeConstants.Spacing.medium
 
     private let contentContainer = NSView()
     private let scrollView = NSScrollView()
     private let rowsStack = NSStackView()
-    private let divider = NSView()
+    private let bottomDivider = NSView()
     private let headerButton = HeaderButton()
 
     private var contentHeightConstraint: NSLayoutConstraint!
@@ -62,9 +63,9 @@ final class ScheduledLinksAccordionView: NSView {
         contentContainer.layer?.masksToBounds = true
         contentContainer.addSubview(scrollView)
 
-        divider.translatesAutoresizingMaskIntoConstraints = false
-        divider.wantsLayer = true
-        divider.layer?.backgroundColor = ThemeConstants.Colors.darkGray
+        bottomDivider.translatesAutoresizingMaskIntoConstraints = false
+        bottomDivider.wantsLayer = true
+        bottomDivider.layer?.backgroundColor = ThemeConstants.Colors.darkGray
             .withAlphaComponent(ThemeConstants.Opacity.minimal).cgColor
 
         headerButton.translatesAutoresizingMaskIntoConstraints = false
@@ -73,16 +74,20 @@ final class ScheduledLinksAccordionView: NSView {
             self.setExpanded(!self.isExpanded, animated: true)
         }
 
-        addSubview(contentContainer)
-        addSubview(divider)
         addSubview(headerButton)
+        addSubview(contentContainer)
+        addSubview(bottomDivider)
 
         contentHeightConstraint = contentContainer.heightAnchor.constraint(equalToConstant: 0)
 
         NSLayoutConstraint.activate([
+            headerButton.leadingAnchor.constraint(equalTo: leadingAnchor),
+            headerButton.trailingAnchor.constraint(equalTo: trailingAnchor),
+            headerButton.topAnchor.constraint(equalTo: topAnchor),
+
             contentContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
             contentContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
-            contentContainer.topAnchor.constraint(equalTo: topAnchor),
+            contentContainer.topAnchor.constraint(equalTo: headerButton.bottomAnchor),
             contentHeightConstraint,
 
             scrollView.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
@@ -99,15 +104,11 @@ final class ScheduledLinksAccordionView: NSView {
             rowsStack.topAnchor.constraint(equalTo: documentView.topAnchor),
             rowsStack.bottomAnchor.constraint(equalTo: documentView.bottomAnchor),
 
-            divider.leadingAnchor.constraint(equalTo: leadingAnchor),
-            divider.trailingAnchor.constraint(equalTo: trailingAnchor),
-            divider.topAnchor.constraint(equalTo: contentContainer.bottomAnchor),
-            divider.heightAnchor.constraint(equalToConstant: 1),
-
-            headerButton.leadingAnchor.constraint(equalTo: leadingAnchor),
-            headerButton.trailingAnchor.constraint(equalTo: trailingAnchor),
-            headerButton.topAnchor.constraint(equalTo: divider.bottomAnchor),
-            headerButton.bottomAnchor.constraint(equalTo: bottomAnchor)
+            bottomDivider.leadingAnchor.constraint(equalTo: leadingAnchor),
+            bottomDivider.trailingAnchor.constraint(equalTo: trailingAnchor),
+            bottomDivider.topAnchor.constraint(equalTo: contentContainer.bottomAnchor, constant: Self.contentDividerGap),
+            bottomDivider.heightAnchor.constraint(equalToConstant: 1),
+            bottomDivider.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
 
