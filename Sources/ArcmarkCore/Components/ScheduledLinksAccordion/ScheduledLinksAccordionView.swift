@@ -13,7 +13,6 @@ final class ScheduledLinksAccordionView: NSView {
     private let contentContainer = NSView()
     private let scrollView = NSScrollView()
     private let rowsStack = NSStackView()
-    private let topDivider = NSView()
     private let bottomDivider = NSView()
     private let headerButton = HeaderButton()
 
@@ -64,16 +63,10 @@ final class ScheduledLinksAccordionView: NSView {
         contentContainer.layer?.masksToBounds = true
         contentContainer.addSubview(scrollView)
 
-        let dividerColor = ThemeConstants.Colors.darkGray
-            .withAlphaComponent(ThemeConstants.Opacity.minimal).cgColor
-
-        topDivider.translatesAutoresizingMaskIntoConstraints = false
-        topDivider.wantsLayer = true
-        topDivider.layer?.backgroundColor = dividerColor
-
         bottomDivider.translatesAutoresizingMaskIntoConstraints = false
         bottomDivider.wantsLayer = true
-        bottomDivider.layer?.backgroundColor = dividerColor
+        bottomDivider.layer?.backgroundColor = ThemeConstants.Colors.darkGray
+            .withAlphaComponent(ThemeConstants.Opacity.minimal).cgColor
 
         headerButton.translatesAutoresizingMaskIntoConstraints = false
         headerButton.onClick = { [weak self] in
@@ -81,7 +74,6 @@ final class ScheduledLinksAccordionView: NSView {
             self.setExpanded(!self.isExpanded, animated: true)
         }
 
-        addSubview(topDivider)
         addSubview(headerButton)
         addSubview(contentContainer)
         addSubview(bottomDivider)
@@ -89,14 +81,9 @@ final class ScheduledLinksAccordionView: NSView {
         contentHeightConstraint = contentContainer.heightAnchor.constraint(equalToConstant: 0)
 
         NSLayoutConstraint.activate([
-            topDivider.leadingAnchor.constraint(equalTo: leadingAnchor),
-            topDivider.trailingAnchor.constraint(equalTo: trailingAnchor),
-            topDivider.topAnchor.constraint(equalTo: topAnchor),
-            topDivider.heightAnchor.constraint(equalToConstant: 1),
-
             headerButton.leadingAnchor.constraint(equalTo: leadingAnchor),
             headerButton.trailingAnchor.constraint(equalTo: trailingAnchor),
-            headerButton.topAnchor.constraint(equalTo: topDivider.bottomAnchor),
+            headerButton.topAnchor.constraint(equalTo: topAnchor),
 
             contentContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
             contentContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
