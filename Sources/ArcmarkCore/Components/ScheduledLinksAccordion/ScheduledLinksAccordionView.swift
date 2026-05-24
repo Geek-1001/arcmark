@@ -30,6 +30,16 @@ final class ScheduledLinksAccordionView: NSView {
         setupView()
     }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func handleScrollBoundsChanged() {
+        for row in rowsStack.arrangedSubviews.compactMap({ $0 as? ScheduledLinkRowView }) {
+            row.refreshHoverState()
+        }
+    }
+
     private func setupView() {
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
@@ -57,6 +67,13 @@ final class ScheduledLinksAccordionView: NSView {
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
         scrollView.documentView = documentView
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScrollBoundsChanged),
+            name: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView
+        )
 
         contentContainer.translatesAutoresizingMaskIntoConstraints = false
         contentContainer.wantsLayer = true
