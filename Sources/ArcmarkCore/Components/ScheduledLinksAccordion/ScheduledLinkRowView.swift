@@ -11,7 +11,7 @@ final class ScheduledLinkRowView: BaseControl {
     var onSelected: ((UUID) -> Void)?
     var onRightClick: ((UUID, NSEvent) -> Void)?
 
-    private static let iconSize: CGFloat = 18
+    private let metrics = ListMetrics()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -24,25 +24,28 @@ final class ScheduledLinkRowView: BaseControl {
     }
 
     private func setupView() {
-        layer?.cornerRadius = ThemeConstants.CornerRadius.medium
+        layer?.cornerRadius = metrics.rowCornerRadius
         layer?.masksToBounds = true
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.imageScaling = .scaleProportionallyDown
         iconView.wantsLayer = true
-        iconView.layer?.cornerRadius = ThemeConstants.CornerRadius.small * 0.5
+        iconView.layer?.cornerRadius = metrics.iconCornerRadius
         iconView.layer?.masksToBounds = true
 
         titleField.translatesAutoresizingMaskIntoConstraints = false
-        titleField.font = ThemeConstants.Fonts.bodyRegular
-        titleField.textColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.high)
+        titleField.font = metrics.linkTitleFont
+        titleField.textColor = metrics.titleColor
         titleField.lineBreakMode = .byTruncatingTail
         titleField.maximumNumberOfLines = 1
         titleField.cell?.usesSingleLineMode = true
+        titleField.cell?.truncatesLastVisibleLine = true
+        titleField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        titleField.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         dateField.translatesAutoresizingMaskIntoConstraints = false
         dateField.font = ThemeConstants.Fonts.systemFont(size: 12, weight: .medium)
-        dateField.textColor = ThemeConstants.Colors.darkGray.withAlphaComponent(ThemeConstants.Opacity.medium)
+        dateField.textColor = metrics.titleColor.withAlphaComponent(0.6)
         dateField.alignment = .right
         dateField.lineBreakMode = .byTruncatingTail
         dateField.maximumNumberOfLines = 1
@@ -54,19 +57,19 @@ final class ScheduledLinkRowView: BaseControl {
         addSubview(dateField)
 
         NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: ThemeConstants.Spacing.medium),
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: metrics.leftPadding),
             iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: Self.iconSize),
-            iconView.heightAnchor.constraint(equalToConstant: Self.iconSize),
+            iconView.widthAnchor.constraint(equalToConstant: metrics.iconSize),
+            iconView.heightAnchor.constraint(equalToConstant: metrics.iconSize),
 
-            titleField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: ThemeConstants.Spacing.medium),
+            titleField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
             titleField.centerYAnchor.constraint(equalTo: centerYAnchor),
             titleField.trailingAnchor.constraint(lessThanOrEqualTo: dateField.leadingAnchor, constant: -ThemeConstants.Spacing.small),
 
-            dateField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -ThemeConstants.Spacing.medium),
+            dateField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             dateField.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            heightAnchor.constraint(equalToConstant: 36)
+            heightAnchor.constraint(equalToConstant: metrics.rowHeight)
         ])
     }
 
@@ -74,7 +77,13 @@ final class ScheduledLinkRowView: BaseControl {
         linkId = entry.link.id
         titleField.stringValue = entry.link.title
         dateField.stringValue = Self.formattedFireDate(entry.fireAt)
-        iconView.image = Self.faviconImage(for: entry.link)
+        let icon = Self.faviconImage(for: entry.link, size: metrics.iconSize)
+        iconView.image = icon
+        if let icon, icon.isTemplate {
+            iconView.contentTintColor = metrics.iconTintColor
+        } else {
+            iconView.contentTintColor = nil
+        }
     }
 
     // MARK: - Mouse Events
@@ -100,16 +109,10 @@ final class ScheduledLinkRowView: BaseControl {
     }
 
     private func updateBackground() {
-        let opacity: CGFloat
         if isPressed {
-            opacity = ThemeConstants.Opacity.subtle
+            layer?.backgroundColor = metrics.selectedBackgroundColor.cgColor
         } else if isHovered {
-            opacity = ThemeConstants.Opacity.minimal
-        } else {
-            opacity = 0
-        }
-        if opacity > 0 {
-            layer?.backgroundColor = ThemeConstants.Colors.darkGray.withAlphaComponent(opacity).cgColor
+            layer?.backgroundColor = metrics.hoverBackgroundColor.cgColor
         } else {
             layer?.backgroundColor = NSColor.clear.cgColor
         }
@@ -117,13 +120,13 @@ final class ScheduledLinkRowView: BaseControl {
 
     // MARK: - Helpers
 
-    private static func faviconImage(for link: Link) -> NSImage? {
+    private static func faviconImage(for link: Link, size: CGFloat) -> NSImage? {
         if let customIcon = link.customIcon {
             switch customIcon {
             case .emoji(let emoji):
-                return NodeListViewController.imageFromEmoji(emoji, size: iconSize)
+                return NodeListViewController.imageFromEmoji(emoji, size: size)
             case .sfSymbol(let name):
-                let config = NSImage.SymbolConfiguration(pointSize: iconSize, weight: .regular)
+                let config = NSImage.SymbolConfiguration(pointSize: size, weight: .regular)
                 let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
                     .withSymbolConfiguration(config)
                 image?.isTemplate = true
@@ -134,7 +137,7 @@ final class ScheduledLinkRowView: BaseControl {
                     image.isTemplate = false
                     return image
                 }
-                return globeImage()
+                return globeImage(size: size)
             }
         }
         if let path = link.faviconPath,
@@ -143,11 +146,11 @@ final class ScheduledLinkRowView: BaseControl {
             image.isTemplate = false
             return image
         }
-        return globeImage()
+        return globeImage(size: size)
     }
 
-    private static func globeImage() -> NSImage? {
-        let config = NSImage.SymbolConfiguration(pointSize: iconSize, weight: .regular)
+    private static func globeImage(size: CGFloat) -> NSImage? {
+        let config = NSImage.SymbolConfiguration(pointSize: size, weight: .regular)
         let image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)?
             .withSymbolConfiguration(config)
         image?.isTemplate = true

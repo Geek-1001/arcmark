@@ -166,8 +166,8 @@ final class ScheduledLinksAccordionView: NSView {
             }
             rowsStack.addArrangedSubview(row)
             NSLayoutConstraint.activate([
-                row.leadingAnchor.constraint(equalTo: rowsStack.leadingAnchor, constant: ThemeConstants.Spacing.small),
-                row.trailingAnchor.constraint(equalTo: rowsStack.trailingAnchor, constant: -ThemeConstants.Spacing.small)
+                row.leadingAnchor.constraint(equalTo: rowsStack.leadingAnchor),
+                row.trailingAnchor.constraint(equalTo: rowsStack.trailingAnchor)
             ])
         }
     }
