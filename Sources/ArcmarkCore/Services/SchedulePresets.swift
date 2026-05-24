@@ -20,3 +20,14 @@ enum SchedulePresets {
         Calendar.current.date(byAdding: component, value: value, to: base)
     }
 }
+
+final class ScheduleMenuPayload {
+    let linkId: UUID
+    let component: Calendar.Component
+    let value: Int
+    init(linkId: UUID, component: Calendar.Component, value: Int) {
+        self.linkId = linkId
+        self.component = component
+        self.value = value
+    }
+}
