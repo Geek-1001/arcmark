@@ -237,6 +237,11 @@ struct ScheduledLinkRef: Equatable, Sendable {
     let fireAt: Date
 }
 
+struct ScheduledLinkEntry: Equatable, Sendable {
+    let link: Link
+    let fireAt: Date
+}
+
 enum WorkspaceMoveDirection {
     case left
     case right
