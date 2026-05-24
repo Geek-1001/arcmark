@@ -977,18 +977,10 @@ extension NodeListViewController: NSMenuDelegate {
             let scheduleItem = NSMenuItem(title: "Schedule", action: nil, keyEquivalent: "")
             let scheduleSubmenu = NSMenu()
 
-            let presets: [(String, Calendar.Component, Int)] = [
-                ("In 1 hour", .hour, 1),
-                ("In 1 day", .day, 1),
-                ("In 2 days", .day, 2),
-                ("In 3 days", .day, 3),
-                ("In 1 week", .day, 7),
-                ("In 2 weeks", .day, 14),
-            ]
-            for (label, component, value) in presets {
-                let item = NSMenuItem(title: label, action: #selector(contextScheduleLink(_:)), keyEquivalent: "")
+            for preset in SchedulePresets.all {
+                let item = NSMenuItem(title: preset.label, action: #selector(contextScheduleLink(_:)), keyEquivalent: "")
                 item.target = self
-                item.representedObject = ScheduleMenuPayload(linkId: node.id, component: component, value: value)
+                item.representedObject = ScheduleMenuPayload(linkId: node.id, component: preset.component, value: preset.value)
                 scheduleSubmenu.addItem(item)
             }
             if case .link(let link) = node, link.scheduledOpenAt != nil {
@@ -1267,16 +1259,6 @@ private struct NodeListRow {
     }
 }
 
-private final class ScheduleMenuPayload {
-    let linkId: UUID
-    let component: Calendar.Component
-    let value: Int
-    init(linkId: UUID, component: Calendar.Component, value: Int) {
-        self.linkId = linkId
-        self.component = component
-        self.value = value
-    }
-}
 
 
 private final class ContextMenuCollectionView: NSCollectionView {

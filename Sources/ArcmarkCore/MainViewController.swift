@@ -15,6 +15,7 @@ final class MainViewController: NSViewController {
     private let workspaceSwitcher = WorkspaceSwitcherView(style: .defaultStyle)
     private let searchField = SearchBarView(style: .defaultSearch)
     private let pinnedTabsView = PinnedTabsView()
+    private let scheduledLinksAccordion = ScheduledLinksAccordionView()
     private let pasteButton = IconTitleButton(
         title: "Add links from clipboard",
         symbolName: "plus",
@@ -144,8 +145,17 @@ final class MainViewController: NSViewController {
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
         bottomBar.addSubview(pasteButton)
 
+        // Scheduled links accordion (docked above paste button)
+        scheduledLinksAccordion.onRowSelected = { [weak self] linkId in
+            guard let self, let link = self.linkById(linkId) else { return }
+            self.openLink(link)
+        }
+        scheduledLinksAccordion.onRowContextMenu = { [weak self] linkId, event in
+            self?.showScheduledRowMenu(linkId: linkId, event: event)
+        }
+
         // Workspace content stack (animated during swipe)
-        let contentStack = NSStackView(views: [pinnedTabsView, nodeListViewController.view, bottomBar])
+        let contentStack = NSStackView(views: [pinnedTabsView, scheduledLinksAccordion, nodeListViewController.view, bottomBar])
         contentStack.orientation = .vertical
         contentStack.spacing = 10
         contentStack.translatesAutoresizingMaskIntoConstraints = false
@@ -209,6 +219,8 @@ final class MainViewController: NSViewController {
             searchField.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -2),
             pinnedTabsView.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: 2),
             pinnedTabsView.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -2),
+            scheduledLinksAccordion.leadingAnchor.constraint(equalTo: contentStack.leadingAnchor, constant: 2),
+            scheduledLinksAccordion.trailingAnchor.constraint(equalTo: contentStack.trailingAnchor, constant: -2),
         ])
 
         // Settings view constraints
@@ -229,7 +241,8 @@ final class MainViewController: NSViewController {
     private func setupNodeListCallbacks() {
         nodeListViewController.nodeProvider = { [weak self] in
             guard let self else { return [] }
-            return self.searchCoordinator.filter(nodes: self.model.currentWorkspace.items)
+            let visible = ScheduledLinkFiltering.hideScheduled(self.model.currentWorkspace.items)
+            return self.searchCoordinator.filter(nodes: visible)
         }
 
         nodeListViewController.workspacesProvider = { [weak self] in
@@ -419,7 +432,9 @@ final class MainViewController: NSViewController {
             showWorkspaceContent()
             applyWorkspaceStyling()
             pinnedTabsView.update(pinnedLinks: model.currentWorkspace.pinnedLinks)
-            let filteredNodes = searchCoordinator.filter(nodes: model.currentWorkspace.items)
+            scheduledLinksAccordion.update(entries: model.scheduledLinks(in: model.currentWorkspace.id))
+            let visibleItems = ScheduledLinkFiltering.hideScheduled(model.currentWorkspace.items)
+            let filteredNodes = searchCoordinator.filter(nodes: visibleItems)
             let forceExpand = searchCoordinator.isSearchActive
             nodeListViewController.isSearchActive = searchCoordinator.isSearchActive
             let animated = !suppressNodeAnimations
@@ -480,6 +495,7 @@ final class MainViewController: NSViewController {
         // Hide workspace content
         searchField.isHidden = true
         pinnedTabsView.isHidden = true
+        scheduledLinksAccordion.isHidden = true
         pasteButton.isHidden = true
         nodeListViewController.view.isHidden = true
 
@@ -729,6 +745,59 @@ final class MainViewController: NSViewController {
         let trimmed = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         model.addNote(title: "Untitled", parentId: nil, content: trimmed)
+    }
+
+    private func linkById(_ id: UUID) -> Link? {
+        guard let node = model.nodeById(id), case .link(let link) = node else { return nil }
+        return link
+    }
+
+    private func showScheduledRowMenu(linkId: UUID, event: NSEvent) {
+        let menu = NSMenu()
+
+        let openItem = NSMenuItem(title: "Open Link", action: #selector(scheduledRowOpen(_:)), keyEquivalent: "")
+        openItem.target = self
+        openItem.representedObject = linkId
+        menu.addItem(openItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let rescheduleItem = NSMenuItem(title: "Reschedule", action: nil, keyEquivalent: "")
+        let rescheduleSubmenu = NSMenu()
+        for preset in SchedulePresets.all {
+            let item = NSMenuItem(title: preset.label, action: #selector(scheduledRowReschedule(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = ScheduleMenuPayload(linkId: linkId, component: preset.component, value: preset.value)
+            rescheduleSubmenu.addItem(item)
+        }
+        rescheduleItem.submenu = rescheduleSubmenu
+        menu.addItem(rescheduleItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let clearItem = NSMenuItem(title: "Clear Schedule", action: #selector(scheduledRowClear(_:)), keyEquivalent: "")
+        clearItem.target = self
+        clearItem.representedObject = linkId
+        menu.addItem(clearItem)
+
+        NSMenu.popUpContextMenu(menu, with: event, for: scheduledLinksAccordion)
+    }
+
+    @objc private func scheduledRowOpen(_ sender: NSMenuItem) {
+        guard let linkId = sender.representedObject as? UUID,
+              let link = linkById(linkId) else { return }
+        openLink(link)
+    }
+
+    @objc private func scheduledRowReschedule(_ sender: NSMenuItem) {
+        guard let payload = sender.representedObject as? ScheduleMenuPayload,
+              let date = SchedulePresets.date(component: payload.component, value: payload.value) else { return }
+        model.scheduleLink(id: payload.linkId, at: date)
+    }
+
+    @objc private func scheduledRowClear(_ sender: NSMenuItem) {
+        guard let linkId = sender.representedObject as? UUID else { return }
+        model.cancelSchedule(id: linkId)
     }
 
     private func openLink(_ link: Link) {
@@ -1214,7 +1283,8 @@ extension MainViewController: SwipeGestureServiceDelegate {
         // Switch to the adjacent workspace and update views without animation
         model.selectWorkspace(id: nextWorkspace.id)
         pinnedTabsView.update(pinnedLinks: nextWorkspace.pinnedLinks)
-        let filteredNodes = searchCoordinator.filter(nodes: nextWorkspace.items)
+        scheduledLinksAccordion.update(entries: model.scheduledLinks(in: nextWorkspace.id))
+        let filteredNodes = searchCoordinator.filter(nodes: ScheduledLinkFiltering.hideScheduled(nextWorkspace.items))
         nodeListViewController.reloadData(with: filteredNodes, forceExpand: false, animated: false)
 
         // Force layout so the views render with new data
@@ -1233,7 +1303,8 @@ extension MainViewController: SwipeGestureServiceDelegate {
         model.selectWorkspace(id: currentId)
         let currentWorkspace = model.currentWorkspace
         pinnedTabsView.update(pinnedLinks: currentWorkspace.pinnedLinks)
-        let currentNodes = searchCoordinator.filter(nodes: currentWorkspace.items)
+        scheduledLinksAccordion.update(entries: model.scheduledLinks(in: currentWorkspace.id))
+        let currentNodes = searchCoordinator.filter(nodes: ScheduledLinkFiltering.hideScheduled(currentWorkspace.items))
         nodeListViewController.reloadData(with: currentNodes, forceExpand: searchCoordinator.isSearchActive, animated: false)
         workspaceContentStack.layoutSubtreeIfNeeded()
 

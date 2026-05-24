@@ -332,6 +332,28 @@ final class AppModel {
         return result
     }
 
+    func scheduledLinks(in workspaceId: UUID) -> [ScheduledLinkEntry] {
+        guard let workspace = state.workspaces.first(where: { $0.id == workspaceId }) else { return [] }
+        var result: [ScheduledLinkEntry] = []
+        collectScheduledEntries(in: workspace.items, into: &result)
+        return result
+    }
+
+    private func collectScheduledEntries(in nodes: [Node], into result: inout [ScheduledLinkEntry]) {
+        for node in nodes {
+            switch node {
+            case .link(let link):
+                if let fireAt = link.scheduledOpenAt {
+                    result.append(ScheduledLinkEntry(link: link, fireAt: fireAt))
+                }
+            case .folder(let folder):
+                collectScheduledEntries(in: folder.children, into: &result)
+            case .note:
+                break
+            }
+        }
+    }
+
     private func collectScheduled(in nodes: [Node], workspaceId: UUID, into result: inout [ScheduledLinkRef]) {
         for node in nodes {
             switch node {
