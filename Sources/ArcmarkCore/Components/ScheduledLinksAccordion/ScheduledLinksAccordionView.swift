@@ -7,7 +7,7 @@ final class ScheduledLinksAccordionView: NSView {
     var onRowContextMenu: ((UUID, NSEvent) -> Void)?
     var onExpandChanged: ((Bool) -> Void)?
 
-    private static let expandedHeight: CGFloat = 300
+    private static let expandedHeight: CGFloat = 200
     private static let contentDividerGap: CGFloat = ThemeConstants.Spacing.medium
 
     private let contentContainer = NSView()
