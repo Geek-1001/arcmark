@@ -229,7 +229,7 @@ private final class HeaderButton: BaseControl {
         titleField.maximumNumberOfLines = 1
 
         let chevronConfig = NSImage.SymbolConfiguration(pointSize: ThemeConstants.Sizing.iconSmall, weight: .medium)
-        chevronView.image = NSImage(systemSymbolName: "chevron.up", accessibilityDescription: nil)?
+        chevronView.image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil)?
             .withSymbolConfiguration(chevronConfig)
         chevronView.image?.isTemplate = true
         chevronView.translatesAutoresizingMaskIntoConstraints = false
@@ -262,7 +262,7 @@ private final class HeaderButton: BaseControl {
 
     func update(count: Int, isExpanded: Bool) {
         titleField.stringValue = "Reminders (\(count))"
-        let symbolName = isExpanded ? "chevron.down" : "chevron.up"
+        let symbolName = isExpanded ? "chevron.up" : "chevron.down"
         let chevronConfig = NSImage.SymbolConfiguration(pointSize: ThemeConstants.Sizing.iconSmall, weight: .medium)
         chevronView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
             .withSymbolConfiguration(chevronConfig)
