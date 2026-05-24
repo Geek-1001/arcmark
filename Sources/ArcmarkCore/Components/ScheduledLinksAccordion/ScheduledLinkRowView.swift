@@ -2,8 +2,7 @@ import AppKit
 
 @MainActor
 final class ScheduledLinkRowView: BaseControl {
-    private let iconView = NSImageView()
-    private let titleField = NSTextField(labelWithString: "")
+    private let content = NodeRowContent()
     private let dateField = NSTextField(labelWithString: "")
 
     private(set) var linkId: UUID?
@@ -27,21 +26,7 @@ final class ScheduledLinkRowView: BaseControl {
         layer?.cornerRadius = metrics.rowCornerRadius
         layer?.masksToBounds = true
 
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.imageScaling = .scaleProportionallyDown
-        iconView.wantsLayer = true
-        iconView.layer?.cornerRadius = metrics.iconCornerRadius
-        iconView.layer?.masksToBounds = true
-
-        titleField.translatesAutoresizingMaskIntoConstraints = false
-        titleField.font = metrics.linkTitleFont
-        titleField.textColor = metrics.titleColor
-        titleField.lineBreakMode = .byTruncatingTail
-        titleField.maximumNumberOfLines = 1
-        titleField.cell?.usesSingleLineMode = true
-        titleField.cell?.truncatesLastVisibleLine = true
-        titleField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        titleField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        content.translatesAutoresizingMaskIntoConstraints = false
 
         dateField.translatesAutoresizingMaskIntoConstraints = false
         dateField.font = ThemeConstants.Fonts.systemFont(size: 12, weight: .medium)
@@ -52,19 +37,14 @@ final class ScheduledLinkRowView: BaseControl {
         dateField.setContentHuggingPriority(.required, for: .horizontal)
         dateField.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        addSubview(iconView)
-        addSubview(titleField)
+        addSubview(content)
         addSubview(dateField)
 
         NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: metrics.leftPadding),
-            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: metrics.iconSize),
-            iconView.heightAnchor.constraint(equalToConstant: metrics.iconSize),
-
-            titleField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
-            titleField.centerYAnchor.constraint(equalTo: centerYAnchor),
-            titleField.trailingAnchor.constraint(lessThanOrEqualTo: dateField.leadingAnchor, constant: -ThemeConstants.Spacing.small),
+            content.leadingAnchor.constraint(equalTo: leadingAnchor),
+            content.topAnchor.constraint(equalTo: topAnchor),
+            content.bottomAnchor.constraint(equalTo: bottomAnchor),
+            content.trailingAnchor.constraint(equalTo: dateField.leadingAnchor, constant: -ThemeConstants.Spacing.small),
 
             dateField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             dateField.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -75,15 +55,14 @@ final class ScheduledLinkRowView: BaseControl {
 
     func configure(entry: ScheduledLinkEntry) {
         linkId = entry.link.id
-        titleField.stringValue = entry.link.title
         dateField.stringValue = Self.formattedFireDate(entry.fireAt)
         let icon = Self.faviconImage(for: entry.link, size: metrics.iconSize)
-        iconView.image = icon
-        if let icon, icon.isTemplate {
-            iconView.contentTintColor = metrics.iconTintColor
-        } else {
-            iconView.contentTintColor = nil
-        }
+        content.configure(
+            title: entry.link.title,
+            icon: icon,
+            titleFont: metrics.linkTitleFont,
+            metrics: metrics
+        )
     }
 
     // MARK: - Mouse Events
