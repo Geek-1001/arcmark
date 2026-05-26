@@ -6,6 +6,35 @@
         <language>en</language>
         <link>https://github.com/Geek-1001/arcmark</link>
             <item>
+                <title>Version 0.1.12</title>
+                <pubDate>Tue, 26 May 2026 12:52:12 +0000</pubDate>
+                <description sparkle:format="markdown">
+What's new?
+
+Create Notes:
+You can now create local Markdown files (aka notes) from ArcMark and edit them directly in the browser. Everything is local-first; newly added files can be organised exactly the same way as you organise your links.
+
+You can even create a new note by copying some text into the clipboard and clicking "Add links from clipboard". ArcMark will detect that you only have plain text and, instead of saving a link, it will create a new note.
+
+Agent Skills:
+Install the ArcMark skill and manage every workspace and link directly from your AI agent of choice. The skill is bundled with a minimal script that talks to ArcMark and lets your agent use the app just as you would.
+
+Reminders:
+Resurface links in the future by setting a reminder date. Reminders are always shown at the top of the selected workspace.
+
+Other Fixes
+- Add overscroll space below the list of links and folders so it doesn't feel too crammed.
+                </description>
+                <enclosure
+                    url="https://github.com/Geek-1001/arcmark/releases/download/v0.1.12/Arcmark-0.1.12.dmg"
+                    sparkle:version="0.1.12"
+                    sparkle:shortVersionString="0.1.12"
+                    sparkle:edSignature="h400jIFhvzOgkYm9hlUqro+T66EYLms7g0uCR5oZOr3vTt+OE/2tBNfJS6inTdL+YX6U6NZm5gUx1mYGwIGyBg=="
+                    length="3310635"
+                    type="application/octet-stream"
+                />
+            </item>
+            <item>
                 <title>Version 0.1.10</title>
                 <pubDate>Fri, 08 May 2026 18:10:17 +0000</pubDate>
                 <description sparkle:format="markdown">
