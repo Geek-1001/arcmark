@@ -432,8 +432,15 @@ final class MainViewController: NSViewController {
             showWorkspaceContent()
             applyWorkspaceStyling()
             pinnedTabsView.update(pinnedLinks: model.currentWorkspace.pinnedLinks)
-            scheduledLinksAccordion.update(entries: model.scheduledLinks(in: model.currentWorkspace.id))
-            let visibleItems = ScheduledLinkFiltering.hideScheduled(model.currentWorkspace.items)
+            if searchCoordinator.isSearchActive {
+                scheduledLinksAccordion.isHidden = true
+            } else {
+                scheduledLinksAccordion.update(entries: model.scheduledLinks(in: model.currentWorkspace.id))
+            }
+            let workspaceItems = model.currentWorkspace.items
+            let visibleItems = searchCoordinator.isSearchActive
+                ? workspaceItems
+                : ScheduledLinkFiltering.hideScheduled(workspaceItems)
             let filteredNodes = searchCoordinator.filter(nodes: visibleItems)
             let forceExpand = searchCoordinator.isSearchActive
             nodeListViewController.isSearchActive = searchCoordinator.isSearchActive
