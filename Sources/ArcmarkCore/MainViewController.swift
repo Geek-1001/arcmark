@@ -432,7 +432,11 @@ final class MainViewController: NSViewController {
             showWorkspaceContent()
             applyWorkspaceStyling()
             pinnedTabsView.update(pinnedLinks: model.currentWorkspace.pinnedLinks)
-            scheduledLinksAccordion.update(entries: model.scheduledLinks(in: model.currentWorkspace.id))
+            if searchCoordinator.isSearchActive {
+                scheduledLinksAccordion.isHidden = true
+            } else {
+                scheduledLinksAccordion.update(entries: model.scheduledLinks(in: model.currentWorkspace.id))
+            }
             let workspaceItems = model.currentWorkspace.items
             let visibleItems = searchCoordinator.isSearchActive
                 ? workspaceItems
