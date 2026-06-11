@@ -16,10 +16,13 @@ final class NoteServer {
     private var listener: NWListener?
     private(set) var port: UInt16 = 0
 
-    init(model: AppModel, resourcesURL: URL? = Bundle.module.resourceURL) {
+    init(model: AppModel, resourcesURL: URL? = NoteServer.resolveBundledResourcesURL()) {
         self.model = model
         self.noteStorage = model.noteStorage
         self.resourcesURL = resourcesURL
+        if resourcesURL == nil {
+            logger.error("NoteServer could not locate bundled editor resources; note editor will be unavailable")
+        }
     }
 
     func start() {
@@ -775,6 +778,53 @@ final class NoteServer {
         ]
         let data = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data("{\"ok\":false}".utf8)
         sendResponse(status: status, statusMessage: "Error", contentType: "application/json; charset=utf-8", body: data, on: connection)
+    }
+
+    // MARK: - Resource resolution
+
+    /// Locates the directory that holds the bundled `NoteEditor/` assets.
+    ///
+    /// Deliberately does **not** use `Bundle.module`: Swift Bundler injects a
+    /// custom `Bundle.module` accessor that calls `fatalError` when its two
+    /// hardcoded search paths (the app root and a developer `.build` path) miss.
+    /// Because the resource bundle actually ships under `Contents/Resources`,
+    /// every external install of 0.1.12 trapped at launch the moment this
+    /// accessor was touched. Here we search the real locations and return `nil`
+    /// on miss so a missing bundle degrades to "editor unavailable" (the server
+    /// already 404s/500s) instead of killing the app.
+    static func resolveBundledResourcesURL() -> URL? {
+        let fm = FileManager.default
+        let bundleName = "Arcmark_ArcmarkCore.bundle"
+
+        // Bases that might contain the resource bundle (packaged app, flat dev
+        // builds) or the assets directly. `Bundle(for:)` covers test/dynamic
+        // builds where ArcmarkCore is not statically linked into Bundle.main.
+        var bases: [URL] = []
+        if let main = Bundle.main.resourceURL { bases.append(main) }
+        bases.append(Bundle.main.bundleURL)
+        if let exeDir = Bundle.main.executableURL?.deletingLastPathComponent() {
+            bases.append(exeDir)
+        }
+        let codeBundle = Bundle(for: NoteServer.self)
+        if let codeResources = codeBundle.resourceURL { bases.append(codeResources) }
+        bases.append(codeBundle.bundleURL)
+
+        func hasEditor(_ dir: URL) -> Bool {
+            fm.fileExists(atPath: dir.appendingPathComponent("NoteEditor/index.html").path)
+        }
+
+        for base in bases {
+            // Nested SwiftPM resource bundle (Arcmark_ArcmarkCore.bundle).
+            let nested = base.appendingPathComponent(bundleName)
+            if let bundle = Bundle(url: nested), let resources = bundle.resourceURL, hasEditor(resources) {
+                return resources
+            }
+            // Resources copied directly under the base directory.
+            if hasEditor(base) {
+                return base
+            }
+        }
+        return nil
     }
 
     // MARK: - Static asset serving
