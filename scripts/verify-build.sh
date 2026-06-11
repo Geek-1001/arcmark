@@ -96,12 +96,25 @@ else
     echo "⚠️  Resources directory not found"
 fi
 
+# The bundled note editor must ship at this exact path. If it is missing,
+# the notes feature is dead in the field — and historically a missing
+# resource bundle crashed the app on launch. Treat its absence as fatal so a
+# broken artifact can never be published.
+EDITOR_INDEX="$APP_PATH/Contents/Resources/Arcmark_ArcmarkCore.bundle/Contents/Resources/NoteEditor/index.html"
+if [ -f "$EDITOR_INDEX" ]; then
+    echo "✅ Note editor resources found: Arcmark_ArcmarkCore.bundle/.../NoteEditor/index.html"
+    EDITOR_OK=true
+else
+    echo "❌ Note editor resources missing (expected at $EDITOR_INDEX)"
+    EDITOR_OK=false
+fi
+
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✨ Summary"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-if [ "$BUNDLE_ID" = "com.arcmark.app" ] && [ "$SIGNATURE_ID" = "com.arcmark.app" ]; then
+if [ "$BUNDLE_ID" = "com.arcmark.app" ] && [ "$SIGNATURE_ID" = "com.arcmark.app" ] && [ "$EDITOR_OK" = "true" ]; then
     echo "✅ Build verification PASSED"
     echo ""
     echo "Ready for installation:"
