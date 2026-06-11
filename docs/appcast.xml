@@ -6,6 +6,21 @@
         <language>en</language>
         <link>https://github.com/Geek-1001/arcmark</link>
             <item>
+                <title>Version 0.1.13</title>
+                <pubDate>Thu, 11 Jun 2026 11:32:22 +0000</pubDate>
+                <description sparkle:format="markdown">
+Fixed note editor resource lookup crash on app start
+                </description>
+                <enclosure
+                    url="https://github.com/Geek-1001/arcmark/releases/download/v0.1.13/Arcmark-0.1.13.dmg"
+                    sparkle:version="0.1.13"
+                    sparkle:shortVersionString="0.1.13"
+                    sparkle:edSignature="dWp9LWL8TDwBjkwanWgPdrrsFaQPo4H3+8hpbn7LW9cp/E5Eosx2TQjqTiwDHiOPARM+6ga5wdFwI2ZSG5RvBA=="
+                    length="3310831"
+                    type="application/octet-stream"
+                />
+            </item>
+            <item>
                 <title>Version 0.1.12</title>
                 <pubDate>Tue, 26 May 2026 12:52:12 +0000</pubDate>
                 <description sparkle:format="markdown">
