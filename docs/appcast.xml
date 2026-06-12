@@ -6,6 +6,22 @@
         <language>en</language>
         <link>https://github.com/Geek-1001/arcmark</link>
             <item>
+                <title>Version 0.1.14</title>
+                <pubDate>Fri, 12 Jun 2026 15:16:26 +0000</pubDate>
+                <description sparkle:format="markdown">
+- Added local backup system for the main data.json file
+- Fixed note editor resource lookup crash
+                </description>
+                <enclosure
+                    url="https://github.com/Geek-1001/arcmark/releases/download/v0.1.14/Arcmark-0.1.14.dmg"
+                    sparkle:version="0.1.14"
+                    sparkle:shortVersionString="0.1.14"
+                    sparkle:edSignature="G4esl5Ld/3lKAtLs6tZliWph+7GcnNM/mA3tShHiw3F7fGXqqqlZ+B6jakNQyQejz5F8Ru9ebeQlvKp+gLy3AQ=="
+                    length="3316893"
+                    type="application/octet-stream"
+                />
+            </item>
+            <item>
                 <title>Version 0.1.12</title>
                 <pubDate>Tue, 26 May 2026 12:52:12 +0000</pubDate>
                 <description sparkle:format="markdown">
