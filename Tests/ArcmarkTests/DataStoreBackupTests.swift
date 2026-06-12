@@ -40,6 +40,21 @@ final class DataStoreBackupTests: XCTestCase {
         XCTAssertEqual(backupData, liveData)
     }
 
+    func testCorruptFileIsPreservedAndBackedUpNotOverwritten() throws {
+        let directory = makeTempDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let corruptBytes = Data("not json".utf8)
+        try corruptBytes.write(to: dataURL(in: directory))
+
+        let state = DataStore(baseDirectory: directory).load()
+
+        XCTAssertEqual(state.workspaces.map(\.name), ["Inbox"])
+        XCTAssertEqual(try Data(contentsOf: dataURL(in: directory)), corruptBytes)
+        let backups = backupURLs(in: directory)
+        XCTAssertEqual(backups.count, 1)
+        XCTAssertEqual(try Data(contentsOf: backups[0]), corruptBytes)
+    }
+
     func testRelaunchWithUnchangedDataDoesNotDuplicateBackup() {
         let directory = makeTempDirectory()
         DataStore(baseDirectory: directory).save(makeState(name: "A"))

@@ -42,9 +42,11 @@ final class DataStore {
             let state = try decoder.decode(AppState.self, from: data)
             return state
         } catch {
-            let fallback = Self.defaultState()
-            save(fallback)
-            return fallback
+            // Leave data.json untouched so a newer-schema or corrupt file can be
+            // recovered (e.g. by re-upgrading); it is only overwritten on the
+            // first actual mutation, and the pre-decode backup exists by then.
+            logger.error("Failed to decode data.json; leaving file untouched: \(error.localizedDescription, privacy: .public)")
+            return Self.defaultState()
         }
     }
 
