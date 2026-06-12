@@ -1,9 +1,20 @@
 import Foundation
+import os
 
 final class DataStore {
     private let fileManager = FileManager.default
     private let baseDirectory: URL
     private let dataURL: URL
+    private let logger = Logger(subsystem: "com.arcmark.app", category: "store")
+    private var hasBackedUpThisSession = false
+    private let backupKeepCount = 10
+    private let backupTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH-mm-ss-SSS"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
 
     init(baseDirectory: URL? = nil) {
         if let baseDirectory {
@@ -23,6 +34,8 @@ final class DataStore {
             return defaultState
         }
 
+        backupDataFileIfNeeded()
+
         do {
             let data = try Data(contentsOf: dataURL)
             let decoder = JSONDecoder()
@@ -36,6 +49,7 @@ final class DataStore {
     }
 
     func save(_ state: AppState) {
+        backupDataFileIfNeeded()
         ensureDirectories()
         do {
             let encoder = JSONEncoder()
@@ -69,6 +83,58 @@ final class DataStore {
 
     func agentEndpointFileURL() -> URL {
         baseDirectory.appendingPathComponent("agent-endpoint.json")
+    }
+
+    /// Copies data.json into `Backups/` once per session, before this process
+    /// first writes to it. Skips the copy when the file is byte-identical to the
+    /// newest existing backup so repeated relaunches don't rotate away the last
+    /// good backup. Keeps the `backupKeepCount` most recent backups.
+    private func backupDataFileIfNeeded() {
+        guard !hasBackedUpThisSession else { return }
+        hasBackedUpThisSession = true
+
+        guard fileManager.fileExists(atPath: dataURL.path) else { return }
+
+        do {
+            let data = try Data(contentsOf: dataURL)
+            let backupsURL = backupsDirectory()
+            if let newest = sortedBackupURLs(in: backupsURL).last,
+               let newestData = try? Data(contentsOf: newest),
+               newestData == data {
+                return
+            }
+            let timestamp = backupTimestampFormatter.string(from: Date())
+            let backupURL = backupsURL.appendingPathComponent("data-\(timestamp).json")
+            try data.write(to: backupURL, options: [.atomic])
+            pruneBackups(in: backupsURL)
+        } catch {
+            logger.error("Failed to back up data.json: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func backupsDirectory() -> URL {
+        let backupsURL = baseDirectory.appendingPathComponent("Backups", isDirectory: true)
+        if !fileManager.fileExists(atPath: backupsURL.path) {
+            try? fileManager.createDirectory(at: backupsURL, withIntermediateDirectories: true)
+        }
+        return backupsURL
+    }
+
+    /// Backup filenames are fixed-width UTC timestamps, so lexicographic order
+    /// equals chronological order.
+    private func sortedBackupURLs(in backupsURL: URL) -> [URL] {
+        let contents = (try? fileManager.contentsOfDirectory(at: backupsURL, includingPropertiesForKeys: nil)) ?? []
+        return contents
+            .filter { $0.lastPathComponent.hasPrefix("data-") && $0.pathExtension == "json" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    private func pruneBackups(in backupsURL: URL) {
+        let backups = sortedBackupURLs(in: backupsURL)
+        guard backups.count > backupKeepCount else { return }
+        for url in backups.dropLast(backupKeepCount) {
+            try? fileManager.removeItem(at: url)
+        }
     }
 
     private func ensureDirectories() {
